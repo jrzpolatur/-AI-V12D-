@@ -1,0 +1,15 @@
+# Render Blueprint — 一键部署
+# 在 Render 后台：New > Blueprint > 连接本仓库即可，无需手动填命令。
+# 平台会自动注入 PORT，prod.mjs 已读取 process.env.PORT。
+services:
+  - type: web
+    name: neon-strike
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8080

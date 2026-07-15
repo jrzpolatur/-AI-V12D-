@@ -1,0 +1,121 @@
+// Lightweight WebSocket relay for 1v1 co-op-base-defense + PvP.
+// It does NOT run any game logic — it only pairs two clients by room code
+// and forwards opaque game messages between them.
+//
+//   npm run server            # listens on :8080 (set PORT to change)
+//   WS URL for clients:  ws://<host>:8080
+//
+// Control messages (server <-> client):
+//   C->S { t:"create", name }              create a room, become host
+//   C->S { t:"join",   room, name }        join an existing room
+//   C->S { t:"msg",    data }              opaque game payload -> forwarded to peer
+//   S->C { t:"created", room, pid }        you created a room
+//   S->C { t:"joined",  room, pid }        you joined a room
+//   S->C { t:"peer",    pid, name, host }  info about the other player
+//   S->C { t:"start" }                     both players present, game may begin
+//   S->C { t:"msg",     data }             a game payload from your peer
+//   S->C { t:"peerLeft" }                  your opponent disconnected
+//   S->C { t:"error",   msg }              something went wrong
+
+import { WebSocketServer } from "ws";
+
+const PORT = Number(process.env.PORT) || 8080;
+const wss = new WebSocketServer({ port: PORT });
+
+/** roomCode -> { peers: Map<pid, {ws, name, host}> } */
+const rooms = new Map();
+let pidCounter = 1;
+
+function genRoom() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code;
+  do {
+    code = "";
+    for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  } while (rooms.has(code));
+  return code;
+}
+
+function send(ws, obj) {
+  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function peerInfo(peer) {
+  return { t: "peer", pid: peer.pid, name: peer.name, host: peer.host };
+}
+
+function notifyPeers(room, exceptPid) {
+  for (const peer of room.peers.values()) {
+    if (peer.pid === exceptPid) continue;
+    send(peer.ws, { t: "peerLeft" });
+  }
+}
+
+wss.on("connection", (ws) => {
+  ws.pid = null;
+  ws.room = null;
+
+  ws.on("message", (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+    if (!msg || typeof msg.t !== "string") return;
+
+    if (msg.t === "create") {
+      const code = genRoom();
+      const pid = pidCounter++;
+      const room = { peers: new Map() };
+      const peer = { pid, ws, name: String(msg.name || "Host").slice(0, 16), host: true };
+      room.peers.set(pid, peer);
+      rooms.set(code, room);
+      ws.pid = pid;
+      ws.room = code;
+      send(ws, { t: "created", room: code, pid });
+    } else if (msg.t === "join") {
+      const code = String(msg.room || "").toUpperCase();
+      const room = rooms.get(code);
+      if (!room) {
+        send(ws, { t: "error", msg: "房间不存在" });
+        return;
+      }
+      if (room.peers.size >= 2) {
+        send(ws, { t: "error", msg: "房间已满" });
+        return;
+      }
+      const pid = pidCounter++;
+      const peer = { pid, ws, name: String(msg.name || "Guest").slice(0, 16), host: false };
+      room.peers.set(pid, peer);
+      ws.pid = pid;
+      ws.room = code;
+      send(ws, { t: "joined", room: code, pid });
+      // tell everyone (including the new peer) about each other
+      for (const p of room.peers.values()) {
+        for (const other of room.peers.values()) {
+          if (other.pid !== p.pid) send(p.ws, peerInfo(other));
+        }
+      }
+      // both present -> start
+      for (const p of room.peers.values()) send(p.ws, { t: "start" });
+    } else if (msg.t === "msg") {
+      const room = ws.room && rooms.get(ws.room);
+      if (!room) return;
+      for (const peer of room.peers.values()) {
+        if (peer.pid !== ws.pid) send(peer.ws, { t: "msg", data: msg.data });
+      }
+    }
+  });
+
+  ws.on("close", () => {
+    const room = ws.room && rooms.get(ws.room);
+    if (room) {
+      notifyPeers(room, ws.pid);
+      room.peers.delete(ws.pid);
+      if (room.peers.size === 0) rooms.delete(ws.room);
+    }
+  });
+});
+
+console.log(`[relay] listening on ws://localhost:${PORT}`);

@@ -1,0 +1,64 @@
+- generic [ref=e276]:
+  - generic:
+    - generic:
+      - generic:
+        - generic: 🏛️
+        - generic: 己方基地
+      - generic: 2000 / 2000
+      - generic:
+        - generic: ⚔️
+        - generic: 敌方基地
+      - generic: 2000 / 2000
+    - generic:
+      - generic:
+        - generic: 波次
+        - generic: "0"
+        - generic: 敌人
+        - generic: NaN
+    - generic:
+      - generic:
+        - generic: 分数 0
+        - generic:
+          - generic: 🪙
+          - generic: "0"
+        - button "🔊" [ref=e278]
+        - button "✕" [ref=e279]
+      - generic: 击杀 0
+  - generic: 守护基地！
+  - generic [ref=e280]:
+    - button "F1" [ref=e281]
+    - button "F2" [ref=e283]
+    - button "F3" [ref=e285]
+    - button "F4" [ref=e287]
+    - button "F5" [ref=e289]
+    - button "F6" [ref=e291]
+    - button "F7" [ref=e293]
+  - generic:
+    - generic:
+      - generic: 突
+      - generic:
+        - generic:
+          - generic: 突袭者
+          - generic:
+            - text: "100"
+            - generic: /100
+    - generic:
+      - generic:
+        - generic:
+          - text: "12"
+          - generic: / 12
+        - generic: R
+  - generic [ref=e295]:
+    - button "⚡ Q" [ref=e296]:
+      - generic [ref=e301]: ⚡
+      - generic [ref=e302]: Q
+    - generic [ref=e303]:
+      - button "1 手枪" [ref=e304]:
+        - generic [ref=e305]: "1"
+        - generic [ref=e306]: 手枪
+      - button "2 步枪" [ref=e307]:
+        - generic [ref=e308]: "2"
+        - generic [ref=e309]: 步枪
+      - button "3 霰弹枪" [ref=e310]:
+        - generic [ref=e311]: "3"
+        - generic [ref=e312]: 霰弹枪

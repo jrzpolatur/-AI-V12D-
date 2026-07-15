@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #0b0c22;
+  overscroll-behavior: none;
+}
+
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+@keyframes bannerPop {
+  0% {
+    transform: scale(0.6) translateY(10px);
+    opacity: 0;
+  }
+  18% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  32% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.9;
+  }
+}
+
+.banner-pop {
+  animation: bannerPop 2.4s ease-out;
+}

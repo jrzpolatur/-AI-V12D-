@@ -1,0 +1,4 @@
+[      42ms] Error: Minified React error #299; visit https://react.dev/errors/299 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at Zn.createRoot (http://localhost:4173/:15:36062)
+    at http://localhost:4173/:15:164438
+[      50ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4173/favicon.ico:0

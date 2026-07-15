@@ -1,0 +1,12 @@
+[     317ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4173/favicon.ico:0
+[   62118ms] TypeError: Cannot set properties of undefined (setting 'shieldHp')
+    at mp.resetState (http://localhost:4173/:20:105686)
+    at mp.start (http://localhost:4173/:20:103662)
+    at http://localhost:4173/:20:158554
+    at Ri (http://localhost:4173/:19:92658)
+    at Qc (http://localhost:4173/:19:107886)
+    at ql (http://localhost:4173/:19:107770)
+    at Qc (http://localhost:4173/:19:107866)
+    at ql (http://localhost:4173/:19:107770)
+    at Qc (http://localhost:4173/:19:108652)
+    at ql (http://localhost:4173/:19:107770)
