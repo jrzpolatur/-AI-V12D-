@@ -1,4 +1,4 @@
-import type { CharacterDef, OutfitDef, GunDef, SkillDef, GadgetDef } from "./types";
+import type { CharacterDef, OutfitDef, GunDef, SkillDef, GadgetDef, MonsterDef } from "./types";
 
 // ---------------------------------------------------------------------------
 // CHARACTERS — different builds with their own stat profiles & color identity.
@@ -575,6 +575,60 @@ export const GUNS: GunDef[] = [
     reloadTime: 1.8,
     rangeTier: "中",
   },
+  // ==================== BIOHAZARD / NEW WEAPONS ====================
+  {
+    id: "gatling",
+    name: "加特林",
+    desc: "极高射速，300发弹容量，但开火前需要预热（转速提升后射速与伤害才拉满）",
+    weaponClass: "ranged",
+    shape: "gatling",
+    iconShape: "gatling",
+    damage: 24,
+    fireRate: 19, // very high once spun up
+    bulletSpeed: 1050,
+    bulletSize: 4.5,
+    spread: 0.11,
+    pellets: 1,
+    pierce: 0,
+    life: 1.0,
+    knockback: 55,
+    color: "#fde68a",
+    glow: "#fbbf24",
+    kind: "tracer",
+    barrel: 26,
+    magazine: 300,
+    reloadTime: 3.4,
+    spinup: 0.55, // seconds to reach full spin
+    spinDown: 0.9, // seconds to spin back down
+    spinMinMult: 0.18, // damage/firerate floor at zero spin
+    rangeTier: "中",
+  },
+  {
+    id: "poison_mist",
+    name: "毒雾喷射机",
+    desc: "向前喷出小范围毒雾，敌人停留越久中毒越深、受到伤害越高（与毒气地雷同款剧毒）",
+    weaponClass: "poison_mist",
+    shape: "poison_mist",
+    iconShape: "poison_mist",
+    damage: 80, // base poison ramp rate reference
+    fireRate: 1,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 20,
+    color: "#a3e635",
+    glow: "#84cc16",
+    kind: "flame",
+    barrel: 22,
+    flameCone: 0.34,
+    flameRange: 130,
+    heatPerShot: 0.4,
+    coolRate: 0.6,
+    rangeTier: "近",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -708,6 +762,156 @@ export const GADGETS: GadgetDef[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// MONSTERS — biohazard (生化危机) bestiary. The first five (walker / runner /
+// brute / spitter / abomination) restore the classic "old" monster roster;
+// the last four (crawler / bloater / screamer / spore) are brand-new additions.
+// ---------------------------------------------------------------------------
+export const MONSTERS: MonsterDef[] = [
+  {
+    id: "walker",
+    name: "行尸",
+    behavior: "walker",
+    desc: "缓慢的近战丧尸，数量众多",
+    hp: 75,
+    speed: 64,
+    damage: 12,
+    size: 15,
+    color: "#7c9c5a",
+    glow: "#a3e635",
+    score: 12,
+    weight: 3,
+  },
+  {
+    id: "runner",
+    name: "奔尸",
+    behavior: "runner",
+    desc: "速度极快，会周期俯冲扑咬",
+    hp: 55,
+    speed: 150,
+    damage: 10,
+    size: 13,
+    color: "#a3e635",
+    glow: "#bef264",
+    score: 16,
+    weight: 2,
+  },
+  {
+    id: "brute",
+    name: "巨尸",
+    behavior: "brute",
+    desc: "皮糙肉厚、移动缓慢的肉盾，撞击沉重",
+    hp: 460,
+    speed: 40,
+    damage: 30,
+    size: 30,
+    color: "#4d7c4d",
+    glow: "#65a30d",
+    score: 60,
+    weight: 1,
+  },
+  {
+    id: "spitter",
+    name: "吐酸者",
+    behavior: "spitter",
+    desc: "远程喷吐剧毒酸液，保持距离输出",
+    hp: 110,
+    speed: 56,
+    damage: 10,
+    size: 17,
+    color: "#a78bfa",
+    glow: "#c084fc",
+    score: 35,
+    ranged: true,
+    rangedRange: 360,
+    rangedDamage: 14,
+    weight: 1.4,
+  },
+  {
+    id: "abomination",
+    name: "母体",
+    behavior: "abomination",
+    desc: "巨型 BOSS，重砸范围伤害，死亡时剧烈爆裂",
+    hp: 2600,
+    speed: 30,
+    damage: 45,
+    size: 46,
+    color: "#7e22ce",
+    glow: "#a855f7",
+    score: 400,
+    weight: 0.4,
+    minWave: 6,
+  },
+  // ===================== NEW (added this update) =====================
+  {
+    id: "crawler",
+    name: "爬虫",
+    behavior: "crawler",
+    desc: "体型极小、成群高速爬行，单个体脆弱但难缠",
+    hp: 30,
+    speed: 205,
+    damage: 7,
+    size: 10,
+    color: "#d9f99d",
+    glow: "#bef264",
+    score: 8,
+    weight: 1.6,
+  },
+  {
+    id: "bloater",
+    name: "毒爆体",
+    behavior: "bloater",
+    desc: "臃肿的毒囊，被击杀时炸开一大片剧毒云",
+    hp: 190,
+    speed: 46,
+    damage: 14,
+    size: 26,
+    color: "#65a30d",
+    glow: "#a3e635",
+    score: 40,
+    explodeRadius: 130,
+    explodeDamage: 60,
+    weight: 0.9,
+    minWave: 2,
+  },
+  {
+    id: "screamer",
+    name: "尖啸者",
+    behavior: "screamer",
+    desc: "发出尖啸，大幅加速周围怪物，并短暂震慑玩家",
+    hp: 130,
+    speed: 72,
+    damage: 8,
+    size: 18,
+    color: "#f0abfc",
+    glow: "#e879f9",
+    score: 45,
+    buffRadius: 270,
+    weight: 0.8,
+    minWave: 3,
+  },
+  {
+    id: "spore",
+    name: "孢子怪",
+    behavior: "spore",
+    desc: "持续释放滞留毒云，靠近会被持续中毒",
+    hp: 165,
+    speed: 50,
+    damage: 10,
+    size: 20,
+    color: "#a3e635",
+    glow: "#84cc16",
+    score: 38,
+    cloudRadius: 95,
+    cloudDamage: 42,
+    weight: 0.9,
+    minWave: 2,
+  },
+];
+
+export const getMonster = (id: string) =>
+  MONSTERS.find((m) => m.id === id) ?? MONSTERS[0];
+
 export const getCharacter = (id: string) =>
   CHARACTERS.find((c) => c.id === id) ?? CHARACTERS[0];
 export const getOutfit = (id: string) =>
@@ -729,6 +933,10 @@ export interface SceneTheme {
   wallColor: string;
   wallDark: string;
   accent: string;
+  /** "grid" = flat neon grid floor (default); "city" = top-down cyber-city blocks */
+  style?: "grid" | "city";
+  /** override grid line color (used by cyber style) */
+  gridColor?: string;
 }
 
 export const SCENES: SceneTheme[] = [
@@ -767,5 +975,16 @@ export const SCENES: SceneTheme[] = [
     wallColor: "#52525b",
     wallDark: "#27272a",
     accent: "#ef4444",
+  },
+  {
+    id: "cyber",
+    name: "赛博都市",
+    bgTop: "#0a0a1f",
+    bgBottom: "#05030f",
+    wallColor: "#1d4ed8",
+    wallDark: "#0b2240",
+    accent: "#22d3ee",
+    style: "city",
+    gridColor: "rgba(34,211,238,0.10)",
   },
 ];

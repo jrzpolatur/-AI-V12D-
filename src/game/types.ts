@@ -52,7 +52,15 @@ export type ProjectileKind =
   | "ion"
   | "grenade";
 
-export type WeaponClass = "ranged" | "melee" | "beam" | "flamethrower" | "sentry" | "bow" | "shield";
+export type WeaponClass =
+  | "ranged"
+  | "melee"
+  | "beam"
+  | "flamethrower"
+  | "poison_mist"
+  | "sentry"
+  | "bow"
+  | "shield";
 
 export interface GunDef {
   id: string;
@@ -145,6 +153,14 @@ export interface GunDef {
   shieldDuration?: number;
   /** shield recharge cooldown after breaking */
   shieldRechargeTime?: number;
+
+  // ---- gatling / spin-up system ----
+  /** seconds of continuous fire to reach full fire rate (spool-up) */
+  spinup?: number;
+  /** seconds to spin back down to zero when not firing */
+  spinDown?: number;
+  /** damage multiplier at zero spin (ramps to 1 at full spin) */
+  spinMinMult?: number;
 }
 
 export interface SkillDef {
@@ -183,4 +199,50 @@ export interface GadgetDef {
   maxStack?: number;
   /** deployable max HP (turrets / healing station). 0 / undefined = built-in default. */
   hp?: number;
+}
+
+// ---------------------------------------------------------------------------
+// MONSTERS — biohazard (生化危机) PvE bestiary. The "old" human-enemy system
+// is kept for the defend-base mode; this is the dedicated zombie/creature
+// roster used by the biohazard single-player mode.
+// ---------------------------------------------------------------------------
+export type MonsterBehavior =
+  | "walker" // 行尸 — slow melee grunt
+  | "runner" // 奔尸 — fast melee, periodic lunge
+  | "brute" // 巨尸 — huge HP, very slow, heavy hit
+  | "spitter" // 吐酸者 — ranged poison spit
+  | "abomination" // 母体 — boss, slam AOE + death blast
+  | "crawler" // 爬虫 — tiny, very fast swarmer
+  | "bloater" // 毒爆体 — bursts into a poison cloud on death
+  | "screamer" // 尖啸者 — buffs nearby monsters, staggers player
+  | "spore"; // 孢子怪 — emits lingering poison clouds
+
+export interface MonsterDef {
+  id: string;
+  name: string;
+  behavior: MonsterBehavior;
+  desc: string;
+  hp: number;
+  speed: number;
+  damage: number;
+  size: number;
+  color: string;
+  glow: string;
+  score: number;
+  ranged?: boolean;
+  /** spit range / damage for spitter */
+  rangedRange?: number;
+  rangedDamage?: number;
+  /** bloater death explosion */
+  explodeRadius?: number;
+  explodeDamage?: number;
+  /** screamer buff radius */
+  buffRadius?: number;
+  /** spore cloud radius / damage */
+  cloudRadius?: number;
+  cloudDamage?: number;
+  /** relative spawn weight (scaled by wave) */
+  weight?: number;
+  /** earliest wave this monster can appear */
+  minWave?: number;
 }

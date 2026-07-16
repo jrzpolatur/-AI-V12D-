@@ -567,6 +567,55 @@ export function drawWeapon(
       ctx.fill();
       break;
     }
+    // ---------------- GATLING ----------------
+    case "gatling": {
+      body(-7, -5, 13, 10, STEEL_X, STEEL, 2.5); // receiver
+      block(-12, -3, 6, 6, STEEL_D, 1.5); // grip/stock
+      ctx.save();
+      ctx.translate(8, 0);
+      block(-4, -5, 13, 10, STEEL, STEEL_D, 2); // barrel housing
+      // spinning multi-barrel cluster (visual spin while firing)
+      ctx.rotate(t * 9);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const bx = Math.cos(a) * 3.2;
+        const by = Math.sin(a) * 3.2;
+        ctx.fillStyle = i % 2 ? STEEL_X : STEEL_L;
+        roundRect(ctx, 2 + bx - 1.3, by - 1.6, 11, 3.2, 1);
+        ctx.fill();
+        ctx.strokeStyle = DARK;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 23, -2, 2.4, 4, 1);
+      ctx.fill();
+      break;
+    }
+    // ---------------- POISON MIST ----------------
+    case "poison_mist": {
+      body(-7, -5, 16, 10, STEEL_X, STEEL_D, 2.5); // body
+      block(-11, -2.6, 5, 5.2, STEEL_D, 1.2); // grip
+      block(0, -8, 11, 4, "#4d7c0f", 1.5); // toxin tank
+      block(2, -7.4, 7, 1, "#bef264", 0.5); // tank highlight
+      body(9, -3, 8, 6, STEEL_L, STEEL_D, 1.5); // nozzle housing
+      block(16, -4.5, 3, 9, STEEL_D, 1); // muzzle
+      // drifting mist puff
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 5; i++) {
+        const ph = (t * 1.4 + i * 0.4) % 1;
+        const rr = 3 + ph * 8;
+        const px = 19 + ph * 11;
+        ctx.fillStyle = rgba("#a3e635", 0.32 * (1 - ph));
+        ctx.beginPath();
+        ctx.arc(px, Math.sin(i * 2 + t * 2) * 4, rr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
     default: {
       body(-4, -4.5, gun.barrel + 6, 9, STEEL, STEEL_D, 3);
     }
@@ -689,63 +738,415 @@ export function drawCharacter(
   }
 
   const r = size * breath;
+  const suit = outfit.suit;
+  const suitDark = outfit.suitDark;
 
-  ctx.fillStyle = outfit.suit;
-  ctx.strokeStyle = outfit.suitDark;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // chest emblem in the character's signature color
-  ctx.fillStyle = rgba(character.bodyColor, 0.9);
-  ctx.beginPath();
-  ctx.arc(r * 0.18, 0, r * 0.62, -Math.PI * 0.5, Math.PI * 0.5);
-  ctx.fill();
-  ctx.strokeStyle = rgba(character.accent, 0.9);
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(r * 0.1, 0, r * 0.34, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // shoulders / arms — lean into the swing for melee weapons
-  const swing = opts.meleeSwing ?? 0;
-  const lean = swing > 0 ? Math.sin(swing * Math.PI) * r * 0.18 : 0;
-  ctx.fillStyle = shade(outfit.suit, -0.08);
-  ctx.strokeStyle = outfit.suitDark;
-  ctx.lineWidth = 1.5;
+  // boots (behind the body, pointing back -x)
+  ctx.fillStyle = shade(suit, -0.2);
+  ctx.strokeStyle = suitDark;
+  ctx.lineWidth = 1.4;
   for (const sy of [-1, 1]) {
     ctx.beginPath();
-    ctx.arc(r * (0.2 + lean), sy * r * 0.78, r * 0.4, 0, Math.PI * 2);
+    ctx.ellipse(-r * 0.72, sy * r * 0.42, r * 0.42, r * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   }
 
-  // head
+  // backpack / tactical rig (behind the torso)
+  ctx.fillStyle = shade(suit, -0.12);
+  ctx.strokeStyle = suitDark;
+  ctx.lineWidth = 1.4;
+  roundRect(ctx, -r * 1.02, -r * 0.5, r * 0.5, r * 1.0, r * 0.18);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = rgba(outfit.accent, 0.5);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.85, -r * 0.4);
+  ctx.lineTo(-r * 0.85, r * 0.4);
+  ctx.stroke();
+
+  // torso (egg-shaped, slightly taller than wide)
+  ctx.fillStyle = suit;
+  ctx.strokeStyle = suitDark;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.0, r * 0.82, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // chest emblem in the character's signature color (front / +x side)
+  ctx.fillStyle = rgba(character.bodyColor, 0.92);
+  ctx.beginPath();
+  ctx.arc(r * 0.22, 0, r * 0.6, -Math.PI * 0.5, Math.PI * 0.5);
+  ctx.fill();
+  ctx.strokeStyle = rgba(character.accent, 0.9);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(r * 0.12, 0, r * 0.32, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // utility belt
+  ctx.strokeStyle = shade(suit, -0.25);
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.82, Math.PI * 0.25, Math.PI * 0.75);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.82, Math.PI * 1.25, Math.PI * 1.75);
+  ctx.stroke();
+
+  // shoulders + arms — lean into the swing for melee weapons
+  const swing = opts.meleeSwing ?? 0;
+  const lean = swing > 0 ? Math.sin(swing * Math.PI) * r * 0.18 : 0;
+  ctx.fillStyle = shade(suit, -0.06);
+  ctx.strokeStyle = suitDark;
+  ctx.lineWidth = 1.5;
+  for (const sy of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(r * (0.28 + lean), sy * r * 0.66, r * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // left arm (resting, -y side) — tapered limb
+  ctx.strokeStyle = shade(suit, -0.06);
+  ctx.lineWidth = r * 0.28;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(r * 0.1, -r * 0.5);
+  ctx.lineTo(-r * 0.1, -r * 0.85);
+  ctx.stroke();
+  // right arm (weapon side, +y) reaching forward
+  ctx.beginPath();
+  ctx.moveTo(r * 0.2, r * 0.5);
+  ctx.lineTo(r * 0.55, r * 0.62);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+
+  // hands
+  ctx.fillStyle = shade(suit, 0.1);
+  ctx.beginPath();
+  ctx.arc(-r * 0.12, -r * 0.85, r * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(r * 0.55, r * 0.62, r * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+
+  // head (forward, +x) with forward-looking eyes
+  const headX = r * 0.18;
   ctx.fillStyle = flash > 0 ? "#ffffff" : character.skin;
   ctx.strokeStyle = "rgba(40,25,15,0.45)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+  ctx.arc(headX, 0, r * 0.55, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = character.accent;
+  ctx.beginPath();
+  ctx.arc(headX + r * 0.32, -r * 0.18, r * 0.1, 0, Math.PI * 2);
+  ctx.arc(headX + r * 0.32, r * 0.18, r * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // chin shadow
+  ctx.fillStyle = "rgba(40,25,15,0.18)";
+  ctx.beginPath();
+  ctx.arc(headX - r * 0.1, 0, r * 0.5, Math.PI * 0.35, Math.PI * 0.65);
+  ctx.fill();
 
-  drawHat(ctx, outfit.hat, outfit.suit, r);
+  ctx.save();
+  ctx.translate(headX, 0);
+  drawHat(ctx, outfit.hat, outfit.suit, r * 0.62);
+  ctx.restore();
 
-  // weapon held forward, offset to the right hand
+  // weapon held forward by the right hand
   if (opts.gun) {
     ctx.save();
-    ctx.translate(r * 0.1, r * 0.62);
+    ctx.translate(r * 0.55, r * 0.62);
     drawWeapon(ctx, opts.gun, outfit.accent, t, swing);
     ctx.restore();
   }
+
+  // rim light on the front edge
+  ctx.strokeStyle = rgba(outfit.accent, 0.35);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.02, -Math.PI * 0.5, Math.PI * 0.5);
+  ctx.stroke();
 
   if (flash > 0) {
     ctx.fillStyle = `rgba(255,80,80,${flash * 0.6})`;
     ctx.beginPath();
     ctx.arc(0, 0, r * 1.05, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ===========================================================================
+// MONSTER DRAWING — biohazard (生化危机) bestiary silhouettes.
+// Drawn centered at the origin, facing +x (the engine rotates by `angle`).
+// `size` is the monster's collision radius in world pixels.
+// ===========================================================================
+export interface DrawMonsterOpts {
+  behavior: string;
+  size: number;
+  color: string;
+  glow: string;
+  angle: number;
+  t: number;
+  flash?: number;
+  poison?: boolean;
+  buffed?: boolean;
+  charging?: boolean;
+}
+
+export function drawMonster(ctx: CanvasRenderingContext2D, opts: DrawMonsterOpts) {
+  const { behavior, size, color, glow, angle, t } = opts;
+  const flash = opts.flash ?? 0;
+  const poison = opts.poison ?? false;
+  const buffed = opts.buffed ?? false;
+  const charging = opts.charging ?? false;
+  const s = size;
+  const bodyCol = flash > 0.05 ? "#ffffff" : color;
+  const dark = shade(color, -0.34);
+
+  ctx.save();
+  ctx.rotate(angle);
+
+  // buff aura (screamer)
+  if (buffed) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const a = 0.22 + Math.sin(t * 8) * 0.12;
+    ctx.strokeStyle = rgba("#e879f9", a);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const fillPath = (p: () => void, c: string = bodyCol) => {
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    p();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  };
+  const eye = (x: number, y: number, r = s * 0.13) => {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+  const limbLine = (x1: number, y1: number, x2: number, y2: number, w: number) => {
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = w;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  };
+
+  switch (behavior) {
+    // 行尸 — hunched shambler, arms reaching forward
+    case "walker": {
+      fillPath(() => ctx.ellipse(-s * 0.5, s * 0.32, s * 0.28, s * 0.16, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.5, -s * 0.32, s * 0.28, s * 0.16, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.05, 0, s * 0.6, s * 0.54, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(s * 0.5, s * 0.3, s * 0.46, s * 0.15, -0.2, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(s * 0.5, -s * 0.3, s * 0.46, s * 0.15, 0.2, 0, Math.PI * 2));
+      fillPath(() => ctx.arc(s * 0.58, 0, s * 0.32, 0, Math.PI * 2));
+      eye(s * 0.7, -s * 0.12);
+      eye(s * 0.7, s * 0.12);
+      break;
+    }
+    // 奔尸 — lean, lunging (stretches forward when charging)
+    case "runner": {
+      if (charging) ctx.scale(1.12, 0.92);
+      fillPath(() => ctx.ellipse(-s * 0.5, s * 0.3, s * 0.24, s * 0.13, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.5, -s * 0.3, s * 0.24, s * 0.13, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(0, 0, s * 0.78, s * 0.4, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.4, s * 0.28, s * 0.4, s * 0.12, 0.4, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.4, -s * 0.28, s * 0.4, s * 0.12, -0.4, 0, Math.PI * 2));
+      fillPath(() => ctx.arc(s * 0.78, 0, s * 0.3, 0, Math.PI * 2));
+      eye(s * 0.92, -s * 0.1);
+      eye(s * 0.92, s * 0.1);
+      break;
+    }
+    // 巨尸 — huge hulking brute
+    case "brute": {
+      fillPath(() => ctx.ellipse(-s * 0.1, 0, s * 0.82, s * 0.78, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.arc(-s * 0.1, -s * 0.7, s * 0.4, 0, Math.PI * 2));
+      fillPath(() => ctx.arc(-s * 0.1, s * 0.7, s * 0.4, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(s * 0.1, -s * 0.62, s * 0.5, s * 0.22, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(s * 0.1, s * 0.62, s * 0.5, s * 0.22, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.arc(s * 0.7, 0, s * 0.26, 0, Math.PI * 2));
+      eye(s * 0.82, -s * 0.1);
+      eye(s * 0.82, s * 0.1);
+      break;
+    }
+    // 吐酸者 — bulbous body, snout/muzzle forward
+    case "spitter": {
+      fillPath(() => ctx.ellipse(0, 0, s * 0.66, s * 0.6, 0, 0, Math.PI * 2));
+      fillPath(() => {
+        ctx.moveTo(s * 0.5, -s * 0.3);
+        ctx.lineTo(s * 1.05, 0);
+        ctx.lineTo(s * 0.5, s * 0.3);
+        ctx.closePath();
+      }, glow);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgba(glow, 0.85);
+      ctx.beginPath();
+      ctx.arc(s * 0.7, 0, s * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      eye(s * 0.2, -s * 0.22);
+      eye(s * 0.2, s * 0.22);
+      break;
+    }
+    // 母体 — boss with glowing core + tentacle limbs + jaw
+    case "abomination": {
+      fillPath(() => ctx.ellipse(0, 0, s * 0.85, s * 0.8, 0, 0, Math.PI * 2));
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.5);
+      cg.addColorStop(0, "#ffffff");
+      cg.addColorStop(0.4, rgba(glow, 0.9));
+      cg.addColorStop(1, rgba(glow, 0));
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + t * 0.4;
+        limbLine(0, 0, Math.cos(a) * s * 0.95, Math.sin(a) * s * 0.95, s * 0.18);
+      }
+      fillPath(() => {
+        ctx.moveTo(s * 0.55, -s * 0.35);
+        ctx.lineTo(s * 1.0, 0);
+        ctx.lineTo(s * 0.55, s * 0.35);
+        ctx.closePath();
+      }, shade(color, 0.1));
+      break;
+    }
+    // 爬虫 — tiny, low, scuttling legs
+    case "crawler": {
+      fillPath(() => ctx.ellipse(0, 0, s * 0.8, s * 0.42, 0, 0, Math.PI * 2));
+      const lp = Math.sin(t * 12) * s * 0.12;
+      for (let i = 0; i < 3; i++) {
+        const bx = -s * 0.3 + i * s * 0.35;
+        limbLine(bx, -s * 0.3, bx - s * 0.2, -s * 0.7 + lp, s * 0.1);
+        limbLine(bx, s * 0.3, bx - s * 0.2, s * 0.7 - lp, s * 0.1);
+      }
+      fillPath(() => ctx.arc(s * 0.75, 0, s * 0.3, 0, Math.PI * 2));
+      eye(s * 0.9, -s * 0.1);
+      eye(s * 0.9, s * 0.1);
+      break;
+    }
+    // 毒爆体 — swollen pulsing sac with veins
+    case "bloater": {
+      const pulse = 1 + Math.sin(t * 3) * 0.04;
+      fillPath(() => ctx.ellipse(0, 0, s * 0.8 * pulse, s * 0.72 * pulse, 0, 0, Math.PI * 2));
+      ctx.strokeStyle = rgba("#bef264", 0.6);
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(a) * s * 0.7, Math.sin(a) * s * 0.64);
+        ctx.stroke();
+      }
+      fillPath(() => ctx.ellipse(-s * 0.3, s * 0.6, s * 0.22, s * 0.14, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.3, -s * 0.6, s * 0.22, s * 0.14, 0, 0, Math.PI * 2));
+      eye(s * 0.4, -s * 0.22);
+      eye(s * 0.4, s * 0.22);
+      break;
+    }
+    // 尖啸者 — tall thin, open maw, sonic rings
+    case "screamer": {
+      fillPath(() => ctx.ellipse(0, 0, s * 0.5, s * 0.82, 0, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.2, -s * 0.6, s * 0.4, s * 0.14, 0.5, 0, Math.PI * 2));
+      fillPath(() => ctx.ellipse(-s * 0.2, s * 0.6, s * 0.4, s * 0.14, -0.5, 0, Math.PI * 2));
+      ctx.fillStyle = "#1a0a1a";
+      ctx.beginPath();
+      ctx.ellipse(s * 0.5, 0, s * 0.32, s * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = rgba(glow, 0.5 + Math.sin(t * 10) * 0.25);
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        const rr = s * (0.9 + i * 0.4 + (t % 1) * 0.4);
+        ctx.beginPath();
+        ctx.arc(s * 0.4, 0, rr, -0.7, 0.7);
+        ctx.stroke();
+      }
+      ctx.restore();
+      eye(s * 0.18, -s * 0.3);
+      eye(s * 0.18, s * 0.3);
+      break;
+    }
+    // 孢子怪 — body with mushroom caps + drifting spores
+    case "spore": {
+      fillPath(() => ctx.ellipse(0, 0, s * 0.62, s * 0.56, 0, 0, Math.PI * 2));
+      ctx.fillStyle = shade(color, 0.15);
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = 1.5;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.arc(i * s * 0.34, -s * 0.45, s * 0.3, Math.PI, 0);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + t * 0.6;
+        const rr = s * 0.7 + Math.sin(t * 2 + i) * s * 0.2;
+        ctx.fillStyle = rgba(glow, 0.55);
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr * 0.7, s * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      eye(s * 0.35, -s * 0.18);
+      eye(s * 0.35, s * 0.18);
+      break;
+    }
+    default: {
+      fillPath(() => ctx.arc(0, 0, s, 0, Math.PI * 2));
+    }
+  }
+
+  // poison-speckle overlay (applied by the engine's active poison aura)
+  if (poison) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + t * 1.5;
+      const px = Math.cos(a) * s * 0.5;
+      const py = Math.sin(a) * s * 0.5;
+      ctx.fillStyle = rgba("#a3e635", 0.5);
+      ctx.beginPath();
+      ctx.arc(px, py, s * 0.11, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   ctx.restore();
@@ -1399,6 +1800,62 @@ export function drawWeaponIcon(
         ctx.moveTo(5, 2.8);
         ctx.lineTo(3.5, 7.5);
       });
+      break;
+    case "gatling":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8, -2.4);
+        ctx.lineTo(6, -2.4);
+        ctx.lineTo(6, -0.6);
+        ctx.lineTo(-1, -0.6);
+        ctx.lineTo(-1, 0.8);
+        ctx.lineTo(6, 0.8);
+        ctx.lineTo(6, 2.4);
+        ctx.lineTo(2.5, 2.4);
+        ctx.lineTo(2.5, 7);
+        ctx.lineTo(-0.5, 7);
+        ctx.lineTo(-0.5, 2.4);
+        ctx.lineTo(-8, 2.4);
+        ctx.closePath();
+      });
+      // barrel cluster (glow)
+      fill(() => {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const x = 2 + Math.cos(a) * 2.6;
+          const y = Math.sin(a) * 2.6;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+      }, rgba(glow, 0.85));
+      break;
+    case "poison_mist":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8, -2.2);
+        ctx.lineTo(6, -2.2);
+        ctx.lineTo(6, 0.4);
+        ctx.lineTo(-2, 0.4);
+        ctx.lineTo(-2, 1.4);
+        ctx.lineTo(2, 1.4);
+        ctx.lineTo(2, 2.2);
+        ctx.lineTo(-1, 2.2);
+        ctx.lineTo(-1, 6.5);
+        ctx.lineTo(-3, 6.5);
+        ctx.lineTo(-3, 2.2);
+        ctx.lineTo(-8, 2.2);
+        ctx.closePath();
+      });
+      // poison cloud (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(6, -1.2, 2.6, 0, Math.PI * 2);
+        ctx.arc(8.6, 0.4, 2.2, 0, Math.PI * 2);
+        ctx.arc(6, 1.8, 2.4, 0, Math.PI * 2);
+        ctx.closePath();
+      }, rgba(glow, 0.85));
       break;
     default:
       body(() => {

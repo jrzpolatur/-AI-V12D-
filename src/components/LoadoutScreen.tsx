@@ -273,6 +273,19 @@ function WeaponDetail({ gun }: { gun: GunDef }) {
             />
           </>
         )}
+        {gun.weaponClass === "poison_mist" && (
+          <>
+            <ParamBar label="毒伤" value={gun.damage} max={120} color="#a3e635" />
+            <ParamBar label="射程" value={gun.flameRange ?? 130} max={200} color="#84cc16" />
+            <ParamBar
+              label="锥角"
+              value={((gun.flameCone ?? 0.34) * 180) / Math.PI}
+              max={30}
+              color="#fbbf24"
+              suffix="°"
+            />
+          </>
+        )}
         {gun.weaponClass === "melee" && (
           <>
             <ParamBar label="伤害" value={gun.damage} max={65} color="#f87171" />
@@ -352,6 +365,7 @@ export default function LoadoutScreen({
     "turret_cannon",
     "mine_explosive",
   ]);
+  const [gameMode, setGameMode] = useState<"defense" | "biohazard">("defense");
 
   const gunId = gunIds[0] ?? "smg";
   const toggleGun = (id: string) => {
@@ -384,6 +398,7 @@ export default function LoadoutScreen({
     gunIds,
     skillId,
     gadgetIds,
+    gameMode,
   };
   const character = CHARACTERS.find((c) => c.id === characterId)!;
   const outfit = OUTFITS.find((o) => o.id === outfitId)!;
@@ -589,6 +604,27 @@ export default function LoadoutScreen({
             </Section>
           </div>
         </div>
+
+            <Section label="游戏模式（单机）">
+              <PickCard
+                active={gameMode === "defense"}
+                accent="#38bdf8"
+                onClick={() => setGameMode("defense")}
+              >
+                <span className="text-xl">🏛️</span>
+                <span className="text-xs font-semibold">守护基地</span>
+                <span className="text-[10px] text-slate-400">经典 PvE 守点</span>
+              </PickCard>
+              <PickCard
+                active={gameMode === "biohazard"}
+                accent="#a3e635"
+                onClick={() => setGameMode("biohazard")}
+              >
+                <span className="text-xl">☣</span>
+                <span className="text-xs font-semibold">生化危机</span>
+                <span className="text-[10px] text-slate-400">尸潮生存 · 新武器</span>
+              </PickCard>
+            </Section>
 
         {/* Controls + start */}
         <div className="mt-6 flex flex-col items-center gap-4">

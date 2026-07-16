@@ -1,6 +1,6 @@
-import { GUNS, GADGETS, getCharacter, getOutfit, getSkill, SCENES, CHARACTERS, OUTFITS } from "./content";
+import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getSkill, SCENES, CHARACTERS, OUTFITS } from "./content";
 import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef, OutfitDef } from "./types";
-import { drawCharacter, drawWeaponIcon, drawGadgetIcon, rgba, shade, roundRect, DARK } from "./draw";
+import { drawCharacter, drawWeaponIcon, drawGadgetIcon, drawMonster, rgba, shade, roundRect, DARK } from "./draw";
 import { sound } from "./sound";
 import { RUNTIME } from "./runtimeConfig";
 import type { NetMode, InputFrame, Snapshot, SnapPlayer, SnapEnemy, SnapBullet } from "../net/protocol";
@@ -14,6 +14,8 @@ export interface Loadout {
   skillId: string;
   /** carried gadgets (max 3). Empty -> first 3 GADGETS. */
   gadgetIds?: string[];
+  /** single-player sub-mode: defend the base (default) or biohazard survival */
+  gameMode?: "defense" | "biohazard";
 }
 
 export interface ActiveEffect {
@@ -53,6 +55,10 @@ export interface HudState {
   reloadPct: number;
   heat: number;
   overheated: boolean;
+  /** gatling spin-up 0..1 (0 = cold, 1 = full fire rate) */
+  warmup: number;
+  /** single-player sub-mode */
+  mode: "defense" | "biohazard";
   skillId: string;
   skillName: string;
   skillIcon: string;
@@ -205,6 +211,31 @@ interface Enemy {
   /** >0 = currently electrified by a lightsaber hit */
   electrifiedTime?: number;
   electrifiedGlow?: string;
+  // ---- biohazard monster fields ----
+  /** monster behavior archetype (biohazard mode) */
+  behavior?: string;
+  /** poison damage-over-time status */
+  poisonT?: number;
+  poisonDps?: number;
+  /** speed buff remaining (from a screamer) */
+  buffT?: number;
+  /** screamer / spore ability timers */
+  screamT?: number;
+  cloudT?: number;
+  /** runner charge lunge timer */
+  chargeT?: number;
+  /** bloater / abomination death explosion */
+  explosiveDeath?: boolean;
+  explodeRadius?: number;
+  explodeDamage?: number;
+  /** spitter ranged params */
+  rangedRange?: number;
+  rangedDamage?: number;
+  /** screamer buff radius */
+  buffRadius?: number;
+  /** spore cloud params */
+  cloudRadius?: number;
+  cloudDamage?: number;
 }
 
 interface EnemyBullet {
@@ -216,6 +247,8 @@ interface EnemyBullet {
   damage: number;
   size: number;
   color: string;
+  /** spitter poison glob (visual + slow on hit) */
+  poison?: boolean;
 }
 
 interface Particle {
@@ -300,6 +333,8 @@ interface WeaponState {
   reload: number;
   heat: number;
   overheated: boolean;
+  /** gatling spin-up 0..1 */
+  spin?: number;
 }
 
 interface BeamHit {
@@ -413,6 +448,8 @@ export class GameEngine {
   // ---- multiplayer ----
   private mode: NetMode = "local";
   private net: Net | null = null;
+  /** single-player sub-mode */
+  private gameMode: "defense" | "biohazard" = "defense";
   private selfPid = 0;
   private peerPid = 0;
   private peerName = "";
@@ -469,6 +506,8 @@ export class GameEngine {
   private beamHit: BeamHit | null = null;
   // flamethrower state
   private flameActive = false;
+  // poison mist state
+  private poisonActive = false;
 
   private keys = new Set<string>();
   private mouse = { x: 400, y: 300 };
@@ -500,6 +539,7 @@ export class GameEngine {
     this.character = getCharacter(loadout.characterId);
     this.outfit = getOutfit(loadout.outfitId);
     this.skill = getSkill(loadout.skillId);
+    this.gameMode = loadout.gameMode ?? "defense";
     // Every player (single-player AND multiplayer) uses only the two weapons
     // chosen in their loadout. In multiplayer the host also tracks the foe's
     // own weapon list (this.foeGuns) so both avatars respect their own picks.
@@ -618,6 +658,12 @@ export class GameEngine {
     this.resize();
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
+    // biohazard mode = single-screen arena (no scrolling). The "map boundary"
+    // is exactly the player's view, so monsters can never leave the screen.
+    if (this.gameMode === "biohazard") {
+      this.worldW = this.W;
+      this.worldH = this.H;
+    }
     this.gx = 0;
     this.gy = 0;
     this.gxInit = false;
@@ -652,6 +698,14 @@ export class GameEngine {
       flash: 0,
       t: 0,
     };
+    // biohazard has no bases to defend — neutralise them so they never
+    // trigger a loss and aren't targeted by monsters.
+    if (this.gameMode === "biohazard") {
+      this.base.hp = Infinity;
+      this.base.maxHp = Infinity;
+      this.enemyBase.hp = Infinity;
+      this.enemyBase.maxHp = Infinity;
+    }
     this.weaponStates = new Map();
     for (const g of this.guns) {
       this.weaponStates.set(g.id, {
@@ -667,7 +721,7 @@ export class GameEngine {
     this.wave = 0;
     this.waveTimer = 0;
     this.spawnTimer = 1;
-    this.maxConcurrent = 8;
+    this.maxConcurrent = this.gameMode === "biohazard" ? 14 : 8;
     this.intermission = 3;
     this.skillCd = 0;
     this.timewarp = 0;
@@ -676,7 +730,11 @@ export class GameEngine {
     this.beamActive = false;
     this.beamHit = null;
     this.flameActive = false;
-    this.banner = { text: "守护基地！", t: 2.2 };
+    this.poisonActive = false;
+    this.banner = {
+      text: this.gameMode === "biohazard" ? "生化危机 · 活下去！" : "守护基地！",
+      t: 2.2,
+    };
     this.enemyId = 1;
     this.gunIndex = 0; // start with first selected weapon
     this.lastGadget = 0;
@@ -724,6 +782,11 @@ export class GameEngine {
       lastHitTime: 0,
     };
     this.localPlayer = this.player;
+    // biohazard: drop the player into the centre of the single-screen arena
+    if (this.gameMode === "biohazard") {
+      this.player.x = this.worldW / 2;
+      this.player.y = this.worldH / 2;
+    }
     // shield weapon init (after player exists)
     this.player.shieldHp = this.gun.shieldMaxHp ?? 0;
     this.applyRuntime();
@@ -1197,7 +1260,12 @@ export class GameEngine {
         this.snapAccum = 0;
         this.sendSnapshot();
       }
-      if (this.base.hp <= 0 && !this.gameOver) this.endGame("基地失守，你输了！");
+      if (
+        this.gameMode !== "biohazard" &&
+        this.base.hp <= 0 &&
+        !this.gameOver
+      )
+        this.endGame("基地失守，你输了！");
     }
 
     // dash charge recharge
@@ -1321,10 +1389,21 @@ export class GameEngine {
       (1 + (this.outfit.fireRateBonus ?? 0)) *
       (p.overdriveTime > 0 ? 1.7 : 1);
 
+    // gatling spin-up: spool the barrel while firing, decay when not
+    let spun = true;
+    if (g.spinup) {
+      if (this.firing)
+        ws.spin = Math.min(1, (ws.spin ?? 0) + dt / g.spinup);
+      else ws.spin = Math.max(0, (ws.spin ?? 0) - dt / (g.spinDown ?? 0.8));
+      spun = (ws.spin ?? 0) > 0.12;
+    }
+
     if (g.weaponClass === "beam") {
       this.updateBeam(dt, this.firing && !this.paused, ws);
     } else if (g.weaponClass === "flamethrower") {
       this.updateFlamethrower(dt, this.firing && !this.paused, ws);
+    } else if (g.weaponClass === "poison_mist") {
+      this.updatePoisonMist(dt, this.firing && !this.paused, ws);
     } else {
       const blocked =
         (g.magazine !== undefined && (ws.reload > 0 || ws.ammo <= 0)) ||
@@ -1343,11 +1422,14 @@ export class GameEngine {
         this.firing &&
         p.fireTimer <= 0 &&
         !blocked &&
-        (!g.semiAuto || !this.semiAutoLatch)
+        (!g.semiAuto || !this.semiAutoLatch) &&
+        spun
       ) {
         if (g.weaponClass === "ranged") this.fireGun(ws);
         else this.meleeLight();
-        p.fireTimer = 1 / fr;
+        // gatling spins up over time — effective fire rate scales with spin
+        const effFr = g.spinup ? fr * (ws.spin ?? 0) : fr;
+        p.fireTimer = 1 / Math.max(0.0001, effFr);
         if (g.semiAuto) this.semiAutoLatch = true;
       }
       if (g.magazine !== undefined && ws.ammo <= 0 && ws.reload <= 0) {
@@ -1368,7 +1450,11 @@ export class GameEngine {
   private fireGun(ws: WeaponState) {
     const p = this.player;
     const g = this.gun;
-    const dmg = g.damage * this.character.damageMult;
+    // gatling: damage ramps with spin-up (weak until the barrel is spooled)
+    const spinMult = g.spinup
+      ? (g.spinMinMult ?? 0.2) + (1 - (g.spinMinMult ?? 0.2)) * (ws.spin ?? 0)
+      : 1;
+    const dmg = g.damage * this.character.damageMult * spinMult;
     const base = p.angle;
     for (let i = 0; i < g.pellets; i++) {
       let a: number;
@@ -1691,6 +1777,72 @@ export class GameEngine {
       });
     } else {
       this.flameActive = false;
+    }
+  }
+
+  // --------------------------------------------------- poison mist sprayer
+  private updatePoisonMist(dt: number, firing: boolean, ws: WeaponState) {
+    const g = this.gun;
+    if (firing && !ws.overheated) {
+      ws.heat = Math.min(1.4, ws.heat + (g.heatPerShot ?? 0.4) * dt);
+      if (ws.heat >= 1) ws.overheated = true;
+      this.poisonActive = true;
+      const cone = g.flameCone ?? 0.34;
+      const range = g.flameRange ?? 130;
+      const dps = g.damage;
+      // spawn a short-lived lingering poison cloud in front of the muzzle
+      const cx = this.player.x + Math.cos(this.player.angle) * range * 0.55;
+      const cy = this.player.y + Math.sin(this.player.angle) * range * 0.55;
+      this.effects.push({
+        type: "poisoncloud",
+        x: cx,
+        y: cy,
+        t: 0,
+        duration: 0.5,
+        radius: range * 0.7,
+        color: g.glow,
+        dps,
+        slow: 0.5,
+      });
+      // directly ramp poison on enemies caught in the forward cone, so the
+      // longer they linger the more damage they take (matches poison gas mine)
+      for (const e of this.enemies) {
+        const dx = e.x - this.player.x;
+        const dy = e.y - this.player.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= range + e.size) {
+          const ang = Math.atan2(dy, dx);
+          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
+            this.applyPoison(e, dps * dt * 0.5);
+          }
+        }
+      }
+      // green mist particles
+      const ox = this.player.x + Math.cos(this.player.angle) * (this.player.size + g.barrel);
+      const oy = this.player.y + Math.sin(this.player.angle) * (this.player.size + g.barrel);
+      for (let i = 0; i < 4; i++) {
+        const a = this.player.angle + (Math.random() - 0.5) * cone * 2;
+        const sp = range * (0.8 + Math.random() * 1.2);
+        this.particles.push({
+          x: ox,
+          y: oy,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          life: 0.35 + Math.random() * 0.25,
+          maxLife: 0.6,
+          color: ["#a3e635", "#bef264", "#84cc16", "#a3e635"][
+            Math.floor(Math.random() * 4)
+          ],
+          size: 4 + Math.random() * 5,
+          shrink: true,
+        });
+      }
+      if (this.flameSndCd <= 0) {
+        sound.shoot("rocket");
+        this.flameSndCd = 0.14;
+      }
+    } else {
+      this.poisonActive = false;
     }
   }
 
@@ -2360,6 +2512,7 @@ export class GameEngine {
       }
       const rr = p.size + b.size;
       if ((p.x - b.x) ** 2 + (p.y - b.y) ** 2 <= rr * rr) {
+        if (b.poison) this.spawnParticles(b.x, b.y, "#a3e635", 6, 120, 0.4);
         this.damagePlayer(b.damage);
         continue;
       }
@@ -2397,7 +2550,6 @@ export class GameEngine {
   private updateEnemies(dt: number) {
     const ts = this.timewarp > 0 ? 0.32 : 1;
     const p = this.player;
-    let base = this.base;
     const next: Enemy[] = [];
     for (const e of this.enemies) {
       e.spawnT = Math.min(1, e.spawnT + dt * 4);
@@ -2406,25 +2558,52 @@ export class GameEngine {
       if (e.electrifiedTime && e.electrifiedTime > 0) e.electrifiedTime -= dt;
       if (e.burnT > 0) {
         e.burnT -= dt;
-        this.damageEnemy(e, e.burnDps * dt, 0, 0);
+        this.damageEnemy(e, e.burnDps * dt, 0, 0, true);
         if (Math.random() < 0.3)
           this.spawnParticles(e.x, e.y, "#fb923c", 1, 50, 0.2);
       }
+      // poison damage-over-time: the longer an enemy stays poisoned, the
+      // higher the dps — enemies lingering in gas take ever more damage.
+      if (e.poisonT && e.poisonT > 0) {
+        e.poisonT -= dt;
+        this.damageEnemy(e, (e.poisonDps ?? 0) * dt, 0, 0, true);
+        e.poisonDps = Math.max(0, (e.poisonDps ?? 0) - 22 * dt);
+        if (Math.random() < 0.25)
+          this.spawnParticles(e.x, e.y, "#a3e635", 1, 50, 0.2);
+      }
       const slowMult = e.slowT > 0 ? 0.5 : 1;
+      const buffMult = e.buffT && e.buffT > 0 ? 1.8 : 1;
+      if (e.buffT && e.buffT > 0) e.buffT -= dt;
 
-      if (this.mode !== "local") base = this.nearestBase(e.x, e.y);
+      // movement target: biohazard monsters swarm the player; defense monsters
+      // besiege the base (and the player if close enough).
+      const bio = this.gameMode === "biohazard";
+      let tbx: number;
+      let tby: number;
+      let tbaseR: number;
+      if (bio) {
+        tbx = p.x;
+        tby = p.y;
+        tbaseR = p.size;
+      } else {
+        const b = this.mode !== "local" ? this.nearestBase(e.x, e.y) : this.base;
+        tbx = b.x;
+        tby = b.y;
+        tbaseR = b.radius;
+      }
 
-      const dbx = base.x - e.x;
-      const dby = base.y - e.y;
+      const dbx = tbx - e.x;
+      const dby = tby - e.y;
       const dbase = Math.hypot(dbx, dby) || 1;
       const dpx = p.x - e.x;
       const dpy = p.y - e.y;
       const dpl = Math.hypot(dpx, dpy) || 1;
 
+      const beh = e.behavior ?? "soldier";
+
       if (e.ranged) {
-        const targetPlayer = dpl < 440;
-        const tx = targetPlayer ? p.x : base.x;
-        const ty = targetPlayer ? p.y : base.y;
+        const tx = tbx;
+        const ty = tby;
         e.angle = Math.atan2(ty - e.y, tx - e.x);
         const preferred = 250;
         let mvx = 0;
@@ -2439,36 +2618,76 @@ export class GameEngine {
           mvx = -dby / dbase;
           mvy = dbx / dbase;
         }
-        e.x += mvx * e.speed * dt * ts * slowMult;
-        e.y += mvy * e.speed * dt * ts * slowMult;
+        e.x += mvx * e.speed * buffMult * dt * ts * slowMult;
+        e.y += mvy * e.speed * buffMult * dt * ts * slowMult;
+        // ranged spit (spitter) — lobs a poison glob at the player
         e.shootTimer -= dt * ts;
-        if (e.shootTimer <= 0 && dbase < 700 && e.spawnT >= 1) {
-          const eg = e.gun;
-          const fireRate = eg ? eg.fireRate : 1.5;
-          e.shootTimer = 1 / fireRate + Math.random() * 0.5;
-          const a = Math.atan2(ty - e.y, tx - e.x);
-          const bulletSpeed = eg ? eg.bulletSpeed * 0.7 : 270;
-          const bulletDmg = eg ? Math.max(6, eg.damage * 0.4) : 8;
-          const bulletSize = eg ? Math.max(4, eg.bulletSize) : 5;
-          const shots = e.type === "elite" ? 3 : 1;
-          for (let i = 0; i < shots; i++) {
-            const aa = a + (shots > 1 ? (i / (shots - 1) - 0.5) * 0.5 : 0);
-            this.enemyBullets.push({
-              x: e.x,
-              y: e.y,
-              vx: Math.cos(aa) * bulletSpeed,
-              vy: Math.sin(aa) * bulletSpeed,
-              life: 3,
-              damage: Math.round(bulletDmg * (e.type === "elite" ? 1.5 : 1)),
-              size: bulletSize,
-              color: e.glow,
-            });
-          }
+        if (e.shootTimer <= 0 && dpl < (e.rangedRange ?? 380) && e.spawnT >= 1) {
+          const a = Math.atan2(p.y - e.y, p.x - e.x);
+          e.shootTimer = 1.6 + Math.random() * 0.6;
+          const dmg = e.rangedDamage ?? 14;
+          this.enemyBullets.push({
+            x: e.x + Math.cos(a) * e.size,
+            y: e.y + Math.sin(a) * e.size,
+            vx: Math.cos(a) * 300,
+            vy: Math.sin(a) * 300,
+            life: 2.4,
+            damage: Math.round(dmg),
+            size: 6,
+            color: e.glow,
+            poison: true,
+          });
         }
       } else {
         e.angle = Math.atan2(dby, dbx);
-        e.x += (dbx / dbase) * e.speed * dt * ts * slowMult;
-        e.y += (dby / dbase) * e.speed * dt * ts * slowMult;
+        let sp = e.speed * buffMult * ts * slowMult;
+        // runner: periodic lunge (dash) toward the player
+        if (beh === "runner" && (e.chargeT ?? 0) <= 0 && dpl < 320 && e.spawnT >= 1) {
+          e.chargeT = 0.45;
+        }
+        if (beh === "runner" && (e.chargeT ?? 0) > 0) {
+          e.chargeT = (e.chargeT ?? 0) - dt;
+          sp *= 2.4;
+        }
+        e.x += (dbx / dbase) * sp * dt;
+        e.y += (dby / dbase) * sp * dt;
+      }
+
+      // screamer: periodic shriek that buffs nearby monsters + staggers player
+      if (beh === "screamer") {
+        e.screamT = (e.screamT ?? 3) - dt;
+        if (e.screamT <= 0 && e.spawnT >= 1) {
+          e.screamT = 5 + Math.random() * 2;
+          const br = e.buffRadius ?? 260;
+          this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.5, radius: br, color: "#f0abfc" });
+          for (const o of this.enemies) {
+            if (Math.hypot(o.x - e.x, o.y - e.y) < br) o.buffT = 3;
+          }
+          if (dpl < br) {
+            this.player.flash = Math.max(this.player.flash, 0.5);
+            this.shake = Math.min(10, this.shake + 4);
+          }
+        }
+      }
+
+      // spore: periodically emit a lingering poison cloud
+      if (beh === "spore") {
+        e.cloudT = (e.cloudT ?? 1.5) - dt;
+        if (e.cloudT <= 0 && e.spawnT >= 1) {
+          e.cloudT = 2.2 + Math.random();
+          const cr = e.cloudRadius ?? 95;
+          this.effects.push({
+            type: "poisoncloud",
+            x: e.x,
+            y: e.y,
+            t: 0,
+            duration: 2.4,
+            radius: cr,
+            color: e.glow,
+            dps: e.cloudDamage ?? 42,
+            slow: 0.5,
+          });
+        }
       }
 
       // glue wall slow
@@ -2493,27 +2712,45 @@ export class GameEngine {
       }
 
       this.collideWalls(e, e.size);
-      this.collideBase(e, e.size);
-      this.collideBase(e, e.size, this.enemyBase);
+      if (!bio) {
+        this.collideBase(e, e.size);
+        this.collideBase(e, e.size, this.enemyBase);
+      }
 
       if (e.spawnT >= 1 && e.hp > 0) {
         e.attackTimer -= dt;
-        if (dbase <= base.radius + e.size && e.attackTimer <= 0) {
-          this.damageBase(e.damage);
-          e.attackTimer = 0.7;
+        if (bio) {
+          // biohazard: monsters only attack the player
+          if (dpl <= e.size + p.size && e.attackTimer <= 0) {
+            this.damagePlayer(e.damage);
+            e.attackTimer = beh === "crawler" ? 0.45 : 0.6;
+          }
+        } else {
+          if (dbase <= tbaseR + e.size && e.attackTimer <= 0) {
+            this.damageBase(e.damage);
+            e.attackTimer = 0.7;
+          }
+          if (dpl <= e.size + p.size && e.attackTimer <= 0) {
+            this.damagePlayer(e.damage);
+            e.attackTimer = 0.65;
+          }
+          if (
+            this.foe &&
+            e.attackTimer <= 0 &&
+            Math.hypot(e.x - this.foe.x, e.y - this.foe.y) <= e.size + this.foe.size
+          ) {
+            this.damagePlayerEntity(this.foe, e.damage);
+            e.attackTimer = 0.65;
+          }
         }
-        if (dpl <= e.size + p.size && e.attackTimer <= 0) {
-          this.damagePlayer(e.damage);
-          e.attackTimer = 0.65;
-        }
-        if (
-          this.foe &&
-          e.attackTimer <= 0 &&
-          Math.hypot(e.x - this.foe.x, e.y - this.foe.y) <= e.size + this.foe.size
-        ) {
-          this.damagePlayerEntity(this.foe, e.damage);
-          e.attackTimer = 0.65;
-        }
+      }
+
+      // MAP BOUNDARY — in biohazard the arena == the player's view, so monsters
+      // can never wander outside the visible screen.
+      if (bio) {
+        const m = e.size;
+        e.x = Math.max(m, Math.min(this.worldW - m, e.x));
+        e.y = Math.max(m, Math.min(this.worldH - m, e.y));
       }
 
       if (e.hp > 0) next.push(e);
@@ -2529,9 +2766,12 @@ export class GameEngine {
         fx.tickT = 0.25;
         for (const e of this.enemies) {
           if (Math.hypot(e.x - fx.x, e.y - fx.y) < fx.radius + e.size) {
-            this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0);
-            if (fx.type === "poisoncloud") e.slowT = Math.max(e.slowT, 0.3);
-            if (fx.type === "firefield") {
+            if (fx.type === "poisoncloud") {
+              // ramp poison so lingering enemies take ever-increasing damage
+              this.applyPoison(e, ((fx.dps ?? 20) * 0.25) * 0.8);
+              e.slowT = Math.max(e.slowT, 0.3);
+            } else {
+              this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true);
               e.burnT = Math.max(e.burnT, 1);
               e.burnDps = Math.max(e.burnDps, 20);
             }
@@ -2545,13 +2785,14 @@ export class GameEngine {
     e: Enemy,
     dmg: number,
     kbx: number,
-    kby: number
+    kby: number,
+    silent = false
   ) {
     if (e.hp <= 0) return;
     dmg *= RUNTIME.playerDamageMult;
     e.hp -= dmg;
-    e.hitFlash = 1;
-    if (this.hitSndCd <= 0) {
+    if (!silent) e.hitFlash = 1;
+    if (!silent && this.hitSndCd <= 0) {
       sound.hit();
       this.hitSndCd = 0.04;
     }
@@ -2571,11 +2812,21 @@ export class GameEngine {
     if (e.hp <= 0) this.killEnemy(e);
   }
 
+  /** Apply (and ramp) poison on an enemy. The longer it stays in gas, the
+   *  higher its poison dps climbs — so lingering hurts more and more. */
+  private applyPoison(e: Enemy, ramp: number) {
+    if (e.hp <= 0) return;
+    e.poisonT = Math.max(e.poisonT ?? 0, 0.9);
+    e.poisonDps = Math.min(260, (e.poisonDps ?? 0) + ramp);
+  }
+
   private killEnemy(e: Enemy) {
     this.score += e.score;
     this.kills += 1;
     // ============ IMPACTFUL COIN BURST ============
-    const goldAmount = e.type === "boss" ? 80 : e.type === "tank" ? 18 : e.type === "shooter" ? 10 : 6;
+    const big = e.type === "boss" || e.behavior === "abomination";
+    const med = e.type === "tank" || e.behavior === "brute" || e.behavior === "bloater";
+    const goldAmount = big ? 80 : med ? 18 : e.type === "shooter" || e.behavior === "spitter" ? 10 : 6;
     this.gold += goldAmount;
     // shockwave ring
     this.effects.push({
@@ -2597,9 +2848,9 @@ export class GameEngine {
       color: "#fde68a",
     });
     // big screen shake for impactful kills
-    this.shake = Math.min(22, this.shake + (e.type === "boss" ? 20 : e.type === "tank" ? 10 : 5));
+    this.shake = Math.min(22, this.shake + (big ? 20 : med ? 10 : 5));
     // coin particles — spinning, gravity-affected
-    const coinCount = e.type === "boss" ? 40 : e.type === "tank" ? 18 : 10;
+    const coinCount = big ? 40 : med ? 18 : 10;
     for (let i = 0; i < coinCount; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = 120 + Math.random() * 280;
@@ -2619,14 +2870,25 @@ export class GameEngine {
       });
     }
     // body debris particles
-    this.spawnParticles(e.x, e.y, e.glow, e.type === "boss" ? 30 : 12, 220, 0.5);
-    this.spawnParticles(e.x, e.y, e.color, e.type === "boss" ? 20 : 6, 160, 0.4);
+    this.spawnParticles(e.x, e.y, e.glow, big ? 30 : 12, 220, 0.5);
+    this.spawnParticles(e.x, e.y, e.color, big ? 20 : 6, 160, 0.4);
 
-    if (e.type === "boss") {
+    if (big) {
       this.explode(e.x, e.y, e.size * 2.2, 0, e.glow);
     }
+    // bloater: bursts into a wide poison cloud on death
+    if (e.explosiveDeath) {
+      const r = e.explodeRadius ?? 120;
+      const dmg = e.explodeDamage ?? 60;
+      this.effects.push({ type: "poisoncloud", x: e.x, y: e.y, t: 0, duration: 2.6, radius: r, color: e.glow, dps: dmg, slow: 0.5 });
+      this.spawnParticles(e.x, e.y, "#a3e635", 30, 320, 0.6);
+      const pd = Math.hypot(this.player.x - e.x, this.player.y - e.y);
+      if (pd < r + this.player.size)
+        this.damagePlayer(Math.round(dmg * (1 - pd / (r + this.player.size))));
+      this.shake = Math.min(16, this.shake + 8);
+    }
     // score popup as gold pickup
-    const dropChance = e.type === "boss" ? 1 : e.type === "tank" ? 0.32 : 0.12;
+    const dropChance = big ? 1 : med ? 0.32 : 0.12;
     if (Math.random() < dropChance) {
       this.pickups.push({
         x: e.x,
@@ -2674,6 +2936,7 @@ export class GameEngine {
 
   private damageBase(dmg: number) {
     if (this.base.hp <= 0) return;
+    if (this.gameMode === "biohazard") return; // no bases in biohazard
     this.base.hp -= dmg;
     this.base.flash = 1;
     this.shake = Math.min(12, this.shake + dmg * 0.25);
@@ -3113,8 +3376,10 @@ export class GameEngine {
     };
 
     // Guest: its own base is the top one (this.enemyBase), the host's is bottom.
-    this.drawBase(ctx, this.enemyBase, true);
-    this.drawBase(ctx, this.base, false);
+    if (this.gameMode !== "biohazard") {
+      this.drawBase(ctx, this.enemyBase, true);
+      this.drawBase(ctx, this.base, false);
+    }
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
       const c = getCharacter(e.character);
@@ -3352,6 +3617,10 @@ export class GameEngine {
   }
 
   private spawnEnemy() {
+    if (this.gameMode === "biohazard") {
+      this.spawnMonster();
+      return;
+    }
     // pick a random character + outfit + gun for this enemy
     const char = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
     const outfit = OUTFITS[Math.floor(Math.random() * OUTFITS.length)];
@@ -3423,6 +3692,101 @@ export class GameEngine {
       x: Math.max(20, Math.min(this.worldW - 20, eb.x + Math.cos(a) * r)),
       y: Math.max(20, Math.min(this.worldH - 20, eb.y + Math.sin(a) * r + 40)),
     };
+  }
+
+  /** Spawn a biohazard monster at a random edge of the (single-screen) arena. */
+  private spawnMonster() {
+    const n = this.wave || 1;
+    // weighted pick — only monsters whose minWave has been reached
+    const pool = MONSTERS.filter((m) => (m.minWave ?? 1) <= n);
+    let total = 0;
+    for (const m of pool) total += m.weight ?? 1;
+    let pick = Math.random() * total;
+    let def = pool[0];
+    for (const m of pool) {
+      pick -= m.weight ?? 1;
+      if (pick <= 0) {
+        def = m;
+        break;
+      }
+    }
+
+    const hpScale = 1 + (n - 1) * 0.12;
+    const dmgScale = 1 + (n - 1) * 0.05;
+    const maxHp = Math.round(def.hp * hpScale);
+    const speed = def.speed * RUNTIME.enemySpeedMult;
+    const dmg = Math.round(def.damage * dmgScale);
+
+    // spawn just inside a random screen edge
+    const m = def.size + 6;
+    const edge = Math.floor(Math.random() * 4);
+    let x = 0;
+    let y = 0;
+    if (edge === 0) {
+      x = m;
+      y = Math.random() * this.worldH;
+    } else if (edge === 1) {
+      x = this.worldW - m;
+      y = Math.random() * this.worldH;
+    } else if (edge === 2) {
+      x = Math.random() * this.worldW;
+      y = m;
+    } else {
+      x = Math.random() * this.worldW;
+      y = this.worldH - m;
+    }
+
+    const e: Enemy = {
+      id: this.enemyId++,
+      type: "monster",
+      behavior: def.behavior,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      hp: maxHp,
+      maxHp,
+      size: def.size,
+      speed,
+      damage: dmg,
+      color: def.color,
+      glow: def.glow,
+      score: def.score,
+      ranged: !!def.ranged,
+      shootTimer: 1 + Math.random(),
+      attackTimer: 0,
+      angle: Math.PI / 2,
+      hitFlash: 0,
+      spawnT: 0,
+      slowT: 0,
+      burnT: 0,
+      burnDps: 0,
+      poisonT: 0,
+      poisonDps: 0,
+      // monster-specific params
+      screamT: 3 + Math.random() * 2,
+      cloudT: 1.5 + Math.random(),
+      chargeT: 0,
+      buffT: 0,
+      explosiveDeath: def.behavior === "bloater",
+      explodeRadius: def.explodeRadius,
+      explodeDamage: def.explodeDamage,
+      rangedRange: def.rangedRange,
+      rangedDamage: def.rangedDamage,
+      buffRadius: def.buffRadius,
+      cloudRadius: def.cloudRadius,
+      cloudDamage: def.cloudDamage,
+    };
+    this.enemies.push(e);
+    this.effects.push({
+      type: "spawn",
+      x,
+      y,
+      t: 0,
+      duration: 0.4,
+      radius: def.size * 2,
+      color: def.glow,
+    });
   }
 
   // ---------------------------------------------------------------- skills
@@ -3590,6 +3954,8 @@ export class GameEngine {
         g.reloadTime && ws.reload > 0 ? 1 - ws.reload / g.reloadTime : 0,
       heat: ws.heat,
       overheated: ws.overheated,
+      warmup: g.spinup ? ws.spin ?? 0 : 0,
+      mode: this.gameMode,
       skillId: s.id,
       skillName: s.name,
       skillIcon: s.icon,
@@ -3649,8 +4015,10 @@ export class GameEngine {
 
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    this.drawBase(ctx, this.enemyBase, false);
-    this.drawBase(ctx, this.base, true);
+    if (this.gameMode !== "biohazard") {
+      this.drawBase(ctx, this.enemyBase, false);
+      this.drawBase(ctx, this.base, true);
+    }
     this.drawArenaBorder(ctx);
     this.drawFieldEffects(ctx);
     this.drawPickups(ctx);
@@ -3708,22 +4076,26 @@ export class GameEngine {
       ctx.fillRect(0, 0, this.W, this.H);
     }
 
-    // grid (scrolls with camera)
-    ctx.strokeStyle = "rgba(130,150,220,0.07)";
-    ctx.lineWidth = 1;
-    const step = 48;
-    const offX = -this.camX % step;
-    const offY = -this.camY % step;
-    ctx.beginPath();
-    for (let x = offX; x <= this.W; x += step) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.H);
+    // floor — cyber city renders top-down neon building blocks; others a plain grid
+    if (theme.style === "city") {
+      this.drawCityBackdrop(ctx, theme);
+    } else {
+      ctx.strokeStyle = theme.gridColor ?? "rgba(130,150,220,0.07)";
+      ctx.lineWidth = 1;
+      const step = 48;
+      const offX = -this.camX % step;
+      const offY = -this.camY % step;
+      ctx.beginPath();
+      for (let x = offX; x <= this.W; x += step) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, this.H);
+      }
+      for (let y = offY; y <= this.H; y += step) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(this.W, y);
+      }
+      ctx.stroke();
     }
-    for (let y = offY; y <= this.H; y += step) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(this.W, y);
-    }
-    ctx.stroke();
 
     // vignette
     const vg = ctx.createRadialGradient(
@@ -3738,6 +4110,89 @@ export class GameEngine {
     vg.addColorStop(1, "rgba(0,0,0,0.45)");
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, this.W, this.H);
+  }
+
+  /**
+   * Top-down cyber-city floor: neon "road" grid + glowing building rooftops
+   * with lit windows. Building positions are hashed from world-cell coords so
+   * the skyline scrolls consistently with the camera.
+   */
+  private drawCityBackdrop(
+    ctx: CanvasRenderingContext2D,
+    theme: { accent: string; wallDark: string; gridColor?: string }
+  ) {
+    // road grid (brighter neon lines, scrolls with camera)
+    ctx.strokeStyle = theme.gridColor ?? "rgba(34,211,238,0.10)";
+    ctx.lineWidth = 1.5;
+    const gstep = 64;
+    const offX = -this.camX % gstep;
+    const offY = -this.camY % gstep;
+    ctx.beginPath();
+    for (let x = offX; x <= this.W; x += gstep) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, this.H);
+    }
+    for (let y = offY; y <= this.H; y += gstep) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(this.W, y);
+    }
+    ctx.stroke();
+
+    // building blocks
+    const block = 220;
+    const x0 = Math.floor(this.camX / block) * block;
+    const y0 = Math.floor(this.camY / block) * block;
+    for (let wx = x0; wx <= this.camX + this.W; wx += block) {
+      for (let wy = y0; wy <= this.camY + this.H; wy += block) {
+        const h = Math.abs(Math.sin(wx * 12.9898 + wy * 78.233) * 43758.5453);
+        const f = h - Math.floor(h); // pseudo-random 0..1
+        const f2 = (h * 1.7) % 1;
+        const pad = 16 + Math.floor(f * 12);
+        const bw = block - pad * 2 - Math.floor(f2 * 26);
+        const bh = block - pad * 2 - Math.floor((1 - f2) * 22);
+        const bx = wx + pad - this.camX;
+        const by = wy + pad - this.camY;
+
+        // rooftop slab
+        ctx.fillStyle = rgba(theme.wallDark, 0.55);
+        roundRect(ctx, bx, by, bw, bh, 7);
+        ctx.fill();
+        // neon edge
+        ctx.strokeStyle = rgba(theme.accent, 0.45);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // inner glow line
+        ctx.strokeStyle = rgba(theme.accent, 0.16);
+        ctx.lineWidth = 1;
+        roundRect(ctx, bx + 4, by + 4, bw - 8, bh - 8, 5);
+        ctx.stroke();
+
+        // lit windows (a few small squares)
+        const cols = Math.max(2, Math.floor(bw / 26));
+        const rows = Math.max(2, Math.floor(bh / 26));
+        for (let i = 0; i < cols; i++) {
+          for (let j = 0; j < rows; j++) {
+            const lit = ((i * 7 + j * 13 + Math.floor(f * 31)) % 5) === 0;
+            if (!lit) continue;
+            ctx.fillStyle = rgba(theme.accent, 0.5);
+            ctx.fillRect(bx + 8 + i * 24, by + 8 + j * 24, 6, 6);
+          }
+        }
+      }
+    }
+
+    // subtle magenta neon sweep for extra cyber flavor
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const sweep = (this.time * 0.05) % 1;
+    const sg = ctx.createLinearGradient(0, 0, this.W, 0);
+    const p = sweep * this.W;
+    sg.addColorStop(0, "rgba(217,70,239,0)");
+    sg.addColorStop(Math.min(1, p / this.W), "rgba(217,70,239,0.05)");
+    sg.addColorStop(1, "rgba(217,70,239,0)");
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, this.W, this.H);
+    ctx.restore();
   }
 
   private drawArenaBorder(ctx: CanvasRenderingContext2D) {
@@ -4218,8 +4673,25 @@ export class GameEngine {
         ctx.restore();
       }
 
-      // use drawCharacter if enemy has a character definition
-      if (e.character && e.outfit) {
+      // biohazard monsters get a dedicated, detailed silhouette
+      if (e.behavior) {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.scale(scale, scale);
+        drawMonster(ctx, {
+          behavior: e.behavior,
+          size: e.size,
+          color: e.color,
+          glow: e.glow,
+          angle: e.angle,
+          t: this.time,
+          flash: e.hitFlash > 0.05 ? Math.min(1, e.hitFlash) : 0,
+          poison: (e.poisonT ?? 0) > 0,
+          buffed: (e.buffT ?? 0) > 0,
+          charging: (e.chargeT ?? 0) > 0,
+        });
+        ctx.restore();
+      } else if (e.character && e.outfit) {
         // tint enemy red-ish by overriding colors
         const enemyChar: CharacterDef = {
           ...e.character,
@@ -4273,6 +4745,17 @@ export class GameEngine {
         ctx.fillStyle = rgba("#84cc16", 0.2);
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.size * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // active poison damage aura
+      if ((e.poisonT ?? 0) > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = rgba("#a3e635", 0.22);
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.size * 1.3, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }

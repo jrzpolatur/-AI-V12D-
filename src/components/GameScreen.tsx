@@ -29,6 +29,8 @@ const initialHud: HudState = {
   skillIcon: "",
   skillCooldownPct: 1,
   skillReady: true,
+  warmup: 0,
+  mode: "defense",
   dashCharges: 3,
   maxDashCharges: 3,
   dashChargePct: 1,
@@ -202,44 +204,58 @@ export default function GameScreen({
 
       {/* ============ TOP BAR ============ */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-start justify-between p-3 sm:p-4">
-        {/* Base HP (left) + Enemy base HP */}
-        <div className="flex flex-col items-start gap-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-sky-200/90">
-            <span>🏛️</span>
-            <span>己方基地</span>
+        {/* Base HP (left) + Enemy base HP — hidden in biohazard */}
+        {hud.mode === "biohazard" ? (
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-lime-200/90">
+              <span>☣</span>
+              <span>生化危机 · 生存</span>
+            </div>
+            <div className="text-[10px] text-slate-400">消灭所有来犯尸潮</div>
+            <div className="mt-1 text-[10px] text-slate-500">
+              击杀{" "}
+              <span className="font-bold text-lime-300">{hud.kills}</span>
+            </div>
           </div>
-          <div className="relative h-3 w-44 overflow-hidden rounded-full border border-sky-300/30 bg-black/55">
-            <div
-              className="h-full rounded-full transition-[width] duration-150"
-              style={{
-                width: `${basePct * 100}%`,
-                background: `linear-gradient(90deg, ${baseColor}, ${baseColor}cc)`,
-                boxShadow: `0 0 12px ${baseColor}88`,
-              }}
-            />
+        ) : (
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-sky-200/90">
+              <span>🏛️</span>
+              <span>己方基地</span>
+            </div>
+            <div className="relative h-3 w-44 overflow-hidden rounded-full border border-sky-300/30 bg-black/55">
+              <div
+                className="h-full rounded-full transition-[width] duration-150"
+                style={{
+                  width: `${basePct * 100}%`,
+                  background: `linear-gradient(90deg, ${baseColor}, ${baseColor}cc)`,
+                  boxShadow: `0 0 12px ${baseColor}88`,
+                }}
+              />
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {hud.baseHp} / {hud.baseMaxHp}
+            </div>
+            {/* enemy base */}
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-200/90">
+              <span>⚔️</span>
+              <span>敌方基地</span>
+            </div>
+            <div className="relative h-2.5 w-36 overflow-hidden rounded-full border border-rose-300/30 bg-black/55">
+              <div
+                className="h-full rounded-full transition-[width] duration-150"
+                style={{
+                  width: `${(hud.enemyBaseHp / hud.enemyBaseMaxHp) * 100}%`,
+                  background: "linear-gradient(90deg, #f87171, #ef4444)",
+                  boxShadow: "0 0 8px #ef444488",
+                }}
+              />
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {hud.enemyBaseHp} / {hud.enemyBaseMaxHp}
+            </div>
           </div>
-          <div className="text-[10px] text-slate-400">
-            {hud.baseHp} / {hud.baseMaxHp}
-          </div>
-          {/* enemy base */}
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-200/90">
-            <span>⚔️</span>
-            <span>敌方基地</span>
-          </div>
-          <div className="relative h-2.5 w-36 overflow-hidden rounded-full border border-rose-300/30 bg-black/55">
-            <div
-              className="h-full rounded-full transition-[width] duration-150"
-              style={{
-                width: `${(hud.enemyBaseHp / hud.enemyBaseMaxHp) * 100}%`,
-                background: "linear-gradient(90deg, #f87171, #ef4444)",
-                boxShadow: "0 0 8px #ef444488",
-              }}
-            />
-          </div>
-          <div className="text-[10px] text-slate-400">
-            {hud.enemyBaseHp} / {hud.enemyBaseMaxHp}
-          </div>
-        </div>
+        )}
 
         {/* Center: wave + enemies */}
         <div className="flex flex-col items-center gap-1">
@@ -478,6 +494,9 @@ export default function GameScreen({
                 {g.weaponClass === "flamethrower" && (
                   <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-orange-400" />
                 )}
+                {g.weaponClass === "poison_mist" && (
+                  <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-lime-400" />
+                )}
                 {g.weaponClass === "bow" && (
                   <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-lime-400" />
                 )}
@@ -711,35 +730,79 @@ function WeaponStatus({ hud }: { hud: HudState }) {
       </div>
     );
   }
+  // poison mist (heat-based, shares overheat logic with flamethrower)
+  if (hud.weaponClass === "poison_mist") {
+    const pct = Math.min(1, hud.heat);
+    return (
+      <div className="pointer-events-none flex w-64 max-w-[70vw] items-center gap-2 rounded-full border border-lime-300/20 bg-black/45 px-3 py-1.5 backdrop-blur">
+        <span
+          className={cn(
+            "text-[11px] font-bold",
+            hud.overheated ? "text-rose-400 animate-pulse" : "text-lime-300"
+          )}
+        >
+          {hud.overheated ? "过热!" : "毒气"}
+        </span>
+        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full transition-[width] duration-75"
+            style={{
+              width: `${pct * 100}%`,
+              background: hud.overheated
+                ? "linear-gradient(90deg,#fb7185,#ef4444)"
+                : "linear-gradient(90deg,#84cc16,#a3e635,#bef264)",
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
   // ranged magazine
   const ammo = hud.ammo ?? 0;
   const mag = hud.magazine ?? 1;
+  const warm = hud.warmup ?? 0;
   return (
-    <div className="pointer-events-none flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-4 py-1.5 text-xs backdrop-blur">
-      {hud.reloading ? (
-        <span className="font-semibold text-amber-300 animate-pulse">
-          换弹中…
-        </span>
-      ) : (
-        <span className="font-bold text-white">
-          {ammo}
-          <span className="text-slate-400"> / {mag}</span>
-        </span>
-      )}
-      <div className="h-2.5 w-28 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: hud.reloading
-              ? `${hud.reloadPct * 100}%`
-              : `${(ammo / mag) * 100}%`,
-            background: hud.reloading
-              ? "linear-gradient(90deg,#fbbf24,#f97316)"
-              : "linear-gradient(90deg,#4ade80,#22d3ee)",
-          }}
-        />
+    <>
+      <div className="pointer-events-none flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-4 py-1.5 text-xs backdrop-blur">
+        {hud.reloading ? (
+          <span className="font-semibold text-amber-300 animate-pulse">
+            换弹中…
+          </span>
+        ) : (
+          <span className="font-bold text-white">
+            {ammo}
+            <span className="text-slate-400"> / {mag}</span>
+          </span>
+        )}
+        <div className="h-2.5 w-28 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: hud.reloading
+                ? `${hud.reloadPct * 100}%`
+                : `${(ammo / mag) * 100}%`,
+              background: hud.reloading
+                ? "linear-gradient(90deg,#fbbf24,#f97316)"
+                : "linear-gradient(90deg,#4ade80,#22d3ee)",
+            }}
+          />
+        </div>
+        <kbd className="kbd">R</kbd>
       </div>
-      <kbd className="kbd">R</kbd>
-    </div>
+      {warm < 0.999 && (
+        <div className="pointer-events-none mt-1 flex w-56 max-w-[70vw] items-center gap-2 rounded-full border border-amber-300/20 bg-black/45 px-3 py-1.5 backdrop-blur">
+          <span className="text-[11px] font-bold text-amber-300">预热</span>
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full transition-[width] duration-75"
+              style={{
+                width: `${warm * 100}%`,
+                background: "linear-gradient(90deg,#fbbf24,#f97316)",
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
