@@ -41,6 +41,7 @@ const server = http.createServer((req, res) => {
 // ---- WebSocket relay (same logic as server/relay.mjs) ----
 const wss = new WebSocketServer({ server });
 const rooms = new Map();
+const queue = []; // players waiting for a quick match
 let pidCounter = 1;
 
 function genRoom() {
@@ -95,6 +96,34 @@ wss.on("connection", (ws) => {
         for (const other of room.peers.values())
           if (other.pid !== p.pid) send(p.ws, peerInfo(other));
       for (const p of room.peers.values()) send(p.ws, { t: "start" });
+    } else if (msg.t === "find") {
+      // Quick match: pair with the first player already waiting in the queue.
+      const name = String(msg.name || "玩家").slice(0, 16);
+      const qi = queue.findIndex((q) => q.ws === ws);
+      if (qi >= 0) queue.splice(qi, 1);
+      if (queue.length > 0) {
+        const other = queue.shift();
+        const code = genRoom();
+        const room = { peers: new Map() };
+        const pidA = other.pid;
+        const pidB = pidCounter++;
+        room.peers.set(pidA, { pid: pidA, ws: other.ws, name: other.name, host: true });
+        room.peers.set(pidB, { pid: pidB, ws, name, host: false });
+        rooms.set(code, room);
+        other.ws.pid = pidA; other.ws.room = code;
+        ws.pid = pidB; ws.room = code;
+        send(other.ws, { t: "created", room: code, pid: pidA });
+        send(ws, { t: "joined", room: code, pid: pidB });
+        for (const p of room.peers.values())
+          for (const o of room.peers.values())
+            if (o.pid !== p.pid) send(p.ws, peerInfo(o));
+        for (const p of room.peers.values()) send(p.ws, { t: "start" });
+      } else {
+        const pid = pidCounter++;
+        queue.push({ ws, pid, name });
+        ws.pid = pid; ws.room = null;
+        send(ws, { t: "queued" });
+      }
     } else if (msg.t === "msg") {
       const room = ws.room && rooms.get(ws.room);
       if (!room) return;
@@ -104,6 +133,8 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    const qi = queue.findIndex((q) => q.ws === ws);
+    if (qi >= 0) queue.splice(qi, 1);
     const room = ws.room && rooms.get(ws.room);
     if (room) {
       notifyPeers(room, ws.pid);

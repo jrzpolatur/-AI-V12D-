@@ -18,8 +18,6 @@ export default function LobbyScreen({
   };
   const [url, setUrl] = useState(defaultUrl);
   const [name, setName] = useState("玩家");
-  const [room, setRoom] = useState("");
-  const [mode, setMode] = useState<"host" | "guest" | null>(null);
   const [status, setStatus] = useState<NetStatus>("idle");
   const [info, setInfo] = useState<string>("");
   const [peerName, setPeerName] = useState("");
@@ -33,35 +31,22 @@ export default function LobbyScreen({
       },
       onPeer: (_pid, n) => setPeerName(n),
       onStart: () => setStatus("ready"),
-      onPeerLeft: () => setStatus("waiting", "对手已离开，等待重连…"),
+      onPeerLeft: () => setStatus("waiting", "对手已离开，正在重新匹配…"),
     });
   }
   const net = netRef.current;
 
-  // Auto-connect on mount so the lobby is ready by the time the user interacts.
-  // Any failure surfaces immediately as an error instead of a silent "idle".
+  // Auto-connect on mount with auto-reconnect so a flaky link (e.g. free-tier
+  // cold starts) recovers transparently instead of flipping colours.
   useEffect(() => {
-    net.connect(url);
+    net.connect(url, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const connect = () => {
-    net.disconnect();
-    net.connect(url);
-  };
-
-  const doCreate = () => {
-    setMode("host");
-    net.create(name);
-  };
-
-  const doJoin = () => {
-    if (room.trim().length < 3) return;
-    setMode("guest");
-    net.join(room, name);
-  };
+  const doFind = () => net.find(name);
 
   const ready = status === "ready";
+  const canFind = status === "connected" || status === "idle" || status === "error";
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100">
@@ -70,17 +55,10 @@ export default function LobbyScreen({
           联机对战
         </h1>
         <p className="mb-6 text-center text-sm text-slate-400">
-          1v1 竞技 + 合作守基地 · 与好友跨网络连接
+          1v1 竞技 + 合作守基地 · 点一下自动匹配对手
         </p>
 
         <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <label className="block text-xs text-slate-400">中转服务器地址</label>
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-cyan-400/60"
-            placeholder="ws://你的服务器:8080"
-          />
           <label className="block text-xs text-slate-400">你的昵称</label>
           <input
             value={name}
@@ -88,58 +66,42 @@ export default function LobbyScreen({
             className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-cyan-400/60"
             maxLength={16}
           />
+
           <button
-            onClick={connect}
-            className="w-full rounded-lg border border-white/15 bg-white/5 py-2 text-sm font-semibold hover:bg-white/10"
+            onClick={doFind}
+            disabled={!canFind}
+            className={
+              "w-full rounded-xl py-4 text-lg font-black transition " +
+              (canFind
+                ? "bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white hover:scale-[1.01] active:scale-95"
+                : "cursor-not-allowed bg-white/5 text-slate-500")
+            }
           >
-            连接服务器
+            {ready ? "已匹配，进入装配 →" : status === "waiting" ? "匹配中…" : "快速匹配"}
           </button>
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button
-              onClick={doCreate}
-              className="rounded-xl border border-cyan-400/40 bg-cyan-500/10 py-3 text-base font-bold text-cyan-200 hover:scale-[1.02] active:scale-95"
-            >
-              创建房间（主机）
-            </button>
-            <div className="flex flex-col gap-2">
-              <input
-                value={room}
-                onChange={(e) => setRoom(e.target.value.toUpperCase())}
-                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-center text-sm uppercase tracking-widest outline-none focus:border-fuchsia-400/60"
-                placeholder="房间码"
-                maxLength={4}
-              />
-              <button
-                onClick={doJoin}
-                className="rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/10 py-2 text-sm font-bold text-fuchsia-200 hover:scale-[1.02] active:scale-95"
-              >
-                加入房间（客户端）
-              </button>
-            </div>
-          </div>
+          <details className="text-xs text-slate-500">
+            <summary className="cursor-pointer select-none">高级：手动服务器地址</summary>
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-cyan-400/60"
+              placeholder="ws://你的服务器:8080"
+            />
+          </details>
         </div>
 
         <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4 text-sm">
           {status === "idle" && <p className="text-slate-400">尚未连接。</p>}
-          {status === "connecting" && <p className="text-amber-300">正在连接服务器…</p>}
-          {status === "connected" && <p className="text-emerald-300">已连接服务器，可以创建或加入房间了。</p>}
-          {status === "waiting" && (
-            <div className="space-y-1">
-              <p className="text-amber-300">{info}</p>
-              {mode === "host" && (
-                <p className="text-cyan-300">
-                  把房间码 <span className="font-mono text-lg font-bold tracking-widest">{net.roomCode}</span> 发给好友，让他用「加入房间」输入。
-                </p>
-              )}
-            </div>
-          )}
+          {status === "connecting" && <p className="text-amber-300">正在连接服务器…（会自动重试）</p>}
+          {status === "connected" && <p className="text-emerald-300">已连接服务器，点「快速匹配」开始。</p>}
+          {status === "waiting" && <p className="text-amber-300">{info}</p>}
           {status === "ready" && (
             <p className="text-emerald-300">
               已与 <span className="font-bold">{peerName || "对手"}</span> 连接！可以开始了。
             </p>
           )}
-          {status === "error" && <p className="text-rose-400">错误：{info}</p>}
+          {status === "error" && <p className="text-rose-400">错误：{info}（正在自动重连…）</p>}
 
           {peerName && status !== "ready" && (
             <p className="mt-1 text-slate-400">对手：{peerName}</p>
@@ -155,7 +117,7 @@ export default function LobbyScreen({
           </button>
           <button
             disabled={!ready}
-            onClick={() => mode && onReady(mode, net)}
+            onClick={() => onReady(net.playerMode, net)}
             className={
               "flex-1 rounded-lg py-2 text-base font-bold transition " +
               (ready

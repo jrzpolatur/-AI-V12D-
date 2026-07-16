@@ -8,9 +8,11 @@
 // Control messages (server <-> client):
 //   C->S { t:"create", name }              create a room, become host
 //   C->S { t:"join",   room, name }        join an existing room
+//   C->S { t:"find",   name }              quick match: pair with next waiting player
 //   C->S { t:"msg",    data }              opaque game payload -> forwarded to peer
 //   S->C { t:"created", room, pid }        you created a room
 //   S->C { t:"joined",  room, pid }        you joined a room
+//   S->C { t:"queued" }                    find() accepted, waiting for an opponent
 //   S->C { t:"peer",    pid, name, host }  info about the other player
 //   S->C { t:"start" }                     both players present, game may begin
 //   S->C { t:"msg",     data }             a game payload from your peer
@@ -24,6 +26,8 @@ const wss = new WebSocketServer({ port: PORT });
 
 /** roomCode -> { peers: Map<pid, {ws, name, host}> } */
 const rooms = new Map();
+/** players waiting for a quick match */
+const queue = [];
 let pidCounter = 1;
 
 function genRoom() {
@@ -99,6 +103,33 @@ wss.on("connection", (ws) => {
       }
       // both present -> start
       for (const p of room.peers.values()) send(p.ws, { t: "start" });
+    } else if (msg.t === "find") {
+      const name = String(msg.name || "玩家").slice(0, 16);
+      const qi = queue.findIndex((q) => q.ws === ws);
+      if (qi >= 0) queue.splice(qi, 1);
+      if (queue.length > 0) {
+        const other = queue.shift();
+        const code = genRoom();
+        const room = { peers: new Map() };
+        const pidA = other.pid;
+        const pidB = pidCounter++;
+        room.peers.set(pidA, { pid: pidA, ws: other.ws, name: other.name, host: true });
+        room.peers.set(pidB, { pid: pidB, ws, name, host: false });
+        rooms.set(code, room);
+        other.ws.pid = pidA; other.ws.room = code;
+        ws.pid = pidB; ws.room = code;
+        send(other.ws, { t: "created", room: code, pid: pidA });
+        send(ws, { t: "joined", room: code, pid: pidB });
+        for (const p of room.peers.values())
+          for (const o of room.peers.values())
+            if (o.pid !== p.pid) send(p.ws, peerInfo(o));
+        for (const p of room.peers.values()) send(p.ws, { t: "start" });
+      } else {
+        const pid = pidCounter++;
+        queue.push({ ws, pid, name });
+        ws.pid = pid; ws.room = null;
+        send(ws, { t: "queued" });
+      }
     } else if (msg.t === "msg") {
       const room = ws.room && rooms.get(ws.room);
       if (!room) return;
@@ -109,6 +140,8 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    const qi = queue.findIndex((q) => q.ws === ws);
+    if (qi >= 0) queue.splice(qi, 1);
     const room = ws.room && rooms.get(ws.room);
     if (room) {
       notifyPeers(room, ws.pid);

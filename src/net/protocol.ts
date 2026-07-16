@@ -7,11 +7,13 @@ export type NetMode = "local" | "host" | "guest";
 export type RelayIn =
   | { t: "create"; name?: string }
   | { t: "join"; room: string; name?: string }
+  | { t: "find"; name?: string } // quick-match: pair with next waiting player
   | { t: "msg"; data: GameMsg };
 
 export type RelayOut =
   | { t: "created"; room: string; pid: number }
   | { t: "joined"; room: string; pid: number }
+  | { t: "queued" } // find() accepted, waiting for an opponent
   | { t: "peer"; pid: number; name: string; host: boolean }
   | { t: "start" }
   | { t: "msg"; data: GameMsg }
