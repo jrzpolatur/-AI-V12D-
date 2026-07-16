@@ -168,6 +168,10 @@ export default function GameScreen({
     const canvas = canvasRef.current!;
     const engine = new GameEngine(canvas, loadout, setHud, { mode, net });
     engineRef.current = engine;
+    // NOTE: enable touch mode HERE (not from MobileControls' own effect). Child
+    // effects run before the parent effect that creates the engine, so at that
+    // point engineRef.current is still null and setTouchMode would silently no-op.
+    if (isTouch) engine.setTouchMode(true);
     engine.start();
     return () => {
       engine.stop();
@@ -176,7 +180,7 @@ export default function GameScreen({
       // so tearing it down here would silently kill the live relay socket and
       // cause a black screen on re-entry. Net lifetime is owned by App/Lobby.
     };
-  }, [loadout]);
+  }, [loadout, isTouch]);
 
   const character = getCharacter(loadout.characterId);
   const outfit = getOutfit(loadout.outfitId);
