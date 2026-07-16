@@ -33,7 +33,8 @@ export interface RuntimeConfig {
   playerDamageMult: number;
   playerSpeedMult: number;
   // health overrides (0 = use character/outfit defaults)
-  /** player base max HP override; 0 means use character.maxHp + outfit.hpBonus */
+  /** player base max HP override; 0 means use character.maxHp + outfit.hpBonus.
+   *  Unified to 250 for ALL players (any character/outfit) — see content/juggernaut. */
   playerBaseHp: number;
   /** enemy base max HP override; 0 means use the per-character scaling */
   enemyHp: number;
@@ -62,7 +63,7 @@ export const RUNTIME_DEFAULTS: RuntimeConfig = {
   enemyEliteDmgMult: 1.8,
   playerDamageMult: 1,
   playerSpeedMult: 1,
-  playerBaseHp: 0,
+  playerBaseHp: 250, // unified max HP for every player (character/outfit HP bonuses disabled)
   enemyHp: 0,
 };
 

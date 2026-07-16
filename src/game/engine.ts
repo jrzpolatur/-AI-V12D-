@@ -751,7 +751,11 @@ export class GameEngine {
   private makeFoe(): Player {
     const c = getCharacter("raider");
     const o = getOutfit("tactical");
-    const maxHp = Math.round(c.maxHp + o.hpBonus);
+    // opponents also use the unified player HP override (so every player = 250)
+    const maxHp =
+      RUNTIME.playerBaseHp > 0
+        ? RUNTIME.playerBaseHp
+        : Math.round(c.maxHp + o.hpBonus);
     this.foeChar = c;
     this.foeOutfit = o;
     return {
@@ -822,7 +826,10 @@ export class GameEngine {
     if (this.foe) {
       const c = this.foeChar;
       const o = this.foeOutfit;
-      this.foe.maxHp = Math.round(c.maxHp + o.hpBonus);
+      this.foe.maxHp =
+        RUNTIME.playerBaseHp > 0
+          ? RUNTIME.playerBaseHp
+          : Math.round(c.maxHp + o.hpBonus);
       if (this.foe.hp > this.foe.maxHp) this.foe.hp = this.foe.maxHp;
       this.foe.speed = c.speed * (1 + o.speedBonus);
       this.foe.size = c.size;
@@ -2082,7 +2089,7 @@ export class GameEngine {
         if (gr.kind === "glue") {
           this.spawnGlueWall(gr.x, gr.y);
         } else {
-          this.explode(gr.x, gr.y, 120, 90, "#fb923c");
+          this.explode(gr.x, gr.y, 120, 225, "#fb923c");
         }
       } else next.push(gr);
     }
@@ -2231,7 +2238,7 @@ export class GameEngine {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 0.6,
-                damage: 14,
+                damage: 35,
                 size: 4,
                 color: "#bae6fd",
                 glow: d.color,
@@ -2253,7 +2260,7 @@ export class GameEngine {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 1.2,
-                damage: 22,
+                damage: 55,
                 size: 7,
                 color: "#ddd6fe",
                 glow: d.color,
@@ -2270,7 +2277,7 @@ export class GameEngine {
         // turrets can be damaged by enemies on contact
         for (const e of this.enemies) {
           if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + d.size) {
-            d.hp -= 30 * dt;
+            d.hp -= 75 * dt;
           }
         }
         if (d.hp > 0 && d.life > 0) next.push(d);
@@ -2286,7 +2293,7 @@ export class GameEngine {
             if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + 24) {
               // triggered
               if (d.kind === "mine_explosive") {
-                this.explode(d.x, d.y, d.radius, 80, d.color);
+                this.explode(d.x, d.y, d.radius, 200, d.color);
               } else if (d.kind === "mine_poison") {
                 this.effects.push({
                   type: "poisoncloud",
@@ -2296,7 +2303,7 @@ export class GameEngine {
                   duration: 5,
                   radius: d.radius,
                   color: d.color,
-                  dps: 30,
+                  dps: 75,
                   slow: 0.5,
                   tickT: 0,
                 });
@@ -2309,7 +2316,7 @@ export class GameEngine {
                   duration: 5,
                   radius: d.radius,
                   color: d.color,
-                  dps: 45,
+                  dps: 112.5,
                   tickT: 0,
                 });
               }
@@ -2325,7 +2332,7 @@ export class GameEngine {
       if (d.kind === "healing_station") {
         const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
         if (dist < d.radius + this.player.size && this.player.hp < this.player.maxHp) {
-          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 18 * dt);
+          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45 * dt);
           if (Math.random() < 0.3)
             this.spawnParticles(this.player.x, this.player.y, "#4ade80", 1, 50, 0.3);
         }
