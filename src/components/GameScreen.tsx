@@ -166,7 +166,10 @@ export default function GameScreen({
     engine.start();
     return () => {
       engine.stop();
-      net?.disconnect();
+      // NOTE: do NOT call net?.disconnect() here. The Net instance is shared
+      // across lobby/loadout/game screens (and in dev StrictMode re-mounts),
+      // so tearing it down here would silently kill the live relay socket and
+      // cause a black screen on re-entry. Net lifetime is owned by App/Lobby.
     };
   }, [loadout]);
 

@@ -689,7 +689,7 @@ export class GameEngine {
     if (this.mode !== "local" && this.net) {
       this.selfPid = this.net.selfPid || 1;
       this.peerPid = this.selfPid === 1 ? 2 : 1;
-      this.gunIndex = Math.max(0, this.guns.findIndex((g) => g.id === loadout.gunId));
+      this.gunIndex = Math.max(0, this.guns.findIndex((g) => g.id === this.loadout.gunId));
       this.player.gunIndex = this.gunIndex;
       this.player.skillCd = 0;
       this.player.dashCharges = MAX_DASH_CHARGES;
