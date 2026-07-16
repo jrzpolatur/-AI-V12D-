@@ -2695,6 +2695,7 @@ export class GameEngine {
 
   private damageEnemyBase(dmg: number) {
     if (this.enemyBase.hp <= 0) return;
+    dmg *= RUNTIME.playerDamageMult;
     this.enemyBase.hp -= dmg;
     this.enemyBase.flash = 1;
     this.shake = Math.min(8, this.shake + dmg * 0.08);

@@ -26,6 +26,7 @@ export interface RuntimeConfig {
   enemyEliteChance: number;
   enemyHpScalePerWave: number;
   enemyDmgScalePerWave: number;
+  /** enemy base per-hit damage; scaled ×2.5 (8 → 20) to match unified 250 player HP */
   enemyBaseDamage: number;
   enemyEliteHpMult: number;
   enemyEliteDmgMult: number;
@@ -36,7 +37,8 @@ export interface RuntimeConfig {
   /** player base max HP override; 0 means use character.maxHp + outfit.hpBonus.
    *  Unified to 250 for ALL players (any character/outfit) — see content/juggernaut. */
   playerBaseHp: number;
-  /** enemy base max HP override; 0 means use the per-character scaling */
+  /** enemy base max HP override; 0 = use per-character scaling.
+   *  Set 250 so enemies match the unified 250 player HP (×2.5 balance scaling). */
   enemyHp: number;
 }
 
@@ -58,13 +60,13 @@ export const RUNTIME_DEFAULTS: RuntimeConfig = {
   enemyEliteChance: 0.15,
   enemyHpScalePerWave: 0.1,
   enemyDmgScalePerWave: 0.04,
-  enemyBaseDamage: 8,
+  enemyBaseDamage: 20, // ×2.5 (8 → 20) to match unified 250 player HP
   enemyEliteHpMult: 2,
   enemyEliteDmgMult: 1.8,
-  playerDamageMult: 1,
+  playerDamageMult: 0.8, // all player damage to enemies ×0.8 (−20%) on top of the ×2.5 balance scaling
   playerSpeedMult: 1,
   playerBaseHp: 250, // unified max HP for every player (character/outfit HP bonuses disabled)
-  enemyHp: 0,
+  enemyHp: 250, // unified enemy base HP ×2.5 to match 250 player HP (per-wave hpScale & elite mult still apply)
 };
 
 export const RUNTIME: RuntimeConfig = { ...RUNTIME_DEFAULTS };
