@@ -49,6 +49,9 @@ export interface SnapPlayer {
   shieldHp: number | null;
   shieldMaxHp: number | null;
   gadgets: { id: string; ready: boolean; cdPct: number; deployed: number }[];
+  /** >0 = electrified by a lightsaber hit (guest renders crackling arcs) */
+  electrified: number;
+  electrifiedGlow: string;
 }
 
 export interface SnapEnemy {

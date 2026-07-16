@@ -786,291 +786,622 @@ export function drawWeaponIcon(
 ) {
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(s / 16, s / 16);
+  const sc = s / 16;
+  ctx.scale(sc, sc);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  const G = glow;
 
-  const silhouette = (fn: () => void) => {
-    ctx.fillStyle = rgba(G, 0.18);
-    ctx.strokeStyle = G;
-    ctx.lineWidth = 1.6;
-    fn();
+  // metallic body gradient (vertical), crisp accent outline + neon glow
+  const grad = ctx.createLinearGradient(0, -9, 0, 9);
+  grad.addColorStop(0, STEEL_X);
+  grad.addColorStop(0.45, STEEL);
+  grad.addColorStop(1, STEEL_D);
+
+  /** Draw the main steel body with a glow outline. */
+  const body = (p: () => void) => {
+    ctx.save();
+    ctx.shadowColor = rgba(glow, 0.55);
+    ctx.shadowBlur = 5;
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = glow;
+    ctx.lineWidth = 1.5;
+    p();
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.stroke();
+    ctx.restore();
   };
+  /** Accent stroke (default = weapon glow). */
+  const stroke = (p: () => void, color = glow, lw = 1.1) => {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    p();
+    ctx.restore();
+  };
+  /** Solid fill in a flat color. */
+  const fill = (p: () => void, color: string) => {
+    ctx.save();
+    ctx.fillStyle = color;
+    p();
+    ctx.fill();
+    ctx.restore();
+  };
+  /** Light highlight line. */
+  const hi = (p: () => void) => stroke(p, STEEL_L, 0.9);
+  /** Dark recess / detail fill. */
+  const inn = (p: () => void) => fill(p, "#14161f");
 
   switch (iconShape) {
     case "pistol":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8, -3);
-        ctx.lineTo(6, -3);
-        ctx.lineTo(6, 1);
-        ctx.lineTo(2, 1);
-        ctx.lineTo(2, 7);
-        ctx.lineTo(-4, 7);
-        ctx.lineTo(-4, 1);
-        ctx.lineTo(-8, 1);
+        ctx.moveTo(-6, -2.2);
+        ctx.lineTo(5, -2.2);
+        ctx.lineTo(6.6, -1);
+        ctx.lineTo(6.6, 0.2);
+        ctx.lineTo(-1, 0.2);
+        ctx.lineTo(-1, 1.4);
+        ctx.lineTo(-3.4, 1.4);
+        ctx.lineTo(-5.4, 7);
+        ctx.lineTo(-7.6, 7);
+        ctx.lineTo(-5.4, 0.4);
+        ctx.lineTo(-6.4, 0.4);
         ctx.closePath();
       });
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-1.6, 1.9);
+        ctx.lineTo(-1.6, 4);
+        ctx.lineTo(0.6, 4);
+        ctx.lineTo(0.6, 1.9);
+      });
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(6.6, -1);
+        ctx.lineTo(7.5, -1);
+        ctx.lineTo(7.5, 0.2);
+        ctx.lineTo(6.6, 0.2);
+        ctx.closePath();
+      }, glow);
       break;
     case "smg":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -2);
-        ctx.lineTo(7, -2);
-        ctx.lineTo(7, 3);
-        ctx.lineTo(2, 3);
+        ctx.moveTo(-8.5, -2.2);
+        ctx.lineTo(6, -2.2);
+        ctx.lineTo(6, -0.4);
+        ctx.lineTo(2, -0.4);
+        ctx.lineTo(2, 0.6);
+        ctx.lineTo(7, 0.6);
+        ctx.lineTo(7, 2.2);
+        ctx.lineTo(2, 2.2);
         ctx.lineTo(2, 8);
-        ctx.lineTo(-2, 8);
-        ctx.lineTo(-2, 3);
-        ctx.lineTo(-9, 3);
+        ctx.lineTo(-1.5, 8);
+        ctx.lineTo(-1.5, 2.2);
+        ctx.lineTo(-8.5, 2.2);
         ctx.closePath();
+      });
+      hi(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8, -1.6);
+        ctx.lineTo(5, -1.6);
+      });
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(2.2, 2.6);
+        ctx.lineTo(2.2, 7);
+        ctx.lineTo(-1.3, 7);
+        ctx.lineTo(-1.3, 2.6);
       });
       break;
     case "shotgun":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -1);
-        ctx.lineTo(-9, 2);
-        ctx.lineTo(-2, 2);
-        ctx.lineTo(-2, 6);
-        ctx.lineTo(2, 6);
-        ctx.lineTo(2, 2);
-        ctx.lineTo(8, 2);
-        ctx.lineTo(8, -1);
+        ctx.moveTo(-9, -1.6);
+        ctx.lineTo(8.5, -1.6);
+        ctx.lineTo(8.5, 0.4);
+        ctx.lineTo(-2, 0.4);
+        ctx.lineTo(-2, 1.4);
+        ctx.lineTo(2, 1.4);
+        ctx.lineTo(2, 2.4);
+        ctx.lineTo(-1, 2.4);
+        ctx.lineTo(-1, 6.5);
+        ctx.lineTo(-3.2, 6.5);
+        ctx.lineTo(-3.2, 2.4);
+        ctx.lineTo(-9, 2.4);
         ctx.closePath();
+      });
+      hi(() => {
+        ctx.beginPath();
+        ctx.moveTo(-2, -1.1);
+        ctx.lineTo(8, -1.1);
+      });
+      // pump grip
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(2.5, 0.8);
+        ctx.lineTo(6, 0.8);
+        ctx.lineTo(6, 1.8);
+        ctx.lineTo(2.5, 1.8);
       });
       break;
     case "rifle":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-10, -1.5);
-        ctx.lineTo(9, -1.5);
-        ctx.lineTo(9, 1.5);
-        ctx.lineTo(2, 1.5);
-        ctx.lineTo(0, 6);
-        ctx.lineTo(-3, 6);
-        ctx.lineTo(-3, 1.5);
-        ctx.lineTo(-10, 1.5);
+        ctx.moveTo(-9.5, -1.6);
+        ctx.lineTo(8.5, -1.6);
+        ctx.lineTo(8.5, 0.4);
+        ctx.lineTo(2, 0.4);
+        ctx.lineTo(2, 1.4);
+        ctx.lineTo(0, 1.4);
+        ctx.lineTo(-1.5, 6);
+        ctx.lineTo(-4, 6);
+        ctx.lineTo(-2.5, 1.4);
+        ctx.lineTo(-9.5, 1.4);
+        ctx.closePath();
+      });
+      // stock
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-6, 0.4);
+        ctx.lineTo(-9.5, 0.4);
+        ctx.lineTo(-9.5, 1.4);
+        ctx.lineTo(-5.5, 1.4);
+      });
+      // magazine
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(2.5, 1.8);
+        ctx.lineTo(4, 1.8);
+        ctx.lineTo(3.3, 5.5);
+        ctx.lineTo(1.8, 5.5);
         ctx.closePath();
       });
       break;
     case "sniper":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-10, -1);
-        ctx.lineTo(10, -1);
-        ctx.lineTo(10, 2);
-        ctx.lineTo(-4, 2);
-        ctx.lineTo(-4, 6);
-        ctx.lineTo(-8, 6);
-        ctx.lineTo(-8, 2);
-        ctx.lineTo(-10, 2);
-        ctx.closePath();
-        // scope
-        ctx.moveTo(-3, -4);
-        ctx.lineTo(4, -4);
-        ctx.lineTo(4, -2);
-        ctx.lineTo(-3, -2);
+        ctx.moveTo(-9, -1.4);
+        ctx.lineTo(9.5, -1.4);
+        ctx.lineTo(9.5, 0.6);
+        ctx.lineTo(2, 0.6);
+        ctx.lineTo(2, 1.6);
+        ctx.lineTo(-1, 1.6);
+        ctx.lineTo(-2.5, 6);
+        ctx.lineTo(-5, 6);
+        ctx.lineTo(-3.5, 1.6);
+        ctx.lineTo(-9, 1.6);
         ctx.closePath();
       });
+      // scope (accent)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-2.5, -4.4);
+        ctx.lineTo(5, -4.4);
+        ctx.lineTo(5.4, -2.4);
+        ctx.lineTo(-3, -2.4);
+        ctx.closePath();
+      }, rgba(glow, 0.85));
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(0.6, -4.4);
+        ctx.lineTo(0.6, -2.4);
+        ctx.moveTo(2.4, -4.4);
+        ctx.lineTo(2.4, -2.4);
+      }, "#0b0c22", 0.8);
       break;
     case "rocket":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
         ctx.moveTo(-9, -3);
-        ctx.lineTo(6, -3);
-        ctx.lineTo(10, 0);
-        ctx.lineTo(6, 3);
+        ctx.lineTo(5, -3);
+        ctx.lineTo(9.5, 0);
+        ctx.lineTo(5, 3);
         ctx.lineTo(-9, 3);
-        ctx.lineTo(-9, 1);
-        ctx.lineTo(-11, 1);
-        ctx.lineTo(-11, -1);
-        ctx.lineTo(-9, -1);
+        ctx.lineTo(-9, 1.2);
+        ctx.lineTo(-11, 1.2);
+        ctx.lineTo(-11, -1.2);
+        ctx.lineTo(-9, -1.2);
         ctx.closePath();
+      });
+      // open muzzle
+      inn(() => {
+        ctx.beginPath();
+        ctx.moveTo(5.4, -1.6);
+        ctx.lineTo(8.6, 0);
+        ctx.lineTo(5.4, 1.6);
+        ctx.closePath();
+      });
+      // rear grip
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9, 0.5);
+        ctx.lineTo(-9, 4);
+        ctx.lineTo(-7, 4);
+        ctx.lineTo(-7, 0.5);
       });
       break;
     case "akm":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-10, -2);
-        ctx.lineTo(8, -2);
-        ctx.lineTo(8, 2);
-        ctx.lineTo(1, 2);
-        ctx.lineTo(1, 7);
-        ctx.lineTo(-2, 7);
-        ctx.lineTo(-2, 2);
-        ctx.lineTo(-10, 2);
+        ctx.moveTo(-9.5, -2.2);
+        ctx.lineTo(7, -2.2);
+        ctx.lineTo(7, -0.4);
+        ctx.lineTo(1, -0.4);
+        ctx.lineTo(1, 0.8);
+        ctx.lineTo(7, 0.8);
+        ctx.lineTo(7, 2.2);
+        ctx.lineTo(2.5, 2.2);
+        ctx.lineTo(2.5, 7.5);
+        ctx.lineTo(-0.5, 7.5);
+        ctx.lineTo(-0.5, 2.2);
+        ctx.lineTo(-9.5, 2.2);
+        ctx.closePath();
+      });
+      // curved magazine
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(0.8, 2.6);
+        ctx.quadraticCurveTo(3.4, 4.5, 2.2, 7.2);
+        ctx.lineTo(-0.3, 7.2);
+        ctx.quadraticCurveTo(0.6, 4.6, -0.7, 2.6);
         ctx.closePath();
       });
       break;
     case "fcar":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-10, -2.5);
-        ctx.lineTo(9, -2.5);
-        ctx.lineTo(9, 2.5);
-        ctx.lineTo(0, 2.5);
-        ctx.lineTo(0, 7);
-        ctx.lineTo(-3, 7);
-        ctx.lineTo(-3, 2.5);
-        ctx.lineTo(-10, 2.5);
+        ctx.moveTo(-9.5, -2.6);
+        ctx.lineTo(8.5, -2.6);
+        ctx.lineTo(8.5, -0.8);
+        ctx.lineTo(0, -0.8);
+        ctx.lineTo(0, 0.6);
+        ctx.lineTo(-2.5, 0.6);
+        ctx.lineTo(-4, 6.5);
+        ctx.lineTo(-6.5, 6.5);
+        ctx.lineTo(-5, 0.6);
+        ctx.lineTo(-9.5, 0.6);
         ctx.closePath();
+      });
+      hi(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9, -2);
+        ctx.lineTo(8, -2);
+      });
+      // foregrip
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(4.5, -0.2);
+        ctx.lineTo(4.5, 2.6);
+        ctx.lineTo(6, 2.6);
+        ctx.lineTo(6, -0.2);
       });
       break;
     case "pulse":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -3);
-        ctx.lineTo(6, -3);
-        ctx.lineTo(9, 0);
-        ctx.lineTo(6, 3);
-        ctx.lineTo(-9, 3);
+        ctx.moveTo(-8.5, -3);
+        ctx.lineTo(4, -3);
+        ctx.lineTo(8.5, 0);
+        ctx.lineTo(4, 3);
+        ctx.lineTo(-8.5, 3);
+        ctx.lineTo(-8.5, 1.2);
+        ctx.lineTo(-10.5, 1.2);
+        ctx.lineTo(-10.5, -1.2);
+        ctx.lineTo(-8.5, -1.2);
         ctx.closePath();
       });
+      // energy core (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(-3, 0, 2.1, 0, Math.PI * 2);
+        ctx.closePath();
+      }, rgba(glow, 0.9));
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-1, -1.6);
+        ctx.lineTo(4, -1.6);
+      }, STEEL_L, 0.9);
       break;
     case "lightsaber":
-      silhouette(() => {
+      // hilt
+      body(() => {
         ctx.beginPath();
-        // hilt
         ctx.moveTo(-8, -2);
         ctx.lineTo(2, -2);
         ctx.lineTo(2, 2);
         ctx.lineTo(-8, 2);
         ctx.closePath();
-        // blade
-        ctx.moveTo(2, -0.8);
-        ctx.lineTo(10, -0.8);
-        ctx.lineTo(10, 0.8);
-        ctx.lineTo(2, 0.8);
-        ctx.closePath();
       });
+      // blade (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(2, -1);
+        ctx.lineTo(11, -1);
+        ctx.lineTo(11, 1);
+        ctx.lineTo(2, 1);
+        ctx.closePath();
+      }, rgba(glow, 0.9));
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(2, -0.4);
+        ctx.lineTo(11, -0.4);
+        ctx.lineTo(11, 0.4);
+        ctx.lineTo(2, 0.4);
+        ctx.closePath();
+      }, "#ffffff");
+      // emitter ring
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(1.6, -2.2);
+        ctx.lineTo(2.4, -2.2);
+        ctx.lineTo(2.4, 2.2);
+        ctx.lineTo(1.6, 2.2);
+        ctx.closePath();
+      }, glow);
       break;
     case "hammer":
-      silhouette(() => {
+      // handle
+      body(() => {
         ctx.beginPath();
-        // handle
-        ctx.moveTo(-7, -1);
-        ctx.lineTo(4, -1);
-        ctx.lineTo(4, 1);
-        ctx.lineTo(-7, 1);
-        ctx.closePath();
-        // head
-        ctx.moveTo(4, -5);
-        ctx.lineTo(10, -5);
-        ctx.lineTo(10, 5);
-        ctx.lineTo(4, 5);
+        ctx.moveTo(-8, -1.1);
+        ctx.lineTo(4, -1.1);
+        ctx.lineTo(4, 1.1);
+        ctx.lineTo(-8, 1.1);
         ctx.closePath();
       });
+      // head (accent block)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(4, -5.2);
+        ctx.lineTo(10.5, -5.2);
+        ctx.lineTo(10.5, 5.2);
+        ctx.lineTo(4, 5.2);
+        ctx.closePath();
+      }, rgba(glow, 0.85));
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(7.2, -5.2);
+        ctx.lineTo(7.2, 5.2);
+      }, "#0b0c22", 0.9);
       break;
     case "flamethrower":
-      silhouette(() => {
+      // tank
+      body(() => {
         ctx.beginPath();
         ctx.moveTo(-9, -3);
-        ctx.lineTo(4, -3);
-        ctx.lineTo(4, -6);
-        ctx.lineTo(8, -6);
-        ctx.lineTo(8, -3);
-        ctx.lineTo(10, -1);
-        ctx.lineTo(10, 2);
-        ctx.lineTo(4, 3);
+        ctx.lineTo(1, -3);
+        ctx.lineTo(1, 3);
         ctx.lineTo(-9, 3);
         ctx.closePath();
       });
+      // nozzle
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(1, -1.4);
+        ctx.lineTo(8.5, -1.4);
+        ctx.lineTo(9.5, 0);
+        ctx.lineTo(8.5, 1.4);
+        ctx.lineTo(1, 1.4);
+        ctx.closePath();
+      });
+      // flames (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(9.4, -1.6);
+        ctx.quadraticCurveTo(12, 0, 9.4, 1.6);
+        ctx.lineTo(9.4, 0.8);
+        ctx.quadraticCurveTo(11, 0, 9.4, -0.8);
+        ctx.closePath();
+      }, rgba(glow, 0.85));
       break;
     case "sa1216":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -2);
-        ctx.lineTo(7, -2);
-        ctx.lineTo(7, 2);
-        ctx.lineTo(2, 2);
-        ctx.lineTo(2, 7);
-        ctx.lineTo(-2, 7);
-        ctx.lineTo(-2, 2);
-        ctx.lineTo(-9, 2);
+        ctx.moveTo(-8.5, -2.4);
+        ctx.lineTo(6.5, -2.4);
+        ctx.lineTo(6.5, -0.6);
+        ctx.lineTo(0.5, -0.6);
+        ctx.lineTo(0.5, 0.8);
+        ctx.lineTo(6.5, 0.8);
+        ctx.lineTo(6.5, 2.4);
+        ctx.lineTo(2.5, 2.4);
+        ctx.lineTo(2.5, 7.5);
+        ctx.lineTo(-0.5, 7.5);
+        ctx.lineTo(-0.5, 2.4);
+        ctx.lineTo(-8.5, 2.4);
+        ctx.closePath();
+      });
+      // bullpup magazine (front)
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(3.5, 2.8);
+        ctx.lineTo(5, 2.8);
+        ctx.lineTo(4.4, 6.5);
+        ctx.lineTo(2.8, 6.5);
         ctx.closePath();
       });
       break;
     case "mgl32":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -2);
-        ctx.lineTo(8, -2);
-        ctx.lineTo(8, 2);
-        ctx.lineTo(0, 2);
-        ctx.arc(0, 2, 4, 0, Math.PI, false);
-        ctx.lineTo(-9, 2);
+        ctx.moveTo(-9, -2.2);
+        ctx.lineTo(7.5, -2.2);
+        ctx.lineTo(7.5, 2.2);
+        ctx.lineTo(-9, 2.2);
         ctx.closePath();
       });
+      // revolving cylinder (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(0, 0.4, 3.6, 0, Math.PI * 2);
+        ctx.closePath();
+      }, rgba(glow, 0.85));
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(0, -3.2);
+        ctx.lineTo(0, 4);
+        ctx.moveTo(-3.6, 0.4);
+        ctx.lineTo(3.6, 0.4);
+      }, "#0b0c22", 0.9);
       break;
     case "spear":
-      silhouette(() => {
+      // shaft
+      body(() => {
         ctx.beginPath();
         ctx.moveTo(-9, -0.8);
-        ctx.lineTo(6, -0.8);
-        ctx.lineTo(10, 0);
-        ctx.lineTo(6, 0.8);
+        ctx.lineTo(5, -0.8);
+        ctx.lineTo(5, 0.8);
         ctx.lineTo(-9, 0.8);
         ctx.closePath();
       });
+      // head (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(4.6, -2.6);
+        ctx.lineTo(11, 0);
+        ctx.lineTo(4.6, 2.6);
+        ctx.lineTo(6, 0);
+        ctx.closePath();
+      }, rgba(glow, 0.9));
       break;
     case "drone":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-7, 0);
-        ctx.lineTo(-4, -5);
-        ctx.lineTo(4, -5);
-        ctx.lineTo(7, 0);
-        ctx.lineTo(4, 5);
-        ctx.lineTo(-4, 5);
+        ctx.moveTo(-5, -1);
+        ctx.lineTo(-3, -5.5);
+        ctx.lineTo(3, -5.5);
+        ctx.lineTo(5, -1);
+        ctx.lineTo(3, 4.5);
+        ctx.lineTo(-3, 4.5);
         ctx.closePath();
       });
+      // rotors
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-7, -6.5);
+        ctx.lineTo(-2, -5);
+        ctx.moveTo(7, -6.5);
+        ctx.lineTo(2, -5);
+        ctx.moveTo(-7, -1);
+        ctx.lineTo(-4, -4);
+        ctx.moveTo(7, -1);
+        ctx.lineTo(4, -4);
+      });
+      // eye (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(0, -0.5, 1.3, 0, Math.PI * 2);
+        ctx.closePath();
+      }, glow);
       break;
     case "recurve_bow":
-      silhouette(() => {
-        // bow arc
+      // bow limbs
+      stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(4, -8);
-        ctx.quadraticCurveTo(10, 0, 4, 8);
-        ctx.lineTo(2, 8);
-        ctx.quadraticCurveTo(8, 0, 2, -8);
+        ctx.moveTo(4, -8.5);
+        ctx.quadraticCurveTo(10.5, 0, 4, 8.5);
+      }, STEEL, 2.4);
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(2, 8.5);
+        ctx.quadraticCurveTo(8, 0, 2, -8.5);
+      }, glow, 1.4);
+      // string
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(4, -8.5);
+        ctx.lineTo(4, 8.5);
+      }, STEEL_L, 0.8);
+      // arrow (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-10, -0.9);
+        ctx.lineTo(2, -0.9);
+        ctx.lineTo(2, 0.9);
+        ctx.lineTo(-10, 0.9);
         ctx.closePath();
-        // arrow
-        ctx.moveTo(-9, 0);
-        ctx.lineTo(2, 0);
-      });
+      }, rgba(glow, 0.9));
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(2, -2);
+        ctx.lineTo(5, 0);
+        ctx.lineTo(2, 2);
+        ctx.closePath();
+      }, glow);
       break;
     case "riot_shield":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
         ctx.moveTo(-8, -7);
         ctx.lineTo(4, -9);
-        ctx.lineTo(7, 0);
+        ctx.lineTo(7.5, 0);
         ctx.lineTo(4, 9);
         ctx.lineTo(-8, 7);
-        ctx.lineTo(-9, 0);
+        ctx.lineTo(-9.2, 0);
         ctx.closePath();
       });
+      // rim accent + boss
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-6.5, -6);
+        ctx.lineTo(3.4, -7.6);
+        ctx.lineTo(6, 0);
+        ctx.lineTo(3.4, 7.6);
+        ctx.lineTo(-6.5, 6);
+        ctx.lineTo(-7.4, 0);
+        ctx.closePath();
+      }, rgba(glow, 0.9), 1.2);
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(-1.5, 0, 2.2, 0, Math.PI * 2);
+        ctx.closePath();
+      }, rgba(glow, 0.9));
+      // grip
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9.2, 0);
+        ctx.lineTo(-11.5, 1.5);
+      }, STEEL_L, 1.2);
       break;
     case "shak50":
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -2);
-        ctx.lineTo(7, -2);
-        ctx.lineTo(7, 2);
-        ctx.lineTo(1, 2);
-        ctx.lineTo(1, 7);
-        ctx.lineTo(-3, 7);
-        ctx.lineTo(-3, 2);
-        ctx.lineTo(-9, 2);
+        ctx.moveTo(-9, -2.4);
+        ctx.lineTo(6.5, -2.4);
+        ctx.lineTo(6.5, -0.6);
+        ctx.lineTo(0.5, -0.6);
+        ctx.lineTo(0.5, 0.8);
+        ctx.lineTo(6.5, 0.8);
+        ctx.lineTo(6.5, 2.4);
+        ctx.lineTo(2.5, 2.4);
+        ctx.lineTo(2.5, 7.5);
+        ctx.lineTo(-0.5, 7.5);
+        ctx.lineTo(-0.5, 2.4);
+        ctx.lineTo(-9, 2.4);
         ctx.closePath();
+      });
+      // box magazine (glow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-1.5, 2.8);
+        ctx.lineTo(2.2, 2.8);
+        ctx.lineTo(2.2, 8.5);
+        ctx.lineTo(-1.5, 8.5);
+        ctx.closePath();
+      }, rgba(glow, 0.85));
+      // bipod
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(5, 2.8);
+        ctx.lineTo(7, 7.5);
+        ctx.moveTo(5, 2.8);
+        ctx.lineTo(3.5, 7.5);
       });
       break;
     default:
-      silhouette(() => {
+      body(() => {
         ctx.beginPath();
         ctx.arc(0, 0, 7, 0, Math.PI * 2);
         ctx.closePath();

@@ -133,6 +133,12 @@ interface Player {
   dashCharges?: number;
   dashRecharge?: number;
   lastGadget?: number;
+  /** >0 means the avatar is down and counting toward respawn (PvP) */
+  deadTimer?: number;
+  /** >0 = currently electrified by a lightsaber hit (renders crackling arcs) */
+  electrifiedTime?: number;
+  /** glow color of the electrifying weapon */
+  electrifiedGlow?: string;
 }
 
 interface Bullet {
@@ -194,6 +200,9 @@ interface Enemy {
   gun?: GunDef;
   /** bow charge for bow enemies */
   bowCharge?: number;
+  /** >0 = currently electrified by a lightsaber hit */
+  electrifiedTime?: number;
+  electrifiedGlow?: string;
 }
 
 interface EnemyBullet {
@@ -225,7 +234,7 @@ interface Particle {
 }
 
 interface Effect {
-  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue";
+  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing";
   x: number;
   y: number;
   t: number;
@@ -335,6 +344,8 @@ const KEYS_MOVE = new Set([
 
 const MAX_DASH_CHARGES = 3;
 const DASH_RECHARGE = 5; // seconds per charge
+/** PvP: seconds a downed player waits before respawning */
+const RESPAWN_TIME = 4;
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
@@ -396,6 +407,10 @@ export class GameEngine {
   private foe: Player | null = null;
   private foeChar: CharacterDef | null = null;
   private foeOutfit: OutfitDef | null = null;
+  /** the opponent's own weapon list (from their loadout, mirrored via "hello") */
+  private foeGuns: GunDef[] = [];
+  /** the host's own avatar; never swapped while simulating the foe */
+  private localPlayer: Player = null as unknown as Player;
   // one-shot action intents captured on the guest, sent with the next input
   private pendGadget = -1;
   private pendSkill = false;
@@ -467,14 +482,15 @@ export class GameEngine {
     this.character = getCharacter(loadout.characterId);
     this.outfit = getOutfit(loadout.outfitId);
     this.skill = getSkill(loadout.skillId);
-    // In multiplayer both players share the full weapon list so gun indices
-    // line up between host and guest; in single-player we respect the loadout.
+    // Every player (single-player AND multiplayer) uses only the two weapons
+    // chosen in their loadout. In multiplayer the host also tracks the foe's
+    // own weapon list (this.foeGuns) so both avatars respect their own picks.
     this.guns =
-      this.mode === "local" && loadout.gunIds && loadout.gunIds.length > 0
+      loadout.gunIds && loadout.gunIds.length > 0
         ? loadout.gunIds
             .map((id) => GUNS.find((g) => g.id === id) ?? GUNS[0])
             .slice(0, 2)
-        : GUNS;
+        : [GUNS.find((g) => g.id === loadout.gunId) ?? GUNS[0]];
     // carried gadgets: from loadout (max 3), else first 3 available gadgets
     const chosen = (loadout.gadgetIds ?? [])
       .map((id) => GADGETS.find((g) => g.id === id))
@@ -681,14 +697,20 @@ export class GameEngine {
       shieldCd: 0,
       lastHitTime: 0,
     };
+    this.localPlayer = this.player;
     // shield weapon init (after player exists)
     this.player.shieldHp = this.gun.shieldMaxHp ?? 0;
     this.applyRuntime();
 
     // ---- multiplayer bootstrapping ----
     if (this.mode !== "local" && this.net) {
-      this.selfPid = this.net.selfPid || 1;
-      this.peerPid = this.selfPid === 1 ? 2 : 1;
+      // Use role-based ids (host=1, guest=2) instead of the relay's global pid
+      // counter. The server's pid is NOT guaranteed to be 1/2 (it increments
+      // across all rooms), so relying on it silently swapped "me"/"foe" in some
+      // sessions -> the player mirrored the opponent and could not move.
+      this.selfPid = this.mode === "host" ? 1 : 2;
+      this.peerPid = this.mode === "host" ? 2 : 1;
+      this.foeGuns = this.guns.slice();
       this.gunIndex = Math.max(0, this.guns.findIndex((g) => g.id === this.loadout.gunId));
       this.player.gunIndex = this.gunIndex;
       this.player.skillCd = 0;
@@ -745,10 +767,32 @@ export class GameEngine {
     };
   }
 
+  /** Make sure every gun in the list has a WeaponState entry (host simulates foe guns too). */
+  private ensureWeaponStates(guns: GunDef[]) {
+    for (const g of guns) {
+      if (!this.weaponStates.has(g.id)) {
+        this.weaponStates.set(g.id, {
+          ammo: g.magazine ?? 0,
+          reload: 0,
+          heat: 0,
+          overheated: false,
+        });
+      }
+    }
+  }
+
   private applyPeerLoadout() {
     if (!this.peerLoadout) return;
     this.foeChar = getCharacter(this.peerLoadout.characterId);
     this.foeOutfit = getOutfit(this.peerLoadout.outfitId);
+    // adopt the opponent's own weapon picks so the host simulates them correctly
+    this.foeGuns =
+      this.peerLoadout.gunIds && this.peerLoadout.gunIds.length > 0
+        ? this.peerLoadout.gunIds
+            .map((id) => GUNS.find((g) => g.id === id) ?? GUNS[0])
+            .slice(0, 2)
+        : [GUNS.find((g) => g.id === this.peerLoadout.gunId) ?? GUNS[0]];
+    this.ensureWeaponStates(this.foeGuns);
     if (this.foe) {
       const c = this.foeChar;
       const o = this.foeOutfit;
@@ -1038,6 +1082,14 @@ export class GameEngine {
     // ---- guest: no local simulation, just mirror the host snapshot ----
     if (this.mode === "guest") {
       this.applySnapshot();
+      // local respawn countdown (host is authoritative on hp; we only display it)
+      if (this.player.hp <= 0) {
+        if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
+        this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
+        this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
+      } else {
+        this.player.deadTimer = 0;
+      }
       this.inpAccum += dt;
       if (this.inpAccum >= 1 / 30) {
         this.inpAccum = 0;
@@ -1068,6 +1120,11 @@ export class GameEngine {
 
     // ---- host: simulate the remote avatar + stream snapshots ----
     if (this.mode === "host") {
+      this.tickRespawns(dt);
+      // keep a live respawn banner up for the local (host) player while downed
+      if (this.player.deadTimer && this.player.deadTimer > 0) {
+        this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
+      }
       this.simulateRemote(dt);
       this.snapAccum += dt;
       if (this.snapAccum >= 1 / 20) {
@@ -1118,8 +1175,9 @@ export class GameEngine {
   }
 
   private updateWeaponStates(dt: number) {
-    for (const g of this.guns) {
-      const s = this.weaponStates.get(g.id)!;
+    for (const [id, s] of this.weaponStates) {
+      const g = GUNS.find((x) => x.id === id);
+      if (!g) continue;
       if (g.magazine && s.reload > 0) {
         s.reload -= dt;
         if (s.reload <= 0) {
@@ -1140,6 +1198,12 @@ export class GameEngine {
     const p = this.player;
     const g = this.gun;
     p.t += dt;
+    // downed avatar waiting to respawn: freeze it (no movement / firing)
+    if (p.deadTimer && p.deadTimer > 0) {
+      p.vx = 0;
+      p.vy = 0;
+      return;
+    }
     if (p.iframes > 0) p.iframes -= dt;
     if (p.flash > 0) p.flash -= dt * 3;
     if (p.shieldTime > 0) p.shieldTime -= dt;
@@ -1151,6 +1215,7 @@ export class GameEngine {
       if (p.comboTimer <= 0) p.comboStep = 0;
     }
     if (p.lunge > 0) p.lunge = Math.max(0, p.lunge - dt * 120);
+    if (p.electrifiedTime && p.electrifiedTime > 0) p.electrifiedTime -= dt;
 
     let dx = 0;
     let dy = 0;
@@ -1290,6 +1355,15 @@ export class GameEngine {
   }
 
   // ------------------------------------------------------------- melee
+  /** The human opponent of whoever is currently `this.player` (the melee attacker). */
+  private meleeOpponent(): Player | null {
+    if (!this.foe || !this.localPlayer) return null;
+    // during host simulation this.player === this.foe (we're simulating the foe),
+    // so the target is the host's own avatar
+    if (this.player === this.foe) return this.localPlayer;
+    return this.foe;
+  }
+
   private meleeLight() {
     const g = this.gun;
     const p = this.player;
@@ -1315,15 +1389,16 @@ export class GameEngine {
     }
 
     const dmgMult = isSpear ? 1 + p.comboStep * 0.35 : 1;
+    const isSaber = g.id === "lightsaber";
     this.effects.push({
-      type: "slash",
+      type: isSaber ? "saberswing" : "slash",
       x: p.x,
       y: p.y,
       angle: p.angle,
       arc,
       range,
       t: 0,
-      duration: 0.22,
+      duration: isSaber ? 0.32 : 0.22,
       radius: range,
       color: g.glow,
     });
@@ -1335,6 +1410,29 @@ export class GameEngine {
         const ang = Math.atan2(dy, dx);
         if (Math.abs(this.angleDiff(ang, p.angle)) <= arc / 2) {
           this.damageEnemy(e, dmg * dmgMult, Math.cos(ang) * g.knockback, Math.sin(ang) * g.knockback);
+          if (isSaber) {
+            e.electrifiedTime = 0.7;
+            e.electrifiedGlow = g.glow;
+          }
+        }
+      }
+    }
+    // player-vs-player melee (now that AI is gone)
+    const opp = this.meleeOpponent();
+    if (opp && !(opp.deadTimer && opp.deadTimer > 0)) {
+      const dx = opp.x - p.x;
+      const dy = opp.y - p.y;
+      const d = Math.hypot(dx, dy);
+      if (d <= range + opp.size) {
+        const ang = Math.atan2(dy, dx);
+        if (Math.abs(this.angleDiff(ang, p.angle)) <= arc / 2) {
+          const kx = Math.cos(ang) * g.knockback;
+          const ky = Math.sin(ang) * g.knockback;
+          this.damagePlayerEntity(opp, dmg * dmgMult, undefined, kx, ky);
+          if (isSaber) {
+            opp.electrifiedTime = 0.7;
+            opp.electrifiedGlow = g.glow;
+          }
         }
       }
     }
@@ -1377,6 +1475,16 @@ export class GameEngine {
         const fall = 1 - d / (radius + e.size);
         const a = Math.atan2(e.y - p.y, e.x - p.x);
         this.damageEnemy(e, dmg * (0.55 + fall * 0.5), Math.cos(a) * 420, Math.sin(a) * 420);
+      }
+    }
+    // player-vs-player slam (hammer)
+    const opp = this.meleeOpponent();
+    if (opp && !(opp.deadTimer && opp.deadTimer > 0)) {
+      const d = Math.hypot(opp.x - p.x, opp.y - p.y);
+      if (d <= radius + opp.size) {
+        const fall = 1 - d / (radius + opp.size);
+        const a = Math.atan2(opp.y - p.y, opp.x - p.x);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), undefined, Math.cos(a) * 420, Math.sin(a) * 420);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -1864,7 +1972,7 @@ export class GameEngine {
       // foe bullets: damage local base + local player
       if (!dead) {
         if (b.owner === "foe") {
-          if (this.hitsPlayer(b, this.player)) {
+          if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
             this.damagePlayerEntity(this.player, b.damage, b);
             if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
             dead = true;
@@ -1885,7 +1993,7 @@ export class GameEngine {
             this.damageEnemyBase(b.damage);
             if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
             dead = true;
-          } else if (this.foe && this.hitsPlayer(b, this.foe)) {
+          } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
             this.damagePlayerEntity(this.foe, b.damage, b);
             if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
             dead = true;
@@ -2229,6 +2337,7 @@ export class GameEngine {
       e.spawnT = Math.min(1, e.spawnT + dt * 4);
       if (e.hitFlash > 0) e.hitFlash -= dt * 4;
       if (e.slowT > 0) e.slowT -= dt;
+      if (e.electrifiedTime && e.electrifiedTime > 0) e.electrifiedTime -= dt;
       if (e.burnT > 0) {
         e.burnT -= dt;
         this.damageEnemy(e, e.burnDps * dt, 0, 0);
@@ -2559,8 +2668,16 @@ export class GameEngine {
     return (p.x - b.x) ** 2 + (p.y - b.y) ** 2 <= rr * rr;
   }
 
-  /** Damage an arbitrary player (local or foe); foe death respawns. */
-  private damagePlayerEntity(p: Player, dmg: number, _b?: Bullet) {
+  /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
+  private damagePlayerEntity(
+    p: Player,
+    dmg: number,
+    _b?: Bullet,
+    knockX = 0,
+    knockY = 0
+  ) {
+    // already downed and waiting to respawn -> ignore further hits
+    if (p.deadTimer && p.deadTimer > 0) return;
     if (p.iframes > 0 || p.shieldTime > 0) {
       if (p.shieldTime > 0) this.spawnParticles(p.x, p.y, "#60a5fa", 4, 90, 0.3);
       return;
@@ -2584,23 +2701,55 @@ export class GameEngine {
     sound.hurt();
     this.shake = Math.min(16, this.shake + dmg * 0.4);
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
+    // apply knockback (melee); clamp to world bounds
+    if (knockX || knockY) {
+      p.x = Math.max(p.size, Math.min(this.worldW - p.size, p.x + knockX));
+      p.y = Math.max(p.size, Math.min(this.worldH - p.size, p.y + knockY));
+    }
     if (p.hp <= 0) {
       p.hp = 0;
-      if (p === this.player) this.endGame("你倒下了");
-      else if (p === this.foe) this.respawnFoe();
+      p.deadTimer = RESPAWN_TIME;
+      p.bowDrawing = false;
+      this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
+      if (p === this.player) {
+        // stop any continuous fire so no beam/flame lingers on the corpse
+        this.firing = false;
+        this.beamActive = false;
+        this.flameActive = false;
+      }
+      if (p === this.foe) {
+        // you downed the opponent
+        this.kills += 1;
+        this.score += 250;
+        this.banner = { text: `击杀 ${this.peerName || "对手"}！`, t: 1.6 };
+      } else {
+        this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
+      }
     }
   }
 
-  private respawnFoe() {
-    if (!this.foe) return;
-    this.kills += 1;
-    this.score += 250;
-    this.spawnParticles(this.foe.x, this.foe.y, "#f472b6", 30, 200, 0.6);
-    this.foe.x = this.worldW / 2;
-    this.foe.y = 220;
-    this.foe.hp = this.foe.maxHp;
-    this.foe.iframes = 1.5;
-    this.banner = { text: `击杀 ${this.peerName || "对手"}！`, t: 1.6 };
+  /** Count down downed avatars and revive them at their base after RESPAWN_TIME. */
+  private tickRespawns(dt: number) {
+    this.reviveIfReady(this.player, this.worldH - 200, dt);
+    if (this.foe) this.reviveIfReady(this.foe, 220, dt);
+  }
+
+  private reviveIfReady(p: Player, spawnY: number, dt: number) {
+    if (!p.deadTimer || p.deadTimer <= 0) return;
+    p.deadTimer -= dt;
+    if (p.deadTimer <= 0) {
+      p.deadTimer = 0;
+      p.hp = p.maxHp;
+      p.x = this.worldW / 2;
+      p.y = spawnY;
+      p.vx = 0;
+      p.vy = 0;
+      p.iframes = 2;
+      p.dashVx = 0;
+      p.dashVy = 0;
+      p.dashTime = 0;
+      this.spawnParticles(p.x, p.y, "#4ade80", 24, 200, 0.6);
+    }
   }
 
   // ---- host: pull peer messages, simulate remote, stream snapshots ----
@@ -2621,11 +2770,14 @@ export class GameEngine {
     const foe = this.foe;
     const inp = this.remoteInput;
     if (!foe || !inp) return;
+    // downed opponent: no movement / firing until it respawns
+    if (foe.deadTimer && foe.deadTimer > 0) return;
     const sp = this.player,
       sg = this.gunIndex,
       sk = this.keys,
       sm = this.mouse,
-      sf = this.firing;
+      sf = this.firing,
+      sGuns = this.guns;
     const sSkill = this.skillCd,
       sDash = this.dashCharges,
       sDashR = this.dashRecharge,
@@ -2633,7 +2785,8 @@ export class GameEngine {
       sSemi = this.semiAutoLatch;
     // load foe state into the engine's single-player simulation context
     this.player = foe;
-    this.gunIndex = foe.gunIndex ?? 0;
+    this.guns = this.foeGuns.length ? this.foeGuns : this.guns;
+    this.gunIndex = Math.min(foe.gunIndex ?? 0, this.guns.length - 1);
     this.keys = new Set(inp.keys);
     this.mouse = { x: inp.mx, y: inp.my };
     this.firing = inp.firing;
@@ -2655,6 +2808,7 @@ export class GameEngine {
     foe.lastGadget = this.lastGadget;
     // restore local context
     this.player = sp;
+    this.guns = sGuns;
     this.gunIndex = sg;
     this.keys = sk;
     this.mouse = sm;
@@ -2688,6 +2842,8 @@ export class GameEngine {
         cdPct: Math.min(1, (this.gadgetCd.get(g.id) ?? 0) / g.cooldown),
         deployed: 0,
       })),
+      electrified: p.electrifiedTime ?? 0,
+      electrifiedGlow: p.electrifiedGlow ?? "#38bdf8",
     };
   }
 
@@ -2769,6 +2925,12 @@ export class GameEngine {
       this.player.hp = me.hp;
       this.player.maxHp = me.maxHp;
       this.player.gunIndex = me.gunIndex;
+      // keep the guest's HUD/crosshair weapon in sync with what the host simulates
+      if (me.gunIndex != null && me.gunIndex >= 0 && me.gunIndex < this.guns.length) {
+        this.gunIndex = me.gunIndex;
+      }
+      this.player.electrifiedTime = me.electrified;
+      this.player.electrifiedGlow = me.electrifiedGlow;
     }
     if (foe) {
       if (!this.foe) this.foe = this.makeFoe();
@@ -2779,6 +2941,8 @@ export class GameEngine {
       fp.hp = foe.hp;
       fp.maxHp = foe.maxHp;
       fp.gunIndex = foe.gunIndex;
+      fp.electrifiedTime = foe.electrified;
+      fp.electrifiedGlow = foe.electrifiedGlow;
       this.foeChar = getCharacter(foe.character);
       this.foeOutfit = getOutfit(foe.outfit);
     }
@@ -2857,6 +3021,7 @@ export class GameEngine {
       }
     }
     for (const p of s.players) {
+      if (p.hp <= 0) continue; // downed players are hidden until they respawn
       const isMe = p.id === this.selfPid;
       const col = isMe ? this.character.bodyColor : this.foeChar?.bodyColor ?? "#f472b6";
       this.drawNetPlayer(
@@ -2868,6 +3033,9 @@ export class GameEngine {
         isMe ? this.character.name : this.peerName || "对手",
         p.hp / p.maxHp
       );
+      if (p.electrified > 0) {
+        this.drawElectricArcs(ctx, p.x, p.y, 14, p.electrifiedGlow, this.time);
+      }
     }
     for (const b of s.bullets) {
       ctx.strokeStyle = b.glow;
@@ -3042,6 +3210,8 @@ export class GameEngine {
 
   // ----------------------------------------------------------------- waves
   private updateWaves(dt: number) {
+    // Multiplayer is pure 1v1 PvP — no AI bots are ever spawned.
+    if (this.mode !== "local") return;
     // continuous spawning — no more wave system
     if (this.intermission > 0) {
       this.intermission -= dt;
@@ -3377,8 +3547,8 @@ export class GameEngine {
     this.drawEnemyBullets(ctx);
     this.drawBeam(ctx);
     this.drawFlameCone(ctx);
-    this.drawPlayer(ctx);
-    if (this.foe) {
+    if (!(this.player.deadTimer && this.player.deadTimer > 0)) this.drawPlayer(ctx);
+    if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0)) {
       this.drawNetPlayer(
         ctx,
         this.foe.x,
@@ -3388,6 +3558,9 @@ export class GameEngine {
         this.peerName || "对手",
         this.foe.hp / this.foe.maxHp
       );
+      if (this.foe.electrifiedTime && this.foe.electrifiedTime > 0) {
+        this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
+      }
     }
     this.drawBullets(ctx);
     this.drawEffects(ctx);
@@ -3991,6 +4164,11 @@ export class GameEngine {
         ctx.fillStyle = rgba(e.glow, 0.9);
         ctx.fillRect(hpx, hpy, w * (e.hp / e.maxHp), 4);
       }
+
+      // electric arcs from a lightsaber hit
+      if (e.electrifiedTime && e.electrifiedTime > 0) {
+        this.drawElectricArcs(ctx, e.x, e.y, e.size, e.electrifiedGlow ?? "#38bdf8", this.time);
+      }
     }
   }
 
@@ -4178,6 +4356,11 @@ export class GameEngine {
       lunge: p.lunge,
     });
 
+    // electric arcs from a lightsaber hit
+    if (p.electrifiedTime && p.electrifiedTime > 0) {
+      this.drawElectricArcs(ctx, p.x, p.y, p.size, p.electrifiedGlow ?? "#38bdf8", this.time);
+    }
+
     if (p.iframes > 0 && p.dashTime <= 0) {
       ctx.save();
       ctx.globalAlpha = 0.35 + Math.sin(this.time * 20) * 0.15;
@@ -4206,6 +4389,50 @@ export class GameEngine {
       ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.restore();
+  }
+
+  /** Crackling electric arcs that cling to an electrified avatar/enemy. */
+  private drawElectricArcs(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    color: string,
+    time: number
+  ) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalCompositeOperation = "lighter";
+    const bolts = 6;
+    for (let i = 0; i < bolts; i++) {
+      const a0 = (i / bolts) * Math.PI * 2 + time * 4;
+      const a1 = a0 + 1.1 + Math.sin(time * 9 + i * 1.7) * 0.5;
+      ctx.beginPath();
+      let ang = a0;
+      let rad = r * 0.55;
+      ctx.moveTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+      const segs = 4;
+      for (let s = 1; s <= segs; s++) {
+        ang = a0 + (a1 - a0) * (s / segs) + (Math.random() - 0.5) * 0.6;
+        rad = r * 0.55 + r * 1.15 * (s / segs);
+        ctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+      }
+      // outer colored bolt
+      ctx.strokeStyle = rgba(color, 0.85);
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      // inner white-hot core
+      ctx.strokeStyle = rgba("#ffffff", 0.7);
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+    }
+    // thin charged ring
+    ctx.strokeStyle = rgba(color, 0.6);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.25, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -4282,6 +4509,43 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(0, 0, range * (0.6 + k * 0.5), -arc / 2, arc / 2);
         ctx.stroke();
+        ctx.restore();
+      } else if (e.type === "saberswing") {
+        // bright energy sweep of the blade, fading as it completes
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.angle ?? 0);
+        ctx.globalCompositeOperation = "lighter";
+        const arc = e.arc ?? 2.5;
+        const range = e.range ?? 80;
+        // soft outer glow wedge
+        const rg = ctx.createRadialGradient(0, 0, range * 0.15, 0, 0, range * 1.05);
+        rg.addColorStop(0, rgba(e.color, (1 - k) * 0.45));
+        rg.addColorStop(1, rgba(e.color, 0));
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, range * (0.85 + k * 0.2), -arc / 2, arc / 2);
+        ctx.closePath();
+        ctx.fill();
+        // white-hot outer edge of the blade sweep
+        ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.9);
+        ctx.lineWidth = 3 * (1 - k) + 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, range * 0.92, -arc / 2, arc / 2);
+        ctx.stroke();
+        // colored energy core
+        ctx.strokeStyle = rgba(e.color, (1 - k) * 0.95);
+        ctx.lineWidth = 9 * (1 - k) + 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, range * 0.92, -arc / 2, arc / 2);
+        ctx.stroke();
+        // leading bright tip
+        const tipA = -arc / 2 + arc * k;
+        ctx.fillStyle = rgba("#ffffff", (1 - k) * 0.9);
+        ctx.beginPath();
+        ctx.arc(Math.cos(tipA) * range * 0.92, Math.sin(tipA) * range * 0.92, 3 * (1 - k) + 1, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
       } else if (e.type === "slam") {
         const r = e.radius * (0.3 + k);
