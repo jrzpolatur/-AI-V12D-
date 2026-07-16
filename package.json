@@ -11,6 +11,9 @@
     "server": "node server/relay.mjs",
     "start": "node server/prod.mjs"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "clsx": "2.1.1",
     "react": "19.2.6",

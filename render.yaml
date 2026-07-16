@@ -10,6 +10,8 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /
-    envVars:
-      - key: PORT
-        value: 8080
+    # NOTE: do NOT hardcode PORT here. Render injects the real port via the
+    # PORT env var; prod.mjs reads process.env.PORT (falling back to 8080 only
+    # when running locally). Hardcoding it would make the server listen on the
+    # wrong port and Render could not route traffic to it.
+
