@@ -89,10 +89,12 @@ export interface Snapshot {
   players: SnapPlayer[]; // both players (host + guest)
   enemies: SnapEnemy[];
   bullets: SnapBullet[]; // all bullets (player + ai)
-  baseHp: number; // local player's base
-  baseMaxHp: number;
-  enemyBaseHp: number; // opponent's base
-  enemyBaseMaxHp: number;
+  /** host's OWN base (bottom of the arena) */
+  hostBaseHp: number;
+  hostBaseMaxHp: number;
+  /** guest's OWN base (top of the arena) */
+  guestBaseHp: number;
+  guestBaseMaxHp: number;
   wave: number;
   enemiesLeft: number;
   score: number;

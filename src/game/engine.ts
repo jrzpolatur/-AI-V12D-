@@ -71,6 +71,8 @@ export interface HudState {
   gameOver: boolean;
   gameOverReason: string;
   paused: boolean;
+  /** net: peer handshake not yet complete (waiting for opponent to connect/sync) */
+  connecting: boolean;
   banner: string | null;
   kills: number;
   gold: number;
@@ -371,6 +373,15 @@ export class GameEngine {
   private gy = 0;
   private gxInit = false;
   private netRender = new Map<number, { x: number; y: number }>();
+  /**
+   * Peer handshake flag. Host sets it when the guest's `hello` arrives; the
+   * guest sets it once it receives the first world snapshot. Until both sides
+   * are confirmed present, the match must not advance (no enemy spawns), so a
+   * late-joining player never lands in a half-played, desynced world.
+   */
+  private peerReady = false;
+  /** Gameplay (waves / enemy spawns) may advance. Gated on `peerReady` for net. */
+  private matchLive = false;
 
   private character = getCharacter("raider");
   private outfit = getOutfit("tactical");
@@ -611,6 +622,9 @@ export class GameEngine {
     this.gy = 0;
     this.gxInit = false;
     this.netRender.clear();
+    // local play is live immediately; net modes wait for the peer handshake
+    this.peerReady = this.mode === "local";
+    this.matchLive = this.mode === "local";
     this.bullets = [];
     this.enemyBullets = [];
     this.enemies = [];
@@ -1158,7 +1172,10 @@ export class GameEngine {
     this.updateParticles(dt);
     this.updateEffects(dt);
     this.updatePickups(dt);
-    this.updateWaves(dt);
+    // Host: do not spawn waves until the guest has connected (peerReady).
+    // This guarantees both players start the match from a clean, identical state
+    // instead of the host having already run ahead.
+    if (this.matchLive) this.updateWaves(dt);
 
     // ---- host: simulate the remote avatar + stream snapshots ----
     if (this.mode === "host") {
@@ -2665,7 +2682,7 @@ export class GameEngine {
     if (this.base.hp <= 0) {
       this.base.hp = 0;
       this.explode(this.base.x, this.base.y, this.base.radius * 2, 0, "#fb7185");
-      this.endGame("基地被摧毁");
+      this.endGame("基地失守，你输了！");
     }
   }
 
@@ -2807,6 +2824,11 @@ export class GameEngine {
         this.peerName = m.name;
         this.peerLoadout = m.loadout as Loadout;
         this.applyPeerLoadout();
+        // The host only begins the match once the guest is actually present.
+        if (this.mode === "host") {
+          this.peerReady = true;
+          this.matchLive = true;
+        }
       }
     }
   }
@@ -2925,10 +2947,10 @@ export class GameEngine {
         kind: b.kind,
         owner: b.owner ?? "self",
       })),
-      baseHp: Math.max(0, Math.round(this.base.hp)),
-      baseMaxHp: this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
-      enemyBaseMaxHp: this.enemyBase.maxHp,
+      hostBaseHp: Math.max(0, Math.round(this.base.hp)),
+      hostBaseMaxHp: this.base.maxHp,
+      guestBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
+      guestBaseMaxHp: this.enemyBase.maxHp,
       wave: this.wave,
       enemiesLeft: this.enemies.length,
       score: this.score,
@@ -3001,13 +3023,26 @@ export class GameEngine {
     this.score = s.score;
     this.kills = s.kills;
     this.gold = s.gold;
-    this.base.hp = s.baseHp;
-    this.base.maxHp = s.baseMaxHp;
-    this.enemyBase.hp = s.enemyBaseHp;
-    this.enemyBase.maxHp = s.enemyBaseMaxHp;
+    // Guest now has the host's world — handshake complete.
+    this.peerReady = true;
+    // Map the two world bases to OUR perspective:
+    //   host's base (bottom) is the OPPONENT from the guest's side
+    //   guest's base (top)   is OUR OWN base
+    this.base.hp = s.hostBaseHp;
+    this.base.maxHp = s.hostBaseMaxHp;
+    this.enemyBase.hp = s.guestBaseHp;
+    this.enemyBase.maxHp = s.guestBaseMaxHp;
     if (s.gameOver && !this.gameOver) {
-      const win = this.base.hp > 0;
-      this.endGame(win ? "胜利！敌方基地已摧毁" : "失败，基地失守");
+      // The host's gameOverReason is from the host's POV; derive the guest's
+      // outcome from the base HPs so it is always correct:
+      //   - my (top) base destroyed -> I lose
+      //   - host (bottom) base destroyed -> I win
+      //   - otherwise (host player down) -> I win
+      let reason: string;
+      if (s.guestBaseHp <= 0) reason = "失败，基地失守";
+      else if (s.hostBaseHp <= 0) reason = "胜利！敌方基地已摧毁";
+      else reason = "胜利！对手已被击败";
+      this.endGame(reason);
     }
   }
 
@@ -3069,8 +3104,9 @@ export class GameEngine {
       return prev;
     };
 
-    this.drawBase(ctx, this.enemyBase);
-    this.drawBase(ctx, this.base);
+    // Guest: its own base is the top one (this.enemyBase), the host's is bottom.
+    this.drawBase(ctx, this.enemyBase, true);
+    this.drawBase(ctx, this.base, false);
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
       const c = getCharacter(e.character);
@@ -3556,13 +3592,16 @@ export class GameEngine {
       dashChargePct: dashChargePct,
       effects: this.getEffects(),
       gadgets,
-      baseHp: Math.max(0, Math.round(this.base.hp)),
-      baseMaxHp: this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
-      enemyBaseMaxHp: this.enemyBase.maxHp,
+      // Each side shows ITS OWN base as "己方基地". On the guest, its own base
+      // is the top one (this.enemyBase), so the mapping is swapped vs the host.
+      baseHp: Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)),
+      baseMaxHp: this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp,
+      enemyBaseHp: Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)),
+      enemyBaseMaxHp: this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
+      connecting: this.mode !== "local" && !this.peerReady,
       banner: this.banner ? this.banner.text : null,
       kills: this.kills,
       gold: this.gold,
@@ -3602,8 +3641,8 @@ export class GameEngine {
 
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    this.drawBase(ctx, this.enemyBase);
-    this.drawBase(ctx, this.base);
+    this.drawBase(ctx, this.enemyBase, false);
+    this.drawBase(ctx, this.base, true);
     this.drawArenaBorder(ctx);
     this.drawFieldEffects(ctx);
     this.drawPickups(ctx);
@@ -3646,9 +3685,12 @@ export class GameEngine {
     ctx.fillRect(0, 0, this.W, this.H);
 
     // blobs at base positions (in world space, but we draw in screen space)
+    // own base glows blue, opponent's glows red — for both host and guest
+    const myBase = this.mode === "guest" ? this.enemyBase : this.base;
+    const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
     const blobs: [number, number, string][] = [
-      [this.enemyBase.x - this.camX, this.enemyBase.y - this.camY, "#dc2626"],
-      [this.base.x - this.camX, this.base.y - this.camY, "#1d4ed8"],
+      [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
+      [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"],
     ];
     for (const [bx, by, col] of blobs) {
       const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
@@ -3980,8 +4022,8 @@ export class GameEngine {
     }
   }
 
-  private drawBase(ctx: CanvasRenderingContext2D, b: Base) {
-    const isEnemy = b === this.enemyBase;
+  private drawBase(ctx: CanvasRenderingContext2D, b: Base, mine: boolean) {
+    const isEnemy = !mine;
     ctx.save();
     ctx.translate(b.x, b.y);
     const frac = b.hp / b.maxHp;
@@ -4053,6 +4095,13 @@ export class GameEngine {
     }
     ctx.closePath();
     ctx.stroke();
+
+    // on-map label so it's unambiguous which base is yours
+    ctx.fillStyle = mine ? "rgba(186,230,253,0.95)" : "rgba(254,202,202,0.95)";
+    ctx.font = "bold 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(mine ? "己方基地" : "敌方基地", 0, b.radius + 40);
 
     ctx.restore();
   }

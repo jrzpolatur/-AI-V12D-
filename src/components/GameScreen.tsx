@@ -41,6 +41,7 @@ const initialHud: HudState = {
   gameOver: false,
   gameOverReason: "",
   paused: false,
+  connecting: false,
   banner: null,
   kills: 0,
   gold: 0,
@@ -488,6 +489,21 @@ export default function GameScreen({
           })}
         </div>
       </div>
+
+      {/* ============ CONNECTING (peer handshake) ============ */}
+      {hud.connecting && !hud.gameOver && !hud.paused && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/30 border-t-cyan-300" />
+            <p className="text-lg font-bold text-slate-100">
+              正在连接对手…
+            </p>
+            <p className="text-sm text-slate-400">
+              等待双方同步，请稍候
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ============ PAUSE OVERLAY ============ */}
       {hud.paused && !hud.gameOver && (
