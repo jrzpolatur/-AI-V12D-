@@ -82,6 +82,10 @@ export interface SnapBullet {
 /** Full world snapshot sent by the host to the guest. */
 export interface Snapshot {
   time: number;
+  /** index into SCENES[] — chosen by the host (authoritative) so both sides load the same map */
+  scene: number;
+  /** true when the host has paused the match (authoritative; guest mirrors this) */
+  paused: boolean;
   players: SnapPlayer[]; // both players (host + guest)
   enemies: SnapEnemy[];
   bullets: SnapBullet[]; // all bullets (player + ai)
@@ -102,4 +106,5 @@ export interface Snapshot {
 export type GameMsg =
   | { t: "hello"; name: string; loadout: unknown }
   | { t: "inp"; input: InputFrame }
+  | { t: "pause" } // guest asks the host to toggle pause (host is authoritative)
   | { t: "snap"; snap: Snapshot };

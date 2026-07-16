@@ -362,8 +362,15 @@ export class GameEngine {
   private camY = 0;
   private raf = 0;
   private sceneTheme = SCENES[0];
+  /** index into SCENES[] chosen by the host (authoritative); synced to the guest */
+  private sceneIndex = 0;
   private last = 0;
   private running = false;
+  /** guest-side interpolation state for smooth rendering between 30Hz snapshots */
+  private gx = 0;
+  private gy = 0;
+  private gxInit = false;
+  private netRender = new Map<number, { x: number; y: number }>();
 
   private character = getCharacter("raider");
   private outfit = getOutfit("tactical");
@@ -598,7 +605,12 @@ export class GameEngine {
 
   private resetState() {
     this.resize();
-    this.sceneTheme = SCENES[Math.floor(Math.random() * SCENES.length)];
+    this.sceneIndex = Math.floor(Math.random() * SCENES.length);
+    this.sceneTheme = SCENES[this.sceneIndex];
+    this.gx = 0;
+    this.gy = 0;
+    this.gxInit = false;
+    this.netRender.clear();
     this.bullets = [];
     this.enemyBullets = [];
     this.enemies = [];
@@ -953,7 +965,11 @@ export class GameEngine {
     )
       return;
     if (e.code === "KeyP" || e.code === "Escape") {
-      if (!this.gameOver) this.setPaused(!this.paused);
+      if (!this.gameOver) {
+        // host decides pause locally; guest asks the host (authoritative) to toggle
+        if (this.mode === "guest" && this.net) this.net.sendGame({ t: "pause" });
+        else this.setPaused(!this.paused);
+      }
       e.preventDefault();
       return;
     }
@@ -1064,7 +1080,7 @@ export class GameEngine {
     let dt = (now - this.last) / 1000;
     this.last = now;
     if (dt > 0.05) dt = 0.05;
-    if (!this.paused && !this.gameOver) this.update(dt);
+    if (!this.gameOver) this.update(dt);
     this.render();
     this.hudAccum += dt;
     if (this.hudAccum > 0.06) {
@@ -1079,9 +1095,35 @@ export class GameEngine {
     // ---- multiplayer: pump peer messages ----
     if (this.mode !== "local" && this.net) this.pumpNet();
 
+    // ---- paused: freeze the simulation, but keep the network in sync ----
+    // The host keeps streaming snapshots (so the guest sees the pause + can request
+    // unpause); the guest keeps mirroring (so it notices when the host unpauses).
+    if (this.paused) {
+      if (this.mode === "host" && this.net) {
+        this.snapAccum += dt;
+        if (this.snapAccum >= 1 / 30) {
+          this.snapAccum = 0;
+          this.sendSnapshot();
+        }
+      } else if (this.mode === "guest") {
+        this.applySnapshot();
+      }
+      return;
+    }
+
     // ---- guest: no local simulation, just mirror the host snapshot ----
     if (this.mode === "guest") {
       this.applySnapshot();
+      // smooth the local avatar toward the latest snapshot so the camera/aim isn't choppy
+      if (!this.gxInit) {
+        this.gx = this.player.x;
+        this.gy = this.player.y;
+        this.gxInit = true;
+      }
+      this.gx += (this.player.x - this.gx) * 0.4;
+      this.gy += (this.player.y - this.gy) * 0.4;
+      this.player.x = this.gx;
+      this.player.y = this.gy;
       // local respawn countdown (host is authoritative on hp; we only display it)
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
@@ -1127,7 +1169,7 @@ export class GameEngine {
       }
       this.simulateRemote(dt);
       this.snapAccum += dt;
-      if (this.snapAccum >= 1 / 20) {
+      if (this.snapAccum >= 1 / 30) {
         this.snapAccum = 0;
         this.sendSnapshot();
       }
@@ -2758,7 +2800,10 @@ export class GameEngine {
     for (const m of this.net.drainGameMsgs()) {
       if (m.t === "inp") this.remoteInput = m.input;
       else if (m.t === "snap") this.lastSnap = m.snap;
-      else if (m.t === "hello") {
+      else if (m.t === "pause") {
+        // only the host may flip the authoritative pause state
+        if (!this.gameOver) this.setPaused(!this.paused);
+      } else if (m.t === "hello") {
         this.peerName = m.name;
         this.peerLoadout = m.loadout as Loadout;
         this.applyPeerLoadout();
@@ -2851,6 +2896,8 @@ export class GameEngine {
     if (!this.net || !this.foe) return;
     const snap: Snapshot = {
       time: this.time,
+      scene: this.sceneIndex,
+      paused: this.paused,
       players: [
         this.toSnapPlayer(this.player, this.character, this.outfit),
         this.toSnapPlayer(this.foe, this.foeChar!, this.foeOutfit!),
@@ -2916,6 +2963,9 @@ export class GameEngine {
   private applySnapshot() {
     const s = this.lastSnap;
     if (!s) return;
+    // adopt the host-authoritative scene + pause state
+    this.sceneTheme = SCENES[s.scene] ?? SCENES[0];
+    this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
     const foe = s.players.find((p) => p.id !== this.selfPid) ?? s.players[1];
     if (me) {
@@ -3005,36 +3055,52 @@ export class GameEngine {
     ctx.save();
     if (this.shake > 0.2) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
     ctx.translate(-this.camX, -this.camY);
+
+    // ease a network entity toward its latest snapshot position so 30Hz updates look smooth
+    const ease = (id: number, x: number, y: number) => {
+      const prev = this.netRender.get(id);
+      if (!prev) {
+        const cur = { x, y };
+        this.netRender.set(id, cur);
+        return cur;
+      }
+      prev.x += (x - prev.x) * 0.4;
+      prev.y += (y - prev.y) * 0.4;
+      return prev;
+    };
+
     this.drawBase(ctx, this.enemyBase);
     this.drawBase(ctx, this.base);
     for (const e of s.enemies) {
+      const r = ease(e.id, e.x, e.y);
       const c = getCharacter(e.character);
       ctx.fillStyle = c?.bodyColor ?? "#f87171";
       ctx.beginPath();
-      ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+      ctx.arc(r.x, r.y, e.size, 0, Math.PI * 2);
       ctx.fill();
       if (e.hp < e.maxHp) {
         ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(e.x - e.size, e.y - e.size - 6, e.size * 2, 3);
+        ctx.fillRect(r.x - e.size, r.y - e.size - 6, e.size * 2, 3);
         ctx.fillStyle = "#f87171";
-        ctx.fillRect(e.x - e.size, e.y - e.size - 6, e.size * 2 * (e.hp / e.maxHp), 3);
+        ctx.fillRect(r.x - e.size, r.y - e.size - 6, e.size * 2 * (e.hp / e.maxHp), 3);
       }
     }
     for (const p of s.players) {
       if (p.hp <= 0) continue; // downed players are hidden until they respawn
       const isMe = p.id === this.selfPid;
+      const r = isMe ? { x: this.player.x, y: this.player.y } : ease(p.id, p.x, p.y);
       const col = isMe ? this.character.bodyColor : this.foeChar?.bodyColor ?? "#f472b6";
       this.drawNetPlayer(
         ctx,
-        p.x,
-        p.y,
+        r.x,
+        r.y,
         p.angle,
         col,
         isMe ? this.character.name : this.peerName || "对手",
         p.hp / p.maxHp
       );
       if (p.electrified > 0) {
-        this.drawElectricArcs(ctx, p.x, p.y, 14, p.electrifiedGlow, this.time);
+        this.drawElectricArcs(ctx, r.x, r.y, 14, p.electrifiedGlow, this.time);
       }
     }
     for (const b of s.bullets) {
