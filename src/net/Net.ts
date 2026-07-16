@@ -7,6 +7,7 @@ import type { GameMsg, RelayIn, RelayOut } from "./protocol";
 export type NetStatus =
   | "idle"
   | "connecting"
+  | "connected" // socket open, ready to create/join
   | "waiting" // created/joined, waiting for opponent
   | "ready" // both players present
   | "error";
@@ -51,7 +52,7 @@ export class Net {
       return;
     }
     this.ws.onopen = () => {
-      // status stays "connecting" until create/join responds
+      this.setStatus("connected");
     };
     this.ws.onerror = () => this.setStatus("error", "无法连接服务器");
     this.ws.onclose = () => {

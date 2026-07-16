@@ -123,6 +123,7 @@ export default function LobbyScreen({
         <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4 text-sm">
           {status === "idle" && <p className="text-slate-400">尚未连接。</p>}
           {status === "connecting" && <p className="text-amber-300">正在连接服务器…</p>}
+          {status === "connected" && <p className="text-emerald-300">已连接服务器，可以创建或加入房间了。</p>}
           {status === "waiting" && (
             <div className="space-y-1">
               <p className="text-amber-300">{info}</p>
