@@ -31,7 +31,10 @@ export default function LobbyScreen({
       },
       onPeer: (_pid, n) => setPeerName(n),
       onStart: () => setStatus("ready"),
-      onPeerLeft: () => setStatus("waiting", "对手已离开，正在重新匹配…"),
+      onPeerLeft: () => {
+        setStatus("waiting");
+        setInfo("对手已离开，正在重新匹配…");
+      },
     });
   }
   const net = netRef.current;

@@ -573,7 +573,7 @@ export function drawWeapon(
       block(-12, -3, 6, 6, STEEL_D, 1.5); // grip/stock
       ctx.save();
       ctx.translate(8, 0);
-      block(-4, -5, 13, 10, STEEL, STEEL_D, 2); // barrel housing
+      block(-4, -5, 13, 10, STEEL, 2); // barrel housing
       // spinning multi-barrel cluster (visual spin while firing)
       ctx.rotate(t * 9);
       for (let i = 0; i < 6; i++) {

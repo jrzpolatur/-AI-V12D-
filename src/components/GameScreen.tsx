@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GameEngine, type HudState, type Loadout } from "../game/engine";
 import type { NetMode } from "../net/protocol";
 import type { Net } from "../net/Net";
 import { getCharacter, getOutfit } from "../game/content";
 import { sound } from "../game/sound";
 import { drawWeaponIcon, drawGadgetIcon } from "../game/draw";
-import { GADGETS } from "../game/content";
 import { cn } from "../utils/cn";
+import { isTouchDevice } from "../utils/device";
+import MobileControls from "./MobileControls";
 
 const initialHud: HudState = {
   hp: 100,
@@ -130,6 +131,7 @@ export default function GameScreen({
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>(initialHud);
   const [muted, setMuted] = useState(false);
+  const isTouch = useMemo(() => isTouchDevice(), []);
 
   // ---- screen shake on hit ----
   const [shake, setShake] = useState({ x: 0, y: 0 });
@@ -508,6 +510,9 @@ export default function GameScreen({
           })}
         </div>
       </div>
+
+      {/* ============ MOBILE CONTROLS (touch only) ============ */}
+      {isTouch && <MobileControls engineRef={engineRef} />}
 
       {/* ============ CONNECTING (peer handshake) ============ */}
       {hud.connecting && !hud.gameOver && !hud.paused && (

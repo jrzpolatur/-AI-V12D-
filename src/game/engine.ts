@@ -1,9 +1,9 @@
 import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getSkill, SCENES, CHARACTERS, OUTFITS } from "./content";
 import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef, OutfitDef } from "./types";
-import { drawCharacter, drawWeaponIcon, drawGadgetIcon, drawMonster, rgba, shade, roundRect, DARK } from "./draw";
+import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK } from "./draw";
 import { sound } from "./sound";
 import { RUNTIME } from "./runtimeConfig";
-import type { NetMode, InputFrame, Snapshot, SnapPlayer, SnapEnemy, SnapBullet } from "../net/protocol";
+import type { NetMode, InputFrame, Snapshot, SnapPlayer } from "../net/protocol";
 import type { Net } from "../net/Net";
 
 export interface Loadout {
@@ -473,6 +473,12 @@ export class GameEngine {
   private pendSkill = false;
   private pendReload = false;
   private pendWeapon = false;
+  /** enemies still queued to spawn this wave (local/host HUD; mirrored value on guest) */
+  private spawnQueue = 0;
+  /** total remaining enemies shown in the HUD (live for host, mirrored for guest) */
+  private enemiesLeft = 0;
+  /** last snapshot's enemy positions — used by the guest-side mobile aim assist */
+  private snapEnemies: { x: number; y: number }[] = [];
 
   private enemyId = 1;
   private score = 0;
@@ -508,19 +514,21 @@ export class GameEngine {
   private beamHit: BeamHit | null = null;
   // flamethrower state
   private flameActive = false;
-  // poison mist state
-  private poisonActive = false;
 
   private keys = new Set<string>();
   private mouse = { x: 400, y: 300 };
   private firing = false;
+  /** virtual movement vector from the on-screen joystick (-1..1 each axis) */
+  private virtualMove = { x: 0, y: 0 };
+  /** touch device: enables the mobile on-screen controls + mobile-only aim assist */
+  private touchMode = false;
 
   private hudAccum = 0;
   private boundKeyDown: (e: KeyboardEvent) => void;
   private boundKeyUp: (e: KeyboardEvent) => void;
   private boundMouseMove: (e: MouseEvent) => void;
   private boundMouseDown: (e: MouseEvent) => void;
-  private boundMouseUp: () => void;
+  private boundMouseUp: (e: MouseEvent) => void;
   private boundWheel: (e: WheelEvent) => void;
   private boundBlur: () => void;
   private boundResize: () => void;
@@ -598,6 +606,25 @@ export class GameEngine {
     this.paused = p;
     if (!p) this.last = performance.now();
     this.emit(true);
+  }
+
+  // --------------------------------------------------- touch / mobile controls
+  /** Called by the React layer when a touch device is detected. Enables the
+   *  on-screen joystick/fire button and the mobile-only aim assist. */
+  setTouchMode(on: boolean) {
+    this.touchMode = on;
+  }
+
+  /** Virtual movement vector from the on-screen joystick (-1..1 each axis). */
+  setVirtualMove(x: number, y: number) {
+    this.virtualMove.x = x;
+    this.virtualMove.y = y;
+  }
+
+  /** Virtual fire button (on-screen). Drives the same `firing` flag as the mouse. */
+  setVirtualFiring(on: boolean) {
+    this.firing = on;
+    if (on) this.semiAutoLatch = false; // fresh trigger pull for semi-auto
   }
 
   selectGun(i: number) {
@@ -732,7 +759,6 @@ export class GameEngine {
     this.beamActive = false;
     this.beamHit = null;
     this.flameActive = false;
-    this.poisonActive = false;
     this.banner = {
       text: this.gameMode === "biohazard" ? "生化危机 · 活下去！" : "守护基地！",
       t: 2.2,
@@ -877,16 +903,17 @@ export class GameEngine {
   }
 
   private applyPeerLoadout() {
-    if (!this.peerLoadout) return;
-    this.foeChar = getCharacter(this.peerLoadout.characterId);
-    this.foeOutfit = getOutfit(this.peerLoadout.outfitId);
+    const pl = this.peerLoadout;
+    if (!pl) return;
+    this.foeChar = getCharacter(pl.characterId);
+    this.foeOutfit = getOutfit(pl.outfitId);
     // adopt the opponent's own weapon picks so the host simulates them correctly
     this.foeGuns =
-      this.peerLoadout.gunIds && this.peerLoadout.gunIds.length > 0
-        ? this.peerLoadout.gunIds
+      pl.gunIds && pl.gunIds.length > 0
+        ? pl.gunIds
             .map((id) => GUNS.find((g) => g.id === id) ?? GUNS[0])
             .slice(0, 2)
-        : [GUNS.find((g) => g.id === this.peerLoadout.gunId) ?? GUNS[0]];
+        : [GUNS.find((g) => g.id === pl.gunId) ?? GUNS[0]];
     this.ensureWeaponStates(this.foeGuns);
     if (this.foe) {
       const c = this.foeChar;
@@ -1248,6 +1275,16 @@ export class GameEngine {
       this.gy += (this.player.y - this.gy) * 0.4;
       this.player.x = this.gx;
       this.player.y = this.gy;
+      // mobile aim assist (guest + touch only): point the avatar at the nearest
+      // threat so the on-screen fire button hits without a separate aim input.
+      // The chosen world point is sent to the host as the aim (mx/my).
+      if (this.touchMode) {
+        const tgt = this.findAimTarget(this.player);
+        if (tgt) {
+          this.mouse.x = tgt.x;
+          this.mouse.y = tgt.y;
+        }
+      }
       // local respawn countdown (host is authoritative on hp; we only display it)
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
@@ -1405,6 +1442,12 @@ export class GameEngine {
     const len = Math.hypot(dx, dy) || 1;
     dx /= len;
     dy /= len;
+    // on-screen joystick (mobile) — combined with keyboard WASD (desktop)
+    dx += this.virtualMove.x;
+    dy += this.virtualMove.y;
+    const vlen = Math.hypot(dx, dy) || 1;
+    dx /= vlen;
+    dy /= vlen;
 
     if (p.dashTime > 0) {
       p.dashTime -= dt;
@@ -1424,6 +1467,14 @@ export class GameEngine {
     this.collideBase(p, p.size);
     this.collideBase(p, p.size, this.enemyBase);
     p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+
+    // mobile aim assist (touch only): auto-lock onto the nearest threat so the
+    // player can move with the joystick and fire with the on-screen button
+    // without needing a separate aim input. Desktop never uses this.
+    if (this.touchMode) {
+      const tgt = this.findAimTarget(p);
+      if (tgt) p.angle = Math.atan2(tgt.y - p.y, tgt.x - p.x);
+    }
 
     // weapon handling
     p.fireTimer -= dt;
@@ -1831,7 +1882,6 @@ export class GameEngine {
     if (firing && !ws.overheated) {
       ws.heat = Math.min(1.4, ws.heat + (g.heatPerShot ?? 0.4) * dt);
       if (ws.heat >= 1) ws.overheated = true;
-      this.poisonActive = true;
       const cone = g.flameCone ?? 0.34;
       const range = g.flameRange ?? 130;
       const dps = g.damage;
@@ -1886,8 +1936,6 @@ export class GameEngine {
         sound.shoot("rocket");
         this.flameSndCd = 0.14;
       }
-    } else {
-      this.poisonActive = false;
     }
   }
 
@@ -3336,6 +3384,8 @@ export class GameEngine {
     }
     this.wave = s.wave;
     this.enemiesLeft = s.enemiesLeft;
+    // mirror enemy positions so the guest-side mobile aim assist can lock on
+    this.snapEnemies = s.enemies.map((e) => ({ x: e.x, y: e.y }));
     this.score = s.score;
     this.kills = s.kills;
     this.gold = s.gold;
@@ -3982,7 +4032,8 @@ export class GameEngine {
       maxHp: p.maxHp,
       score: this.score,
       wave: this.wave,
-      enemiesLeft: this.enemies.length + this.spawnQueue,
+      enemiesLeft:
+        this.mode === "guest" ? this.enemiesLeft : this.enemies.length + this.spawnQueue,
       gunId: g.id,
       guns: this.guns.map((gn) => ({
         id: gn.id,
@@ -5237,7 +5288,37 @@ export class GameEngine {
     ctx.restore();
   }
 
+  /** Nearest living enemy (or foe, in versus mode) within range — used by the
+   *  mobile-only aim assist to auto-point the player at the closest threat.
+   *  On the guest (who has no local enemy simulation) the targets come from the
+   *  last host snapshot; otherwise they come from the local enemy list. */
+  private findAimTarget(p: Player): { x: number; y: number } | null {
+    const RANGE = 640;
+    let best: { x: number; y: number } | null = null;
+    let bestD = RANGE * RANGE;
+    const list: { x: number; y: number; hp?: number }[] =
+      this.mode === "guest" ? this.snapEnemies : (this.enemies as unknown as { x: number; y: number; hp?: number }[]);
+    for (const e of list) {
+      if (e.hp !== undefined && e.hp <= 0) continue;
+      const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0)) {
+      const d = (this.foe.x - p.x) ** 2 + (this.foe.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = this.foe;
+      }
+    }
+    return best;
+  }
+
   private drawCrosshair(ctx: CanvasRenderingContext2D) {
+    // hide the mouse reticle on touch devices (aim is handled by aim assist)
+    if (this.touchMode) return;
     const { x, y } = this.mouse;
     const sx = x - this.camX;
     const sy = y - this.camY;
