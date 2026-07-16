@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Net, type NetStatus } from "../net/Net";
 
 export default function LobbyScreen({
@@ -37,6 +37,13 @@ export default function LobbyScreen({
     });
   }
   const net = netRef.current;
+
+  // Auto-connect on mount so the lobby is ready by the time the user interacts.
+  // Any failure surfaces immediately as an error instead of a silent "idle".
+  useEffect(() => {
+    net.connect(url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const connect = () => {
     net.disconnect();
