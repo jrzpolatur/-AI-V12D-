@@ -2089,7 +2089,7 @@ export class GameEngine {
         if (gr.kind === "glue") {
           this.spawnGlueWall(gr.x, gr.y);
         } else {
-          this.explode(gr.x, gr.y, 120, 225, "#fb923c");
+          this.explode(gr.x, gr.y, 120, 180, "#fb923c");
         }
       } else next.push(gr);
     }
@@ -2238,7 +2238,7 @@ export class GameEngine {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 0.6,
-                damage: 35,
+                damage: 28,
                 size: 4,
                 color: "#bae6fd",
                 glow: d.color,
@@ -2260,7 +2260,7 @@ export class GameEngine {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 1.2,
-                damage: 55,
+                damage: 44,
                 size: 7,
                 color: "#ddd6fe",
                 glow: d.color,
@@ -2293,7 +2293,7 @@ export class GameEngine {
             if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + 24) {
               // triggered
               if (d.kind === "mine_explosive") {
-                this.explode(d.x, d.y, d.radius, 200, d.color);
+                this.explode(d.x, d.y, d.radius, 160, d.color);
               } else if (d.kind === "mine_poison") {
                 this.effects.push({
                   type: "poisoncloud",
@@ -2303,7 +2303,7 @@ export class GameEngine {
                   duration: 5,
                   radius: d.radius,
                   color: d.color,
-                  dps: 75,
+                  dps: 60,
                   slow: 0.5,
                   tickT: 0,
                 });
@@ -2316,7 +2316,7 @@ export class GameEngine {
                   duration: 5,
                   radius: d.radius,
                   color: d.color,
-                  dps: 112.5,
+                  dps: 90,
                   tickT: 0,
                 });
               }
