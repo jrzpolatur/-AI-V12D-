@@ -316,6 +316,8 @@ interface Wall {
   /** glue walls slow enemies passing through */
   glue?: boolean;
   slow?: number;
+  /** invisible boundary "air walls" — collide but are never drawn */
+  invisible?: boolean;
 }
 
 interface Base {
@@ -571,7 +573,7 @@ export class GameEngine {
       this.firing = false;
       this.semiAutoLatch = false;
     };
-    this.boundResize = () => this.resize();
+    this.boundResize = () => this.onResize();
     this.boundContext = (e) => e.preventDefault();
   }
 
@@ -996,6 +998,27 @@ export class GameEngine {
     cover(cx - 400, cy + 150, 90, 26);
     cover(cx + 400, cy - 150, 90, 26);
 
+    // ---- invisible boundary "air walls" ----
+    // These solid (non-glue) walls sit just outside the playfield. They block
+    // the player, monsters and bullets from ever leaving the arena, so nothing
+    // can escape the map boundary (works in every mode). They are never drawn.
+    const TH = 80;
+    const air = (x: number, y: number, w: number, h: number) =>
+      walls.push({
+        x,
+        y,
+        w,
+        h,
+        hp: Infinity,
+        maxHp: Infinity,
+        destructible: false,
+        invisible: true,
+      });
+    air(-TH, -TH, TH, this.worldH + TH * 2); // left
+    air(this.worldW, -TH, TH, this.worldH + TH * 2); // right
+    air(-TH, -TH, this.worldW + TH * 2, TH); // top
+    air(-TH, this.worldH, this.worldW + TH * 2, TH); // bottom
+
     return walls;
   }
 
@@ -1033,6 +1056,23 @@ export class GameEngine {
     this.canvas.width = Math.floor(this.W * dpr);
     this.canvas.height = Math.floor(this.H * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /** Window resize handler: refresh the canvas size, then in the single-screen
+   *  biohazard arena re-sync the world bounds to the new viewport so the whole
+   *  playfield stays visible and the air walls stay at the screen edges. */
+  private onResize() {
+    this.resize();
+    if (this.gameMode === "biohazard") {
+      this.worldW = this.W;
+      this.worldH = this.H;
+      this.walls = this.buildWalls();
+      this.camX = 0;
+      this.camY = 0;
+      // keep the (neutralised) bases/blobs aligned to the new viewport
+      this.base.y = this.worldH - 120;
+      this.enemyBase.y = 120;
+    }
   }
 
   // ----------------------------------------------------------------- input
@@ -1319,8 +1359,13 @@ export class GameEngine {
           s.ammo = g.magazine;
         }
       }
-      // heat cooldown for beam & flamethrower
-      if ((g.weaponClass === "beam" || g.weaponClass === "flamethrower") && s.heat > 0) {
+      // heat cooldown for beam, flamethrower & poison mist
+      if (
+        (g.weaponClass === "beam" ||
+          g.weaponClass === "flamethrower" ||
+          g.weaponClass === "poison_mist") &&
+        s.heat > 0
+      ) {
         const cool = s.overheated ? (g.coolRate ?? 0.5) * 0.85 : g.coolRate ?? 0.5;
         s.heat = Math.max(0, s.heat - cool * dt);
         if (s.overheated && s.heat < 0.3) s.overheated = false;
@@ -2006,7 +2051,7 @@ export class GameEngine {
 
   private pointInWall(x: number, y: number, size: number): Wall | null {
     for (const w of this.walls) {
-      if (w.glue) continue;
+      if (w.glue || w.invisible) continue;
       if (
         x > w.x - size &&
         x < w.x + w.w + size &&
@@ -4138,8 +4183,9 @@ export class GameEngine {
     }
     ctx.stroke();
 
-    // building blocks
-    const block = 220;
+    // building blocks — kept subtle so the single-screen biohazard arena reads
+    // as a faint neon-city floor rather than a wall of blue squares.
+    const block = 150;
     const x0 = Math.floor(this.camX / block) * block;
     const y0 = Math.floor(this.camY / block) * block;
     for (let wx = x0; wx <= this.camX + this.W; wx += block) {
@@ -4147,22 +4193,22 @@ export class GameEngine {
         const h = Math.abs(Math.sin(wx * 12.9898 + wy * 78.233) * 43758.5453);
         const f = h - Math.floor(h); // pseudo-random 0..1
         const f2 = (h * 1.7) % 1;
-        const pad = 16 + Math.floor(f * 12);
-        const bw = block - pad * 2 - Math.floor(f2 * 26);
-        const bh = block - pad * 2 - Math.floor((1 - f2) * 22);
+        const pad = 24 + Math.floor(f * 22);
+        const bw = block - pad * 2 - Math.floor(f2 * 20);
+        const bh = block - pad * 2 - Math.floor((1 - f2) * 16);
         const bx = wx + pad - this.camX;
         const by = wy + pad - this.camY;
 
-        // rooftop slab
-        ctx.fillStyle = rgba(theme.wallDark, 0.55);
+        // rooftop slab (low alpha so the floor stays in the background)
+        ctx.fillStyle = rgba(theme.wallDark, 0.26);
         roundRect(ctx, bx, by, bw, bh, 7);
         ctx.fill();
-        // neon edge
-        ctx.strokeStyle = rgba(theme.accent, 0.45);
-        ctx.lineWidth = 1.5;
+        // neon edge (thin, soft)
+        ctx.strokeStyle = rgba(theme.accent, 0.28);
+        ctx.lineWidth = 1;
         ctx.stroke();
         // inner glow line
-        ctx.strokeStyle = rgba(theme.accent, 0.16);
+        ctx.strokeStyle = rgba(theme.accent, 0.08);
         ctx.lineWidth = 1;
         roundRect(ctx, bx + 4, by + 4, bw - 8, bh - 8, 5);
         ctx.stroke();
@@ -4174,8 +4220,8 @@ export class GameEngine {
           for (let j = 0; j < rows; j++) {
             const lit = ((i * 7 + j * 13 + Math.floor(f * 31)) % 5) === 0;
             if (!lit) continue;
-            ctx.fillStyle = rgba(theme.accent, 0.5);
-            ctx.fillRect(bx + 8 + i * 24, by + 8 + j * 24, 6, 6);
+            ctx.fillStyle = rgba(theme.accent, 0.32);
+            ctx.fillRect(bx + 8 + i * 22, by + 8 + j * 22, 5, 5);
           }
         }
       }
@@ -4203,6 +4249,7 @@ export class GameEngine {
 
   private drawWalls(ctx: CanvasRenderingContext2D) {
     for (const w of this.walls) {
+      if (w.invisible) continue;
       ctx.save();
       if (w.glue) {
         // glue wall — translucent cyan gel
