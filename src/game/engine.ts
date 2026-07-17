@@ -598,6 +598,8 @@ export class GameEngine {
     this.running = true;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
+    // expose the engine instance for debugging / automated tests
+    (window as unknown as { __game?: unknown }).__game = this;
     this.emit(true);
   }
 
@@ -1122,11 +1124,10 @@ export class GameEngine {
     )
       return;
     if (e.code === "KeyP" || e.code === "Escape") {
-      if (!this.gameOver) {
-        // host decides pause locally; guest asks the host (authoritative) to toggle
-        if (this.mode === "guest" && this.net) this.net.sendGame({ t: "pause" });
-        else this.setPaused(!this.paused);
-      }
+      // Pause is a single-player convenience only. In multiplayer the host is
+      // authoritative and the guest is a dumb mirror, so pausing would just
+      // freeze both sides (and could desync). Keep it local-only.
+      if (this.mode === "local" && !this.gameOver) this.setPaused(!this.paused);
       e.preventDefault();
       return;
     }
@@ -3065,7 +3066,20 @@ export class GameEngine {
     if (p.hp <= 0) {
       p.hp = 0;
       this.playSelfDeath();
-      this.endGame("你倒下了");
+      if (this.mode === "local") {
+        this.endGame("你倒下了");
+      } else {
+        // Multiplayer: a downed player respawns after RESPAWN_TIME instead of
+        // ending the match. Ending the game here would freeze the host's whole
+        // simulation (no more snapshots) and lock the opponent out completely.
+        // The match only ends when a base is destroyed.
+        p.deadTimer = RESPAWN_TIME;
+        p.bowDrawing = false;
+        this.firing = false;
+        this.beamActive = false;
+        this.flameActive = false;
+        this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
+      }
     }
   }
 
@@ -3224,10 +3238,7 @@ export class GameEngine {
     for (const m of this.net.drainGameMsgs()) {
       if (m.t === "inp") this.remoteInput = m.input;
       else if (m.t === "snap") this.lastSnap = m.snap;
-      else if (m.t === "pause") {
-        // only the host may flip the authoritative pause state
-        if (!this.gameOver) this.setPaused(!this.paused);
-      } else if (m.t === "hello") {
+      else if (m.t === "hello") {
         this.peerName = m.name;
         this.peerLoadout = m.loadout as Loadout;
         this.applyPeerLoadout();
@@ -3405,7 +3416,8 @@ export class GameEngine {
     if (!s) return;
     // adopt the host-authoritative scene + pause state
     this.sceneTheme = SCENES[s.scene] ?? SCENES[0];
-    this.paused = s.paused;
+    // pause is a single-player-only feature; ignore any stale `paused` flag from the wire
+    if (this.mode === "local") this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
     const foe = s.players.find((p) => p.id !== this.selfPid) ?? s.players[1];
     if (me) {

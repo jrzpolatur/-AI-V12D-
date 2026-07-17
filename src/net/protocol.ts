@@ -110,5 +110,4 @@ export interface Snapshot {
 export type GameMsg =
   | { t: "hello"; name: string; loadout: unknown }
   | { t: "inp"; input: InputFrame }
-  | { t: "pause" } // guest asks the host to toggle pause (host is authoritative)
   | { t: "snap"; snap: Snapshot };
