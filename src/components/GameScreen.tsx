@@ -179,6 +179,10 @@ export default function GameScreen({
       peerPid: online ? (net!.youPid === 1 ? 2 : 1) : undefined,
     });
     engineRef.current = engine;
+    // Both networked peers are thin input-senders + snapshot mirrors: the
+    // authoritative server simulates the whole world, so the client never runs
+    // a local simulation (keeps it light and in lock-step with the server).
+    if (online) engine.setAuthoritative(true);
     // NOTE: enable touch mode HERE (not from MobileControls' own effect). Child
     // effects run before the parent effect that creates the engine, so at that
     // point engineRef.current is still null and setTouchMode would silently no-op.

@@ -23,8 +23,15 @@ import { GameEngine } from "./engine.bundle.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(__dirname, "../dist");
 const PORT = Number(process.env.PORT) || 8080;
-const TICK_HZ = 60;
+// The authoritative loop runs at a fixed 30Hz. This is a deliberate trade-off:
+// stepping + serializing a full snapshot every tick is the dominant server cost,
+// and on busy matches a 60Hz loop drops well below 30Hz (and feels like 5-10fps).
+// 30Hz stays comfortably under the per-tick budget, and the client interpolates
+// snapshots via `ease()`, so 30Hz looks smooth. (Physics/input are still sampled
+// at 30Hz, which is plenty for a top-down shooter.)
+const TICK_HZ = 30;
 const TICK_MS = 1000 / TICK_HZ;
+const STEP = 1 / TICK_HZ; // fixed simulation timestep (seconds)
 // After a client disconnects we keep the room (and its authoritative engine)
 // alive for this long, so a transient reconnect can rejoin the SAME match
 // instead of being forced to re-match from scratch.
@@ -86,15 +93,29 @@ function notifyReady(room) {
  *  tick is already paused (timer === null) so a rejoining peer resumes smoothly. */
 function startTick(room) {
   if (room.timer) clearInterval(room.timer);
+  room.acc = 0;
+  room.lastTick = Date.now();
+  // Drive the loop with a tight scheduler (well above the target rate) and step
+  // the simulation from a real-time accumulator. A naive setInterval(TICK_MS)
+  // drifts badly under event-loop load (timer coalescing drops ticks even when
+  // each step is sub-millisecond), which is what made the match feel like 5-10fps.
+  // The accumulator guarantees a true TICK_HZ regardless of timer slack.
   room.timer = setInterval(() => {
+    const now = Date.now();
+    room.acc += (now - room.lastTick) / 1000;
+    room.lastTick = now;
+    // never let a stalled loop "catch up" with a burst of steps
+    if (room.acc > STEP * 5) room.acc = STEP;
+    if (room.acc < STEP) return;
+    room.acc -= STEP;
     try {
-      room.engine.stepServer(1 / TICK_HZ);
+      room.engine.stepServer(STEP);
       const snap = room.engine.buildSnapshot();
       broadcast(room, { t: "msg", data: { t: "snap", snap } });
     } catch (e) {
       console.error(`[auth] room ${room.code} tick error:`, e);
     }
-  }, TICK_MS);
+  }, Math.max(4, Math.floor(TICK_MS / 4)));
 }
 
 /** Spin up the authoritative simulation for a room once both loadouts are known. */

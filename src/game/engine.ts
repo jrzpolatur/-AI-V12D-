@@ -479,6 +479,9 @@ export class GameEngine {
 
   // ---- multiplayer ----
   private mode: NetMode = "local";
+  /** true when playing through the authoritative server: BOTH clients only
+   *  send input + mirror the server snapshot (no local world simulation). */
+  private authoritative = false;
   private net: Net | null = null;
   /** single-player sub-mode */
   private gameMode: "defense" | "biohazard" = "defense";
@@ -512,6 +515,10 @@ export class GameEngine {
   private pendWeapon = false;
   /** authoritative-server mode: latest InputFrame received from each peer (pid -> frame) */
   private peerInput = new Map<number, InputFrame>();
+  /** latched one-shot actions so a discrete input (weapon switch / skill / reload /
+   *  gadget) is never dropped just because a later no-op frame overwrote the latest
+   *  frame before the authoritative tick consumed it. */
+  private peerLatch = new Map<number, { weaponSwitch: boolean; skill: boolean; reload: boolean; gadget: number }>();
   /** enemies still queued to spawn this wave (local/host HUD; mirrored value on guest) */
   private spawnQueue = 0;
   /** total remaining enemies shown in the HUD (live for host, mirrored for guest) */
@@ -662,6 +669,11 @@ export class GameEngine {
     this.paused = p;
     if (!p) this.last = performance.now();
     this.emit(true);
+  }
+
+  /** Enable server-authoritative client mode (both peers send input + mirror). */
+  setAuthoritative(v: boolean) {
+    this.authoritative = v;
   }
 
   // --------------------------------------------------- touch / mobile controls
@@ -1340,6 +1352,40 @@ export class GameEngine {
   private update(dt: number) {
     // ---- multiplayer: pump peer messages ----
     if (this.mode !== "local" && this.net) this.pumpNet();
+
+    // ---- server-authoritative: both peers are thin input senders + snapshot
+    // mirrors. No local world simulation runs here (the server is authoritative),
+    // which keeps the client light and in lock-step with the server's view.
+    if (this.authoritative) {
+      this.applySnapshot();
+      // smooth the local avatar toward the latest snapshot so the camera/aim isn't choppy
+      if (!this.gxInit) {
+        this.gx = this.player.x;
+        this.gy = this.player.y;
+        this.gxInit = true;
+      }
+      this.gx += (this.player.x - this.gx) * 0.4;
+      this.gy += (this.player.y - this.gy) * 0.4;
+      this.player.x = this.gx;
+      this.player.y = this.gy;
+      // local respawn countdown (server is authoritative on hp; we only display it)
+      if (this.player.hp <= 0) {
+        if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
+        this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
+        this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
+      } else {
+        this.player.deadTimer = 0;
+      }
+      this.inpAccum += dt;
+      if (this.inpAccum >= 1 / 30) {
+        this.inpAccum = 0;
+        this.sendInput();
+      }
+      this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
+      this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      this.emit(true);
+      return;
+    }
 
     // ---- paused: freeze the simulation, but keep the network in sync ----
     // The host keeps streaming snapshots (so the guest sees the pause + can request
@@ -3578,6 +3624,35 @@ export class GameEngine {
   /** Feed a peer's latest input frame (called by the Node server for each socket). */
   setPeerInput(pid: number, frame: InputFrame) {
     this.peerInput.set(pid, frame);
+    let l = this.peerLatch.get(pid);
+    if (!l) {
+      l = { weaponSwitch: false, skill: false, reload: false, gadget: -1 };
+      this.peerLatch.set(pid, l);
+    }
+    if (frame.weaponSwitch) l.weaponSwitch = true;
+    if (frame.skill) l.skill = true;
+    if (frame.reload) l.reload = true;
+    if (typeof frame.gadget === "number" && frame.gadget >= 0) l.gadget = frame.gadget;
+  }
+
+  /** Merge the latest continuous frame with any latched one-shot actions, then
+   *  clear the latch so each discrete input fires exactly once. */
+  private takePeerFrame(pid: number): InputFrame {
+    const base = this.peerInput.get(pid) ?? EMPTY_FRAME;
+    const l = this.peerLatch.get(pid);
+    if (!l) return base;
+    const merged: InputFrame = {
+      ...base,
+      weaponSwitch: base.weaponSwitch || l.weaponSwitch,
+      skill: base.skill || l.skill,
+      reload: base.reload || l.reload,
+      gadget: l.gadget >= 0 ? l.gadget : base.gadget,
+    };
+    l.weaponSwitch = false;
+    l.skill = false;
+    l.reload = false;
+    l.gadget = -1;
+    return merged;
   }
 
   /**
@@ -3695,8 +3770,8 @@ export class GameEngine {
       }
       return;
     }
-    const fA = this.peerInput.get(this.selfPid) ?? EMPTY_FRAME;
-    const fB = this.peerInput.get(this.peerPid) ?? EMPTY_FRAME;
+    const fA = this.takePeerFrame(this.selfPid);
+    const fB = this.takePeerFrame(this.peerPid);
     if (this.player)
       this.simulatePeer(this.player, fA, this.guns, this.gadgets, this.gadgetCd, dt);
     if (this.foe)
@@ -3729,6 +3804,7 @@ export class GameEngine {
     this.peerPid = pidB;
     // reset the per-player input buffers so a stale frame can't leak across matches
     this.peerInput.clear();
+    this.peerLatch.clear();
     this.foe = this.makeFoe();
     this.peerLoadout = loadoutB;
     this.applyPeerLoadout();
@@ -4513,8 +4589,8 @@ export class GameEngine {
     ctx.clearRect(0, 0, this.W, this.H);
     this.drawBackground(ctx);
 
-    // guest renders the world straight from the host snapshot
-    if (this.mode === "guest") {
+    // guest / authoritative-server clients render the world straight from the snapshot
+    if (this.mode === "guest" || this.authoritative) {
       this.renderNet(ctx);
       this.drawCrosshair(ctx);
       this.drawOverlays(ctx);
