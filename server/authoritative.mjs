@@ -63,8 +63,23 @@ function broadcast(room, obj) {
   for (const p of room.peers.values()) send(p.ws, obj);
 }
 
+/** Tell both peers the match is paired and they may enter the loadout screen.
+ *  We must NOT start the simulation yet: clients only send their loadout via
+ *  `hello` once they are inside the game. Starting the sim here would deadlock —
+ *  a client can't enter the game until it receives `start`, but `start` was
+ *  previously only sent after BOTH loadouts had arrived (which never happens). */
+function notifyReady(room) {
+  if (room.notified) return;
+  room.notified = true;
+  for (const [pid, peer] of room.peers) {
+    const other = pid === 1 ? room.peers.get(2) : room.peers.get(1);
+    send(peer.ws, { t: "peer", pid: other.pid, name: other.name, host: false });
+    send(peer.ws, { t: "start", youPid: pid });
+  }
+}
+
 /** Spin up the authoritative simulation for a room once both loadouts are known. */
-function startRoom(room) {
+function startEngine(room) {
   if (room.engine) return;
   const a = room.peers.get(1);
   const b = room.peers.get(2);
@@ -75,13 +90,6 @@ function startRoom(room) {
   engine.setupServerMatch(b.loadout, 1, 2);
   engine.serverStartMatch();
   room.engine = engine;
-
-  // tell each client its own pid (so it mirrors the right player) + the opponent
-  for (const [pid, peer] of room.peers) {
-    const other = pid === 1 ? room.peers.get(2) : room.peers.get(1);
-    send(peer.ws, { t: "peer", pid: other.pid, name: other.name, host: false });
-    send(peer.ws, { t: "start", youPid: pid });
-  }
 
   // fixed 60Hz authoritative tick: step the sim, then broadcast the snapshot
   room.timer = setInterval(() => {
@@ -130,6 +138,7 @@ wss.on("connection", (ws) => {
       ws.room = code;
       addPeer(room, ws, msg.name, 2);
       send(ws, { t: "joined", room: code, pid: 2 });
+      if (room.peers.size === 2) notifyReady(room);
     } else if (msg.t === "find") {
       const name = String(msg.name || "玩家").slice(0, 16);
       if (queue.length > 0) {
@@ -143,6 +152,7 @@ wss.on("connection", (ws) => {
         addPeer(room, ws, name, 2);
         send(other.ws, { t: "created", room: code, pid: 1 });
         send(ws, { t: "joined", room: code, pid: 2 });
+        notifyReady(room);
       } else {
         queue.push({ ws, name });
         ws.pid = pidCounter++;
@@ -158,7 +168,7 @@ wss.on("connection", (ws) => {
         const peer = room.peers.get(ws.pid);
         if (peer) peer.loadout = data.loadout;
         // once both loadouts are known, boot the authoritative simulation
-        if (room.peers.get(1)?.loadout && room.peers.get(2)?.loadout) startRoom(room);
+        startEngine(room);
       } else if (data.t === "inp") {
         // route the peer's input frame into the authoritative engine
         if (room.engine && ws.pid != null) room.engine.setPeerInput(ws.pid, data.input);
