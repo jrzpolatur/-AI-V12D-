@@ -165,64 +165,6 @@ class SoundManager {
     this.tone(330, 0.14, "triangle", 0.16, 440);
     setTimeout(() => this.tone(440, 0.18, "triangle", 0.16, 550), 120);
   }
-
-  // ---- character wav sfx (base64 data-URI clips, decoded + cached) ----
-  private dataClips = new Map<string, AudioBuffer>();
-  private dataPending = new Map<string, Promise<AudioBuffer | null>>();
-
-  /** Pre-decode a data-URI wav so the first playback has no latency. */
-  primeDataUri(uri: string) {
-    if (!uri || this.dataClips.has(uri) || this.dataPending.has(uri)) return;
-    const p = this.decodeDataUri(uri);
-    this.dataPending.set(uri, p);
-    p.then((buf) => {
-      this.dataPending.delete(uri);
-      if (buf) this.dataClips.set(uri, buf);
-    });
-  }
-
-  /** Play a wav encoded as a `data:audio/wav;base64,...` URI. */
-  playDataUri(uri: string) {
-    if (!this.enabled || !uri) return;
-    const cached = this.dataClips.get(uri);
-    if (cached) {
-      this.playBuffer(cached);
-      return;
-    }
-    if (this.dataPending.has(uri)) return;
-    const p = this.decodeDataUri(uri);
-    this.dataPending.set(uri, p);
-    p.then((buf) => {
-      this.dataPending.delete(uri);
-      if (buf) {
-        this.dataClips.set(uri, buf);
-        this.playBuffer(buf);
-      }
-    });
-  }
-
-  private async decodeDataUri(uri: string): Promise<AudioBuffer | null> {
-    try {
-      if (!this.ctx) this.ensure();
-      if (!this.ctx) return null;
-      const comma = uri.indexOf(",");
-      if (comma < 0) return null;
-      const bin = atob(uri.slice(comma + 1));
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      return await this.ctx.decodeAudioData(bytes.buffer);
-    } catch {
-      return null;
-    }
-  }
-
-  private playBuffer(buf: AudioBuffer) {
-    if (!this.enabled || !this.ctx || !this.master) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(this.master);
-    src.start(0);
-  }
 }
 
 export const sound = new SoundManager();

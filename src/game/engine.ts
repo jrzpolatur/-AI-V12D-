@@ -2,7 +2,6 @@ import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getSkill, SCENES, CHA
 import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef, OutfitDef } from "./types";
 import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK } from "./draw";
 import { sound } from "./sound";
-import { SFX } from "./sfxData";
 import { RUNTIME } from "./runtimeConfig";
 import type { NetMode, InputFrame, Snapshot, SnapPlayer } from "../net/protocol";
 import type { Net } from "../net/Net";
@@ -175,6 +174,9 @@ interface Bullet {
   bounced?: boolean;
   /** who fired this bullet (for PvP ownership) */
   owner?: "self" | "foe" | "enemy";
+  /** sideways drift velocity so parallel shots fan apart over flight (px/s) */
+  driftX?: number;
+  driftY?: number;
 }
 
 interface Enemy {
@@ -523,10 +525,6 @@ export class GameEngine {
   private virtualMove = { x: 0, y: 0 };
   /** touch device: enables the mobile on-screen controls + mobile-only aim assist */
   private touchMode = false;
-  /** self (local player) hp from the previous frame — used for guest-side hit/death sfx */
-  private lastSelfHp = -1;
-  /** throttle so simultaneous bullets don't machine-gun the hit sfx */
-  private hurtSndCd = 0;
 
   private hudAccum = 0;
   private boundKeyDown: (e: KeyboardEvent) => void;
@@ -766,7 +764,6 @@ export class GameEngine {
     this.beamActive = false;
     this.beamHit = null;
     this.flameActive = false;
-    this.primeSelfSfx();
     this.banner = {
       text: this.gameMode === "biohazard" ? "生化危机 · 活下去！" : "守护基地！",
       t: 2.2,
@@ -1252,7 +1249,6 @@ export class GameEngine {
   private update(dt: number) {
     // ---- multiplayer: pump peer messages ----
     if (this.mode !== "local" && this.net) this.pumpNet();
-    if (this.hurtSndCd > 0) this.hurtSndCd = Math.max(0, this.hurtSndCd - dt);
 
     // ---- paused: freeze the simulation, but keep the network in sync ----
     // The host keeps streaming snapshots (so the guest sees the pause + can request
@@ -1301,13 +1297,6 @@ export class GameEngine {
       } else {
         this.player.deadTimer = 0;
       }
-      // guest has no local damage sim — derive hit/death sfx from host snapshot hp
-      const hpNow = this.player.hp;
-      if (this.lastSelfHp >= 0) {
-        if (this.lastSelfHp > hpNow && hpNow > 0) this.playSelfHit();
-        else if (this.lastSelfHp > 0 && hpNow <= 0) this.playSelfDeath();
-      }
-      this.lastSelfHp = hpNow;
       this.inpAccum += dt;
       if (this.inpAccum >= 1 / 30) {
         this.inpAccum = 0;
@@ -1567,22 +1556,44 @@ export class GameEngine {
       : 1;
     const dmg = g.damage * this.character.damageMult * spinMult;
     const base = p.angle;
+    const perp = base + Math.PI / 2;
+    const useParallel = (g.parallel ?? 1) > 1;
+    const gap = g.parallelGap ?? 8;
+    const drift = g.drift ?? 0;
     for (let i = 0; i < g.pellets; i++) {
       let a: number;
-      if (g.pellets > 1) {
+      let bx: number;
+      let by: number;
+      let driftX = 0;
+      let driftY = 0;
+      if (useParallel) {
+        // parallel side-by-side shots that drift apart as they travel
+        const off = i - (g.pellets - 1) / 2;
+        const lateral = off * gap;
+        bx = p.x + Math.cos(base) * (p.size + g.barrel) + Math.cos(perp) * lateral;
+        by = p.y + Math.sin(base) * (p.size + g.barrel) + Math.sin(perp) * lateral;
+        a = base;
+        const sign = off === 0 ? (i % 2 ? 1 : -1) : Math.sign(off);
+        driftX = Math.cos(perp) * drift * sign;
+        driftY = Math.sin(perp) * drift * sign;
+      } else if (g.pellets > 1) {
         const off = (i / (g.pellets - 1) - 0.5) * 2 * g.spread;
         a = base + off + (Math.random() - 0.5) * g.spread * 0.35;
+        bx = p.x + Math.cos(a) * (p.size + g.barrel);
+        by = p.y + Math.sin(a) * (p.size + g.barrel);
       } else {
         a = base + (Math.random() - 0.5) * g.spread;
+        bx = p.x + Math.cos(a) * (p.size + g.barrel);
+        by = p.y + Math.sin(a) * (p.size + g.barrel);
       }
       const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
-      const bx = p.x + Math.cos(a) * (p.size + g.barrel);
-      const by = p.y + Math.sin(a) * (p.size + g.barrel);
       this.bullets.push({
         x: bx,
         y: by,
         vx: Math.cos(a) * sp,
         vy: Math.sin(a) * sp,
+        driftX,
+        driftY,
         life: g.life,
         damage: dmg,
         size: g.bulletSize,
@@ -2194,6 +2205,8 @@ export class GameEngine {
     for (const b of this.bullets) {
       b.x += b.vx * dt;
       b.y += b.vy * dt;
+      b.x += (b.driftX ?? 0) * dt;
+      b.y += (b.driftY ?? 0) * dt;
       b.life -= dt;
       if (b.trail && Math.random() < 0.7) {
         this.particles.push({
@@ -3008,33 +3021,6 @@ export class GameEngine {
     }
   }
 
-  /** Play the local player's character hit sfx (falls back to the synth `hurt`). */
-  private playSelfHit() {
-    if (this.hurtSndCd > 0) return;
-    this.hurtSndCd = 0.05;
-    const s = SFX[this.character.id];
-    if (s && s.hit.length) {
-      sound.playDataUri(s.hit[(Math.random() * s.hit.length) | 0]);
-    } else {
-      sound.hurt();
-    }
-  }
-
-  /** Play the local player's elimination sfx (phantom only; others fall silent). */
-  private playSelfDeath() {
-    const s = SFX[this.character.id];
-    if (s && s.death) sound.playDataUri(s.death);
-  }
-
-  /** Pre-decode the local player's character wav sfx so the first hit has no delay. */
-  private primeSelfSfx() {
-    const s = SFX[this.character.id];
-    if (s) {
-      for (const h of s.hit) sound.primeDataUri(h);
-      sound.primeDataUri(s.death);
-    }
-  }
-
   private damagePlayer(dmg: number) {
     const p = this.player;
     if (p.iframes > 0 || p.shieldTime > 0) {
@@ -3060,12 +3046,11 @@ export class GameEngine {
     p.flash = 1;
     p.iframes = 0.45;
     p.lastHitTime = this.time;
-    this.playSelfHit();
+    sound.hurt();
     this.shake = Math.min(16, this.shake + dmg * 0.4);
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
     if (p.hp <= 0) {
       p.hp = 0;
-      this.playSelfDeath();
       if (this.mode === "local") {
         this.endGame("你倒下了");
       } else {
@@ -3177,7 +3162,7 @@ export class GameEngine {
     p.flash = 1;
     p.iframes = 0.45;
     p.lastHitTime = this.time;
-    this.playSelfHit();
+    sound.hurt();
     this.shake = Math.min(16, this.shake + dmg * 0.4);
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
     // apply knockback (melee); clamp to world bounds
@@ -3195,7 +3180,6 @@ export class GameEngine {
         this.firing = false;
         this.beamActive = false;
         this.flameActive = false;
-        this.playSelfDeath();
       }
       if (p === this.foe) {
         // you downed the opponent

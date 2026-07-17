@@ -78,6 +78,14 @@ export interface GunDef {
   spread: number;
   pellets: number;
   pierce: number;
+  /** side-by-side parallel shot count (e.g. 2 = twin barrels). Shots spawn
+   *  parallel to the aim line and drift apart over flight (see `drift`).
+   *  Only used when > 1; otherwise the normal `spread` fan logic applies. */
+  parallel?: number;
+  /** initial sideways gap between parallel shots (px) */
+  parallelGap?: number;
+  /** sideways drift speed applied to each parallel shot so they fan out (px/s) */
+  drift?: number;
   /** bullet lifetime in seconds */
   life: number;
   knockback: number;
