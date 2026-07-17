@@ -576,7 +576,7 @@ export default function LoadoutScreen({
               ))}
             </Section>
 
-            <Section label={`战术道具（最多携带 3 个，已选 ${gadgetIds.length}/3，游戏中 1/2/3 或滚轮部署）`}>
+            <Section label={`战术道具（最多携带 3 个，已选 ${gadgetIds.length}/3，游戏中 1/2/3 或滚轮选择，左键投掷/部署）`}>
               {GADGETS.map((gd) => {
                 const idx = gadgetIds.indexOf(gd.id);
                 const selected = idx >= 0;
@@ -634,7 +634,7 @@ export default function LoadoutScreen({
             <span><kbd className="kbd">Q</kbd> 技能</span>
             <span><kbd className="kbd">R</kbd> 换弹</span>
             <span><kbd className="kbd">1-9/0 · [ ] · 滚轮</kbd> 切换武器</span>
-            <span><kbd className="kbd">F1-F6</kbd> 部署道具</span>
+            <span><kbd className="kbd">1/2/3 · 滚轮</kbd> 选择道具 · <kbd className="kbd">左键</kbd> 部署</span>
             <span><kbd className="kbd">大锤右键</kbd> 砸地拆墙</span>
             <span><kbd className="kbd">P</kbd> 暂停</span>
           </div>

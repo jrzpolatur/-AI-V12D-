@@ -166,7 +166,17 @@ export default function GameScreen({
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    const engine = new GameEngine(canvas, loadout, setHud, { mode, net });
+    // In PvP the server is authoritative: BOTH clients are thin (send input +
+    // mirror the server snapshot). We reuse the existing guest code path and
+    // just tell the engine which pid it is so it mirrors the right player.
+    const online = !!net;
+    const effectiveMode: NetMode = online ? "guest" : mode;
+    const engine = new GameEngine(canvas, loadout, setHud, {
+      mode: effectiveMode,
+      net,
+      selfPid: online ? net!.youPid : undefined,
+      peerPid: online ? (net!.youPid === 1 ? 2 : 1) : undefined,
+    });
     engineRef.current = engine;
     // NOTE: enable touch mode HERE (not from MobileControls' own effect). Child
     // effects run before the parent effect that creates the engine, so at that
@@ -329,17 +339,23 @@ export default function GameScreen({
         {hud.gadgets.map((gd, i) => (
           <button
             key={gd.id}
-            onClick={() => engineRef.current?.deployGadget(i)}
+            onClick={() => engineRef.current?.selectGadget(i)}
             className={cn(
               "relative flex h-12 w-12 flex-col items-center justify-center overflow-hidden rounded-xl border-2 bg-black/55 backdrop-blur transition-transform active:scale-95",
-              gd.ready
+              gd.selected
+                ? "border-white ring-2 ring-white/80 scale-105"
+                : gd.ready
                 ? "border-white/30 hover:border-white/50"
                 : "border-white/10 opacity-60"
             )}
             style={{
-              boxShadow: gd.ready ? `0 0 10px ${gd.color}55` : "none",
+              boxShadow: gd.selected
+                ? `0 0 16px ${gd.color}cc, 0 0 4px #fff`
+                : gd.ready
+                ? `0 0 10px ${gd.color}55`
+                : "none",
             }}
-            title={`${gd.name} (F${i + 1}) · ${gd.deployed}/${gd.maxStack}`}
+            title={`${gd.name} · ${gd.deployed}/${gd.maxStack} · 点击选中后左键部署`}
           >
             {!gd.ready && (
               <div
@@ -353,6 +369,11 @@ export default function GameScreen({
             <span className="relative text-[8px] font-bold text-slate-300">
               {i + 1}
             </span>
+            {gd.selected && (
+              <span className="absolute left-0.5 top-0.5 rounded-full bg-white px-1 text-[7px] font-bold text-slate-900">
+                已选
+              </span>
+            )}
             {gd.deployed > 0 && (
               <span className="absolute right-0.5 top-0.5 rounded-full bg-black/70 px-1 text-[8px] font-bold text-white">
                 {gd.deployed}
@@ -542,7 +563,7 @@ export default function GameScreen({
             <div className="mb-4 space-y-1 text-left text-xs text-slate-300">
               <p><kbd className="kbd">WASD</kbd> 移动 · <kbd className="kbd">鼠标左键</kbd> 攻击</p>
               <p><kbd className="kbd">Q</kbd> 技能 · <kbd className="kbd">R</kbd> 换弹</p>
-              <p><kbd className="kbd">1/2/3</kbd> 部署道具 · <kbd className="kbd">滚轮</kbd> 切换道具</p>
+              <p><kbd className="kbd">1/2/3</kbd> / <kbd className="kbd">滚轮</kbd> 选择道具 · <kbd className="kbd">鼠标左键</kbd> 投掷/部署</p>
               <p><kbd className="kbd">E</kbd> 切换武器</p>
               <p><kbd className="kbd">弓</kbd> 长按蓄力 · <kbd className="kbd">盾</kbd> 右键举盾</p>
               <p><kbd className="kbd">P/Esc</kbd> 继续</p>

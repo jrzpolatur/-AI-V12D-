@@ -476,6 +476,42 @@ export function drawWeapon(
       ctx.stroke();
       break;
     }
+    // ---------------- LIGHTNING WHIP (闪电鞭) ----------------
+    case "lightning_whip": {
+      // short handle
+      body(-8, -2.4, 12, 4.8, STEEL_X, STEEL_D, 1.5);
+      block(-8, -2.4, 4, 4.8, STEEL_D, 1); // grip
+      block(2, -2.6, 2, 5.2, STEEL_L, 0.8); // emitter
+      // crackling energy tail that flickers like a whip
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const len = (gun.meleeRange ?? 90) * 0.9;
+      const flick = 1 + Math.sin(t * 22) * 0.12;
+      const tail = (w: number, col: string) => {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(4, 0);
+        let x = 4;
+        let y = 0;
+        const segs = 5;
+        for (let i = 1; i <= segs; i++) {
+          const f = i / segs;
+          const nx = 4 + len * f;
+          const ny =
+            Math.sin(f * Math.PI * 2.5 + t * 6) * (10 * (1 - f)) * flick;
+          ctx.lineTo(nx, ny);
+          x = nx;
+          y = ny;
+        }
+        ctx.stroke();
+        return { x, y };
+      };
+      tail(8 * flick, rgba(gun.glow, 0.28));
+      tail(3 * flick, rgba("#ffffff", 0.9));
+      ctx.restore();
+      break;
+    }
     // ---------------- RECURVE BOW ----------------
     case "recurve_bow": {
       // grip
@@ -682,6 +718,74 @@ function drawHat(
     ctx.moveTo(r * 0.1, -r * 0.42);
     ctx.lineTo(r * 0.85, -r * 0.3);
     ctx.stroke();
+  } else if (hat === "alien") {
+    // big black almond eyes + a pair of curved antennae
+    ctx.fillStyle = "#0b1020";
+    ctx.beginPath();
+    ctx.ellipse(r * 0.22, -r * 0.28, r * 0.34, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(r * 0.22, r * 0.28, r * 0.34, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = rgba(accent, 0.9);
+    ctx.beginPath();
+    ctx.arc(r * 0.22, -r * 0.28, r * 0.08, 0, Math.PI * 2);
+    ctx.arc(r * 0.22, r * 0.28, r * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    // antennae
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.6;
+    for (const sy of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(r * 0.1, sy * r * 0.4);
+      ctx.quadraticCurveTo(r * -0.2, sy * r * 0.9, r * -0.35, sy * r * 1.1);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(r * -0.35, sy * r * 1.1, r * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (hat === "monkey") {
+    // round ears + a muzzle with nostrils
+    ctx.fillStyle = shade(accent, -0.1);
+    ctx.strokeStyle = "rgba(40,25,15,0.5)";
+    ctx.lineWidth = 1.2;
+    for (const sy of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(-r * 0.1, sy * r * 0.62, r * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#caa072";
+      ctx.beginPath();
+      ctx.arc(-r * 0.1, sy * r * 0.62, r * 0.24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = shade(accent, -0.1);
+    }
+    // muzzle
+    ctx.fillStyle = "#e8c79a";
+    ctx.beginPath();
+    ctx.ellipse(r * 0.32, 0, r * 0.34, r * 0.26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(40,25,15,0.6)";
+    ctx.beginPath();
+    ctx.arc(r * 0.5, -r * 0.08, r * 0.05, 0, Math.PI * 2);
+    ctx.arc(r * 0.5, r * 0.08, r * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (hat === "tycoon") {
+    // black top hat 🎩 with a gold band
+    ctx.fillStyle = "#0b0c22";
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.lineWidth = 1;
+    // brim
+    roundRect(ctx, -r * 1.1, -r * 0.18, r * 2.2, r * 0.34, r * 0.12);
+    ctx.fill();
+    ctx.stroke();
+    // crown
+    roundRect(ctx, -r * 0.62, -r * 1.3, r * 1.24, r * 1.2, r * 0.1);
+    ctx.fill();
+    ctx.stroke();
+    // gold band
+    ctx.fillStyle = accent;
+    roundRect(ctx, -r * 0.62, -r * 0.34, r * 1.24, r * 0.2, 0);
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -834,7 +938,7 @@ export function drawCharacter(
 
   // head (forward, +x) with forward-looking eyes
   const headX = r * 0.18;
-  ctx.fillStyle = flash > 0 ? "#ffffff" : character.skin;
+  ctx.fillStyle = flash > 0 ? "#ffffff" : (outfit.skin ?? character.skin);
   ctx.strokeStyle = "rgba(40,25,15,0.45)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -1857,6 +1961,29 @@ export function drawWeaponIcon(
         ctx.closePath();
       }, rgba(glow, 0.85));
       break;
+    case "lightning_whip":
+      // handle
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8, -1.1);
+        ctx.lineTo(1, -1.1);
+        ctx.lineTo(1, 1.1);
+        ctx.lineTo(-8, 1.1);
+        ctx.closePath();
+      });
+      // energy whip (glow) — jagged bolt
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(1, 0);
+        ctx.lineTo(4, -3);
+        ctx.lineTo(7, 2);
+        ctx.lineTo(9.5, -2.5);
+        ctx.lineTo(11.5, 1);
+      }, rgba(glow, 0.9), 1.6);
+      ctx.restore();
+      break;
     default:
       body(() => {
         ctx.beginPath();
@@ -1951,6 +2078,15 @@ export function drawGadgetIcon(
         ctx.moveTo(0, -6);
         ctx.lineTo(0, -9);
         ctx.lineTo(3, -9);
+      });
+      break;
+    case "fire_grenade":
+      sil(() => {
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        // flame tongue
+        ctx.moveTo(-2, -5);
+        ctx.quadraticCurveTo(0, -11, 3, -5);
+        ctx.lineTo(0, -6);
       });
       break;
     case "healing_station":

@@ -1,7 +1,7 @@
 // Shared networking types for 1v1 co-op-base-defense + PvP.
 // Kept free of engine imports so both client and (future) tooling can use them.
 
-export type NetMode = "local" | "host" | "guest";
+export type NetMode = "local" | "host" | "guest" | "server";
 
 /** Control messages exchanged with the relay server. */
 export type RelayIn =
@@ -15,7 +15,7 @@ export type RelayOut =
   | { t: "joined"; room: string; pid: number }
   | { t: "queued" } // find() accepted, waiting for an opponent
   | { t: "peer"; pid: number; name: string; host: boolean }
-  | { t: "start" }
+  | { t: "start"; youPid?: number }
   | { t: "msg"; data: GameMsg }
   | { t: "peerLeft" }
   | { t: "error"; msg: string };

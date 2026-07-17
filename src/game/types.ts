@@ -26,7 +26,15 @@ export interface CharacterDef {
   desc: string;
 }
 
-export type HatType = "none" | "cap" | "helmet" | "hood" | "visor";
+export type HatType =
+  | "none"
+  | "cap"
+  | "helmet"
+  | "hood"
+  | "visor"
+  | "alien"
+  | "monkey"
+  | "tycoon";
 
 export interface OutfitDef {
   id: string;
@@ -41,6 +49,8 @@ export interface OutfitDef {
   speedBonus: number;
   hpBonus: number;
   fireRateBonus?: number;
+  /** optional skin tone override (used by the alien / monkey skins) */
+  skin?: string;
 }
 
 export type ProjectileKind =
@@ -135,6 +145,12 @@ export interface GunDef {
   /** combo chain length for spear */
   comboLength?: number;
 
+  // ---- lightning whip (闪电鞭) ----
+  /** if true, the melee swing alternates left/right and slows hit enemies */
+  whip?: boolean;
+  /** slow duration (seconds) applied to enemies/opponents on a whip hit */
+  slowOnHit?: number;
+
   // ---- range tier label for display ----
   rangeTier?: "近" | "中" | "远";
 
@@ -191,6 +207,7 @@ export type GadgetKind =
   | "mine_poison"
   | "mine_fire"
   | "glue_grenade"
+  | "fire_grenade"
   | "healing_station";
 
 export interface GadgetDef {
@@ -207,6 +224,8 @@ export interface GadgetDef {
   maxStack?: number;
   /** deployable max HP (turrets / healing station). 0 / undefined = built-in default. */
   hp?: number;
+  /** max placement/throw distance from the player (px). Defaults per kind. */
+  range?: number;
 }
 
 // ---------------------------------------------------------------------------

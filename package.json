@@ -1,15 +1,19 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.4.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/fix-file-protocol.mjs",
+    "build": "vite build && node scripts/fix-file-protocol.mjs && npm run build:engine",
     "preview": "vite preview",
     "play": "vite build && node scripts/fix-file-protocol.mjs && node scripts/open.mjs",
     "server": "node server/relay.mjs",
-    "start": "node server/prod.mjs"
+    "start": "node server/authoritative.mjs",
+    "build:engine": "esbuild src/game/engine.ts --bundle --format=esm --platform=node --outfile=server/engine.bundle.mjs",
+    "server:auth": "node server/authoritative.mjs",
+    "smoke:server": "node scripts/smoke-server.mjs",
+    "smoke:ws": "node scripts/smoke-ws.mjs"
   },
   "engines": {
     "node": ">=20"

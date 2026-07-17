@@ -28,6 +28,8 @@ export class Net {
   private mode: "host" | "guest" = "guest";
   status: NetStatus = "idle";
   peerName = "";
+  /** the pid assigned to THIS client by the (authoritative) server */
+  youPid = 0;
   /** buffered game messages received from the peer (drained by the engine) */
   private inbox: GameMsg[] = [];
   private autoReconnect = false;
@@ -155,6 +157,7 @@ export class Net {
         break;
       case "start":
         this.pendingFind = null;
+        this.youPid = (m as { youPid?: number }).youPid ?? this.youPid;
         this.setStatus("ready");
         this.events.onStart?.();
         break;
