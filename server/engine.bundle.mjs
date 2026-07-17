@@ -2382,6 +2382,8 @@ var GameEngine = class {
    * late-joining player never lands in a half-played, desynced world.
    */
   peerReady = false;
+  /** opponent transiently disconnected; HUD shows a "reconnecting" overlay */
+  reconnecting = false;
   /** Gameplay (waves / enemy spawns) may advance. Gated on `peerReady` for net. */
   matchLive = false;
   character = getCharacter("raider");
@@ -5178,6 +5180,12 @@ var GameEngine = class {
     this.peerReady = true;
     this.matchLive = true;
   }
+  /** Net: toggle the "opponent reconnecting" overlay (driven by peerGone/peerBack). */
+  setReconnecting(v) {
+    if (this.reconnecting === v) return;
+    this.reconnecting = v;
+    this.syncHud();
+  }
   /**
    * Server: register peer B (the second socket) from their loadout and assign
    * the two role pids. Peer A is the engine's own player (constructed with its
@@ -5861,6 +5869,7 @@ var GameEngine = class {
       gameOverReason: this.gameOverReason,
       paused: this.paused,
       connecting: this.mode !== "local" && !this.peerReady,
+      reconnecting: this.reconnecting,
       banner: this.banner ? this.banner.text : null,
       kills: this.kills,
       gold: this.gold,

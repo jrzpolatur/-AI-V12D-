@@ -17,6 +17,8 @@ export interface NetEvents {
   onPeer?: (pid: number, name: string, host: boolean) => void;
   onStart?: () => void;
   onPeerLeft?: () => void;
+  onPeerGone?: () => void;
+  onPeerBack?: () => void;
   onGameMsg?: (m: GameMsg) => void;
 }
 
@@ -25,6 +27,10 @@ export class Net {
   private url = "";
   private room = "";
   private pid = 0;
+  /** name used for the last create/join/find — reused on rejoin */
+  private name = "玩家";
+  /** last loadout we sent in `hello` — reused on rejoin so the match resumes */
+  private lastLoadout: unknown = null;
   private mode: "host" | "guest" = "guest";
   status: NetStatus = "idle";
   peerName = "";
@@ -35,6 +41,16 @@ export class Net {
   private autoReconnect = false;
   private pendingFind: string | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** dynamic listeners (used by GameScreen, which doesn't own the Net instance) */
+  private peerGoneCbs: (() => void)[] = [];
+  private peerBackCbs: (() => void)[] = [];
+
+  onPeerGone(cb: () => void) {
+    this.peerGoneCbs.push(cb);
+  }
+  onPeerBack(cb: () => void) {
+    this.peerBackCbs.push(cb);
+  }
 
   constructor(private events: NetEvents = {}) {}
 
@@ -67,8 +83,11 @@ export class Net {
     }
     this.ws.onopen = () => {
       this.setStatus("connected");
-      // Re-issue a pending match request after a reconnect.
-      if (this.pendingFind) this.find(this.pendingFind);
+      // A transient reconnect: if we were already in a matched room, rejoin the
+      // SAME room instead of re-matching from scratch. Otherwise re-issue a
+      // pending quick-match request.
+      if (this.room && this.pid) this.rejoin(this.name, this.lastLoadout);
+      else if (this.pendingFind) this.find(this.pendingFind);
     };
     this.ws.onerror = () => this.setStatus("error", "无法连接服务器");
     this.ws.onclose = () => {
@@ -93,18 +112,28 @@ export class Net {
   }
 
   create(name: string) {
+    this.name = name;
     this.send({ t: "create", name });
     this.setStatus("waiting", "房间已创建，等待好友加入…");
   }
 
   join(room: string, name: string) {
+    this.name = name;
     this.room = room.toUpperCase();
     this.send({ t: "join", room: this.room, name });
     this.setStatus("waiting", "正在加入房间…");
   }
 
+  /** Resume a previously-matched room after a transient disconnect. */
+  rejoin(name: string, loadout: unknown) {
+    if (!this.room || !this.pid) return;
+    this.send({ t: "rejoin", room: this.room, pid: this.pid, name, loadout });
+    this.setStatus("waiting", "正在恢复对局…");
+  }
+
   /** Quick match: server pairs us with the next waiting player. */
   find(name: string) {
+    this.name = name;
     this.pendingFind = name;
     this.send({ t: "find", name });
     this.setStatus("waiting", "匹配中，等待对手…");
@@ -112,6 +141,8 @@ export class Net {
 
   /** Send an opaque game payload to the peer (via relay). */
   sendGame(m: GameMsg) {
+    // remember the loadout we advertised so a later rejoin can resume the match
+    if (m.t === "hello") this.lastLoadout = m.loadout;
     this.send({ t: "msg", data: m });
   }
 
@@ -165,10 +196,25 @@ export class Net {
         this.inbox.push(m.data as GameMsg);
         this.events.onGameMsg?.(m.data as GameMsg);
         break;
+      case "peerGone":
+        this.events.onPeerGone?.();
+        this.peerGoneCbs.forEach((c) => c());
+        break;
+      case "peerBack":
+        this.events.onPeerBack?.();
+        this.peerBackCbs.forEach((c) => c());
+        break;
       case "peerLeft":
         this.events.onPeerLeft?.();
         break;
       case "error":
+        // a "room expired" error means our previous match is gone: forget it so
+        // the UI lets the player re-match instead of looping on a dead room.
+        if (m.msg.includes("重新匹配") || m.msg.includes("失效")) {
+          this.room = "";
+          this.pid = 0;
+          this.pendingFind = null;
+        }
         this.setStatus("error", m.msg);
         break;
     }

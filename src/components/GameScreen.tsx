@@ -45,6 +45,7 @@ const initialHud: HudState = {
   gameOverReason: "",
   paused: false,
   connecting: false,
+  reconnecting: false,
   banner: null,
   kills: 0,
   gold: 0,
@@ -194,6 +195,15 @@ export default function GameScreen({
 
   const character = getCharacter(loadout.characterId);
   const outfit = getOutfit(loadout.outfitId);
+
+  // Keep the "opponent reconnecting" overlay in sync with transient disconnects.
+  useEffect(() => {
+    if (!net) return;
+    const gone = () => engineRef.current?.setReconnecting(true);
+    const back = () => engineRef.current?.setReconnecting(false);
+    net.onPeerGone(gone);
+    net.onPeerBack(back);
+  }, [net]);
 
   const hpPct = hud.maxHp ? hud.hp / hud.maxHp : 0;
   const hpColor =
@@ -538,6 +548,21 @@ export default function GameScreen({
 
       {/* ============ MOBILE CONTROLS (touch only) ============ */}
       {isTouch && <MobileControls engineRef={engineRef} />}
+
+      {/* ============ RECONNECTING (opponent transiently dropped) ============ */}
+      {hud.reconnecting && !hud.gameOver && !hud.paused && !hud.connecting && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-amber-300/30 border-t-amber-300" />
+            <p className="text-lg font-bold text-slate-100">
+              对手掉线，正在重连…
+            </p>
+            <p className="text-sm text-slate-400">
+              对局已为你保留，请稍候
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ============ CONNECTING (peer handshake) ============ */}
       {hud.connecting && !hud.gameOver && !hud.paused && (

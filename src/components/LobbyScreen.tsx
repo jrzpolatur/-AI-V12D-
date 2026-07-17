@@ -23,6 +23,7 @@ export default function LobbyScreen({
   const [peerName, setPeerName] = useState("");
 
   const netRef = useRef<Net | null>(null);
+  const advanced = useRef(false);
   if (!netRef.current) {
     netRef.current = new Net({
       onStatus: (s, i) => {
@@ -30,8 +31,26 @@ export default function LobbyScreen({
         if (i) setInfo(i);
       },
       onPeer: (_pid, n) => setPeerName(n),
-      onStart: () => setStatus("ready"),
+      onStart: () => {
+        setStatus("ready");
+        // Once matched (or re-matched after a transient reconnect) go straight
+        // to the loadout screen — no extra "进入装配" click, and never a forced
+        // re-match. Guarded so a later rejoin (while already in-game) can't kick
+        // the player back to the lobby.
+        if (!advanced.current) {
+          advanced.current = true;
+          onReady(net.playerMode, net);
+        }
+      },
+      onPeerGone: () => {
+        setInfo("对手掉线，正在等待重连…");
+      },
+      onPeerBack: () => {
+        setInfo("");
+        setStatus("ready");
+      },
       onPeerLeft: () => {
+        advanced.current = false;
         setStatus("waiting");
         setInfo("对手已离开，正在重新匹配…");
       },

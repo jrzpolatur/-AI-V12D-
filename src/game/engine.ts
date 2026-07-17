@@ -95,6 +95,8 @@ export interface HudState {
   shieldCdPct: number;
   /** hit flash 0..1 (decays; triggers HUD shake) */
   hitFlash: number;
+  /** net: opponent transiently disconnected; show "reconnecting" overlay */
+  reconnecting: boolean;
 }
 
 interface Player {
@@ -441,6 +443,8 @@ export class GameEngine {
    * late-joining player never lands in a half-played, desynced world.
    */
   private peerReady = false;
+  /** opponent transiently disconnected; HUD shows a "reconnecting" overlay */
+  private reconnecting = false;
   /** Gameplay (waves / enemy spawns) may advance. Gated on `peerReady` for net. */
   private matchLive = false;
 
@@ -3708,6 +3712,13 @@ export class GameEngine {
     this.matchLive = true;
   }
 
+  /** Net: toggle the "opponent reconnecting" overlay (driven by peerGone/peerBack). */
+  setReconnecting(v: boolean) {
+    if (this.reconnecting === v) return;
+    this.reconnecting = v;
+    this.syncHud();
+  }
+
   /**
    * Server: register peer B (the second socket) from their loadout and assign
    * the two role pids. Peer A is the engine's own player (constructed with its
@@ -4480,6 +4491,7 @@ export class GameEngine {
       gameOverReason: this.gameOverReason,
       paused: this.paused,
       connecting: this.mode !== "local" && !this.peerReady,
+      reconnecting: this.reconnecting,
       banner: this.banner ? this.banner.text : null,
       kills: this.kills,
       gold: this.gold,

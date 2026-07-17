@@ -8,6 +8,7 @@ export type RelayIn =
   | { t: "create"; name?: string }
   | { t: "join"; room: string; name?: string }
   | { t: "find"; name?: string } // quick-match: pair with next waiting player
+  | { t: "rejoin"; room: string; pid: number; name?: string; loadout?: unknown } // resume a matched room after a transient disconnect
   | { t: "msg"; data: GameMsg };
 
 export type RelayOut =
@@ -17,7 +18,9 @@ export type RelayOut =
   | { t: "peer"; pid: number; name: string; host: boolean }
   | { t: "start"; youPid?: number }
   | { t: "msg"; data: GameMsg }
-  | { t: "peerLeft" }
+  | { t: "peerGone" } // opponent transiently disconnected (rejoin possible)
+  | { t: "peerBack" } // opponent reconnected
+  | { t: "peerLeft" } // opponent permanently left (room closing)
   | { t: "error"; msg: string };
 
 /** Per-frame input sent by a guest to the host. */

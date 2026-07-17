@@ -130,6 +130,30 @@ try {
   const x1 = after.players.find((p) => p.id === aPid).x;
   console.log("A moved right:", x1 > x0, `(${x0.toFixed(1)} -> ${x1.toFixed(1)})`);
   console.log("bullets in latest snapshot:", after.bullets.length);
+
+  // ---- reconnect / resume test ----
+  // Drop A's socket. B must be told the peer is GONE (not permanently LEFT),
+  // and the room must survive so A can rejoin the SAME match.
+  b.msgs.length = 0;
+  a.close();
+  const gone = await waitMsg(b, (m) => m.t === "peerGone");
+  if (!gone) throw new Error("B never received peerGone after A disconnected");
+  if (b.msgs.some((m) => m.t === "peerLeft")) {
+    throw new Error("B wrongly received peerLeft during grace window");
+  }
+  console.log("peerGone received (room preserved):", !!gone);
+
+  await sleep(120); // let the auto-reconnect window elapse
+  const a2 = await connect();
+  a2.send(JSON.stringify({ t: "rejoin", room, pid: aPid, name: "A", loadout: loadout() }));
+  const resumed = await waitMsg(a2, (m) => m.t === "start");
+  await waitMsg(b, (m) => m.t === "peerBack");
+  if (!resumed) throw new Error("rejoin did not resume the match (no start)");
+  // snapshots should resume flowing to the rejoined client
+  const s2 = await waitMsg(a2, (m) => m.t === "msg" && m.data && m.data.t === "snap");
+  console.log("rejoin resumed match, snapshot streaming:", !!s2);
+  if (!s2) throw new Error("no snapshot after rejoin");
+
   console.log("WS SMOKE TEST OK");
 } catch (e) {
   console.error("WS SMOKE TEST FAILED:", e);

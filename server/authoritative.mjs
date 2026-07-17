@@ -25,6 +25,10 @@ const DIST = path.resolve(__dirname, "../dist");
 const PORT = Number(process.env.PORT) || 8080;
 const TICK_HZ = 60;
 const TICK_MS = 1000 / TICK_HZ;
+// After a client disconnects we keep the room (and its authoritative engine)
+// alive for this long, so a transient reconnect can rejoin the SAME match
+// instead of being forced to re-match from scratch.
+const RECONNECT_GRACE_MS = 15000;
 
 // ---------------------------------------------------------------- static files
 const server = http.createServer((req, res) => {
@@ -78,6 +82,21 @@ function notifyReady(room) {
   }
 }
 
+/** (Re)start the authoritative 60Hz tick for a room. Safe to call when the
+ *  tick is already paused (timer === null) so a rejoining peer resumes smoothly. */
+function startTick(room) {
+  if (room.timer) clearInterval(room.timer);
+  room.timer = setInterval(() => {
+    try {
+      room.engine.stepServer(1 / TICK_HZ);
+      const snap = room.engine.buildSnapshot();
+      broadcast(room, { t: "msg", data: { t: "snap", snap } });
+    } catch (e) {
+      console.error(`[auth] room ${room.code} tick error:`, e);
+    }
+  }, TICK_MS);
+}
+
 /** Spin up the authoritative simulation for a room once both loadouts are known. */
 function startEngine(room) {
   if (room.engine) return;
@@ -90,17 +109,7 @@ function startEngine(room) {
   engine.setupServerMatch(b.loadout, 1, 2);
   engine.serverStartMatch();
   room.engine = engine;
-
-  // fixed 60Hz authoritative tick: step the sim, then broadcast the snapshot
-  room.timer = setInterval(() => {
-    try {
-      engine.stepServer(1 / TICK_HZ);
-      const snap = engine.buildSnapshot();
-      broadcast(room, { t: "msg", data: { t: "snap", snap } });
-    } catch (e) {
-      console.error(`[auth] room ${room.code} tick error:`, e);
-    }
-  }, TICK_MS);
+  startTick(room);
 }
 
 function addPeer(room, ws, name, role) {
@@ -174,6 +183,41 @@ wss.on("connection", (ws) => {
         if (room.engine && ws.pid != null) room.engine.setPeerInput(ws.pid, data.input);
       }
       // client-sent "snap" is ignored (server is authoritative)
+    } else if (msg.t === "rejoin") {
+      // A previously-matched client is reconnecting after a transient drop.
+      // Re-attach its socket to the SAME room/pid so the match resumes instead
+      // of forcing a fresh re-match.
+      const code = String(msg.room || "").toUpperCase();
+      const room = rooms.get(code);
+      if (!room) return send(ws, { t: "error", msg: "房间已失效，请重新匹配" });
+      const pid = Number(msg.pid);
+      const peer = room.peers.get(pid);
+      if (!peer) return send(ws, { t: "error", msg: "房间已失效，请重新匹配" });
+
+      // cancel the grace timer we started on disconnect
+      if (room.graceTimers?.has(pid)) {
+        clearTimeout(room.graceTimers.get(pid));
+        room.graceTimers.delete(pid);
+      }
+
+      // re-bind this socket to the existing peer slot
+      peer.ws = ws;
+      peer.disconnected = false;
+      peer.name = String(msg.name || peer.name || "玩家").slice(0, 16);
+      if (msg.loadout) peer.loadout = msg.loadout;
+      ws.room = code;
+      ws.pid = pid;
+
+      const other = pid === 1 ? room.peers.get(2) : room.peers.get(1);
+      // tell the rejoining peer who the opponent is + that play may resume
+      send(ws, { t: "peer", pid: other?.pid ?? 0, name: other?.name ?? "", host: false });
+      send(ws, { t: "start", youPid: pid });
+      // tell the opponent the peer is back
+      if (other && !other.disconnected) send(other.ws, { t: "peerBack" });
+
+      // resume (or boot) the authoritative sim
+      if (room.engine) startTick(room);
+      else startEngine(room);
     }
   });
 
@@ -181,12 +225,33 @@ wss.on("connection", (ws) => {
     const qi = queue.findIndex((q) => q.ws === ws);
     if (qi >= 0) queue.splice(qi, 1);
     const room = ws.room && rooms.get(ws.room);
-    if (room) {
-      for (const p of room.peers.values()) if (p.ws !== ws) send(p.ws, { t: "peerLeft" });
-      if (room.timer) clearInterval(room.timer);
-      room.peers.delete(ws.pid);
-      if (room.peers.size === 0) rooms.delete(ws.room);
+    if (!room) return;
+    const peer = ws.pid != null ? room.peers.get(ws.pid) : null;
+    if (!peer) return;
+
+    // The peer dropped, but we keep the room + engine alive for a grace period
+    // so a quick reconnect can resume the match. The opponent is told the peer
+    // is gone (not permanently left) and the sim is paused to avoid desync.
+    peer.disconnected = true;
+    const other = ws.pid === 1 ? room.peers.get(2) : room.peers.get(1);
+    if (other && !other.disconnected) send(other.ws, { t: "peerGone" });
+    if (room.timer) {
+      clearInterval(room.timer);
+      room.timer = null;
     }
+    if (!room.graceTimers) room.graceTimers = new Map();
+    room.graceTimers.set(ws.pid, setTimeout(() => {
+      // grace expired without a rejoin: tear the room down for good
+      room.peers.delete(ws.pid);
+      if (other && !other.disconnected) send(other.ws, { t: "peerLeft" });
+      if (room.timer) {
+        clearInterval(room.timer);
+        room.timer = null;
+      }
+      room.engine = null;
+      room.graceTimers.delete(ws.pid);
+      if (room.peers.size === 0) rooms.delete(room.code);
+    }, RECONNECT_GRACE_MS));
   });
 });
 
