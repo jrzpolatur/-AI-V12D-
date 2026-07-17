@@ -3214,12 +3214,18 @@ export class GameEngine {
       sDashR = this.dashRecharge,
       sLastG = this.lastGadget,
       sSemi = this.semiAutoLatch;
+    // save the host's own joystick vector so it can be restored after simulating
+    const svmx = this.virtualMove.x;
+    const svmy = this.virtualMove.y;
     // load foe state into the engine's single-player simulation context
     this.player = foe;
     this.guns = this.foeGuns.length ? this.foeGuns : this.guns;
     this.gunIndex = Math.min(foe.gunIndex ?? 0, this.guns.length - 1);
     this.keys = new Set(inp.keys);
     this.mouse = { x: inp.mx, y: inp.my };
+    // adopt the GUEST's joystick vector so the host simulates the foe's movement
+    this.virtualMove.x = inp.vmx;
+    this.virtualMove.y = inp.vmy;
     this.firing = inp.firing;
     this.skillCd = foe.skillCd ?? 0;
     this.dashCharges = foe.dashCharges ?? MAX_DASH_CHARGES;
@@ -3249,6 +3255,9 @@ export class GameEngine {
     this.dashRecharge = sDashR;
     this.lastGadget = sLastG;
     this.semiAutoLatch = sSemi;
+    // restore the host's own joystick vector
+    this.virtualMove.x = svmx;
+    this.virtualMove.y = svmy;
   }
 
   private toSnapPlayer(p: Player, c: CharacterDef, o: OutfitDef): SnapPlayer {
@@ -3333,6 +3342,8 @@ export class GameEngine {
       keys: [...this.keys],
       mx: this.mouse.x,
       my: this.mouse.y,
+      vmx: this.virtualMove.x,
+      vmy: this.virtualMove.y,
       firing: this.firing,
       gadget: this.pendGadget,
       skill: this.pendSkill,

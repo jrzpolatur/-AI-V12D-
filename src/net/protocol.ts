@@ -25,6 +25,8 @@ export interface InputFrame {
   keys: string[]; // held key codes (movement + actions)
   mx: number; // aim world X
   my: number; // aim world Y
+  vmx: number; // virtual move X (on-screen joystick, -1..1)
+  vmy: number; // virtual move Y (on-screen joystick, -1..1)
   firing: boolean;
   gadget: number; // -1 none, else 0..2 deploy request (one-shot)
   weaponSwitch: boolean; // E pressed (one-shot)
