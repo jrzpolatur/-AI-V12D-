@@ -111,6 +111,8 @@ export interface Snapshot {
   bullets: SnapBullet[]; // all bullets (player + ai)
   /** terrain cover walls (indestructible pillars + destructible cover) */
   walls: SnapWall[];
+  /** host-simulated visual effects mirrored to the guest (explosions, sweeps, ...) */
+  effects: SnapEffect[];
   /** host's OWN base (bottom of the arena) */
   hostBaseHp: number;
   hostBaseMaxHp: number;
@@ -124,6 +126,27 @@ export interface Snapshot {
   gold: number;
   gameOver: boolean;
   gameOverReason: string;
+}
+
+/** Compact effect payload so guest / authoritative clients can mirror the
+ *  host's visual effects (explosions, shockwaves, melee sweeps, ...). */
+export interface SnapEffect {
+  /** stable id assigned by the host (so the guest can keep animating it across snapshots) */
+  id: number;
+  type: string;
+  x: number;
+  y: number;
+  /** elapsed time on the host; the guest continues aging it by real frame dt */
+  t: number;
+  duration: number;
+  radius: number;
+  color: string;
+  angle?: number;
+  arc?: number;
+  range?: number;
+  style?: string;
+  dirX?: number;
+  dirY?: number;
 }
 
 /** Peer-to-peer game payloads (wrapped in RelayIn/RelayOut `msg`). */

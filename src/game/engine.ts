@@ -3,7 +3,7 @@ import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef
 import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK } from "./draw";
 import { sound } from "./sound";
 import { RUNTIME } from "./runtimeConfig";
-import type { NetMode, InputFrame, Snapshot, SnapPlayer } from "../net/protocol";
+import type { NetMode, InputFrame, Snapshot, SnapPlayer, SnapEffect } from "../net/protocol";
 import type { Net } from "../net/Net";
 
 /** Coin-burst palettes keyed by kill style (drives ring tint + coin colors). */
@@ -479,6 +479,12 @@ export class GameEngine {
   private gy = 0;
   private gxInit = false;
   private netRender = new Map<number, { x: number; y: number }>();
+  /** host-authored effects mirrored from the latest snapshot (guest/authoritative) */
+  private netEffects: SnapEffect[] = [];
+  private netFxPrev = 0;
+  /** stable ids for effects so the guest can keep animating them across snapshots */
+  private fxIds = new WeakMap<object, number>();
+  private fxSeq = 1;
   /**
    * Peer handshake flag. Host sets it when the guest's `hello` arrives; the
    * guest sets it once it receives the first world snapshot. Until both sides
@@ -3705,6 +3711,29 @@ export class GameEngine {
           destructible: w.destructible,
           glue: !!w.glue,
         })),
+      effects: this.effects.map((e) => {
+        let id = this.fxIds.get(e);
+        if (id === undefined) {
+          id = this.fxSeq++;
+          this.fxIds.set(e, id);
+        }
+        return {
+          id,
+          type: e.type,
+          x: e.x,
+          y: e.y,
+          t: e.t,
+          duration: e.duration,
+          radius: e.radius,
+          color: e.color,
+          angle: e.angle,
+          arc: e.arc,
+          range: e.range,
+          style: e.style,
+          dirX: e.dirX,
+          dirY: e.dirY,
+        } satisfies SnapEffect;
+      }),
       hostBaseHp: Math.max(0, Math.round(this.base.hp)),
       hostBaseMaxHp: this.base.maxHp,
       guestBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
@@ -3993,6 +4022,9 @@ export class GameEngine {
     this.gold = s.gold;
     // Guest now has the host's world — handshake complete.
     this.peerReady = true;
+    // mirror the host's visual effects so explosions / sweeps / shockwaves show
+    // on the guest side too (the guest runs no world simulation of its own).
+    this.netEffects = s.effects ? s.effects.map((e) => ({ ...e })) : [];
     // Map the two world bases to OUR perspective:
     //   host's base (bottom) is the OPPONENT from the guest's side
     //   guest's base (top)   is OUR OWN base
@@ -4039,36 +4071,42 @@ export class GameEngine {
     }
   }
 
-  /** Draw a player avatar as a colored circle + barrel (used for the foe / net). */
-  private drawNetPlayer(
+  /** Draw a networked player (me or foe) with the full character silhouette —
+   *  including the held weapon, skin/outfit + hat — instead of the crude circle.
+   *  Resolves the gun def from the player's own weapon list via `gunList`. */
+  private drawNetCharacter(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
     angle: number,
-    color: string,
+    charId: string,
+    outfitId: string,
+    gunIndex: number,
+    gunList: GunDef[],
     name: string,
-    hpPct: number
+    hpPct: number,
+    t: number,
+    size: number
   ) {
-    ctx.save();
-    ctx.translate(x, y);
-    // body
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, 14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    // barrel
-    ctx.rotate(angle);
-    ctx.fillStyle = "#e2e8f0";
-    ctx.fillRect(8, -2.5, 16, 5);
-    ctx.restore();
+    const char = getCharacter(charId);
+    const outfit = getOutfit(outfitId);
+    const gun = gunList[gunIndex] ?? gunList[0];
+    drawCharacter(ctx, {
+      x,
+      y,
+      angle,
+      character: char,
+      outfit,
+      size,
+      t,
+      gun,
+    });
     // hp bar
+    const w = 32;
     ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(x - 16, y - 24, 32, 4);
+    ctx.fillRect(x - w / 2, y - 24, w, 4);
     ctx.fillStyle = hpPct > 0.5 ? "#4ade80" : hpPct > 0.25 ? "#fbbf24" : "#f87171";
-    ctx.fillRect(x - 16, y - 24, 32 * Math.max(0, hpPct), 4);
+    ctx.fillRect(x - w / 2, y - 24, w * Math.max(0, hpPct), 4);
     // name
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.font = "10px sans-serif";
@@ -4083,6 +4121,18 @@ export class GameEngine {
     ctx.save();
     if (this.shake > 0.2) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
     ctx.translate(-this.camX, -this.camY);
+
+    // age the mirrored effects by real frame time so they animate smoothly
+    // between 30Hz snapshots (the host sends their current elapsed `t`).
+    {
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const dtfx = this.netFxPrev ? Math.min(0.05, (now - this.netFxPrev) / 1000) : 0;
+      this.netFxPrev = now;
+      if (dtfx > 0 && this.netEffects.length) {
+        for (const e of this.netEffects) e.t += dtfx;
+        this.netEffects = this.netEffects.filter((e) => e.t < e.duration);
+      }
+    }
 
     // ease a network entity toward its latest snapshot position so 30Hz updates look smooth
     const ease = (id: number, x: number, y: number) => {
@@ -4128,30 +4178,56 @@ export class GameEngine {
       if (p.hp <= 0) continue; // downed players are hidden until they respawn
       const isMe = p.id === this.selfPid;
       const r = isMe ? { x: this.player.x, y: this.player.y } : ease(p.id, p.x, p.y);
-      const col = isMe ? this.character.bodyColor : this.foeChar?.bodyColor ?? "#f472b6";
-      this.drawNetPlayer(
+      const gunList = isMe ? this.guns : this.foeGuns;
+      const size = isMe ? this.player.size : getCharacter(p.character).size;
+      this.drawNetCharacter(
         ctx,
         r.x,
         r.y,
         p.angle,
-        col,
+        p.character,
+        p.outfit,
+        p.gunIndex ?? 0,
+        gunList,
         isMe ? this.character.name : this.peerName || "对手",
-        p.hp / p.maxHp
+        p.hp / p.maxHp,
+        this.time,
+        size
       );
       if (p.electrified > 0) {
-        this.drawElectricArcs(ctx, r.x, r.y, 14, p.electrifiedGlow, this.time);
+        this.drawElectricArcs(ctx, r.x, r.y, size, p.electrifiedGlow, this.time);
       }
     }
     // local gadget aiming preview (selection highlight + throw/deploy hint)
     this.drawAimPreview(ctx);
+    // glowing bullets with a short trail (弹道) instead of bare lines
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
     for (const b of s.bullets) {
-      ctx.strokeStyle = b.glow;
-      ctx.lineWidth = Math.max(1, b.size * 0.7);
+      const sp = Math.hypot(b.vx, b.vy) || 1;
+      const tx = b.x - (b.vx / sp) * b.size * 4;
+      const ty = b.y - (b.vy / sp) * b.size * 4;
+      ctx.strokeStyle = rgba(b.glow, 0.5);
+      ctx.lineWidth = Math.max(1, b.size * 0.9);
       ctx.beginPath();
       ctx.moveTo(b.x, b.y);
-      ctx.lineTo(b.x - b.vx * 0.02, b.y - b.vy * 0.02);
+      ctx.lineTo(tx, ty);
       ctx.stroke();
+      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3.4);
+      rg.addColorStop(0, rgba(b.glow, 0.85));
+      rg.addColorStop(1, rgba(b.glow, 0));
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.size * 3.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+      ctx.fill();
     }
+    ctx.restore();
+    // mirrored host effects (explosions, sweeps, shockwaves, ...)
+    if (this.netEffects.length) this.drawEffects(ctx, this.netEffects as unknown as Effect[]);
     ctx.restore();
   }
 
@@ -4799,14 +4875,19 @@ export class GameEngine {
     this.drawFlameCone(ctx);
     if (!(this.player.deadTimer && this.player.deadTimer > 0)) this.drawPlayer(ctx);
     if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0)) {
-      this.drawNetPlayer(
+      this.drawNetCharacter(
         ctx,
         this.foe.x,
         this.foe.y,
         this.foe.angle,
-        this.foeChar?.bodyColor ?? "#f472b6",
+        this.foeChar?.id ?? "raider",
+        this.foeOutfit?.id ?? "tactical",
+        this.foe.gunIndex ?? 0,
+        this.foeGuns,
         this.peerName || "对手",
-        this.foe.hp / this.foe.maxHp
+        this.foe.hp / this.foe.maxHp,
+        this.time,
+        this.foe.size
       );
       if (this.foe.electrifiedTime && this.foe.electrifiedTime > 0) {
         this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
@@ -5925,10 +6006,10 @@ export class GameEngine {
     ctx.restore();
   }
 
-  private drawEffects(ctx: CanvasRenderingContext2D) {
+  private drawEffects(ctx: CanvasRenderingContext2D, list: Effect[] = this.effects) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    for (const e of this.effects) {
+    for (const e of list) {
       const k = e.t / e.duration;
       if (e.type === "explosion") {
         const r = e.radius * (0.3 + k * 0.9);
