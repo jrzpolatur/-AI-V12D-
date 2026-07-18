@@ -84,6 +84,21 @@ export interface SnapBullet {
   owner: "self" | "foe" | "enemy";
 }
 
+/** Terrain cover walls (indestructible pillars + destructible cover). Sent every
+ *  snapshot so the guest mirrors exactly which cover still stands — including
+ *  destruction — instead of showing a stale/ghost wall. */
+export interface SnapWall {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** live hp for destructible walls; -1 for indestructible (pillars) */
+  hp: number;
+  maxHp: number;
+  destructible: boolean;
+  glue: boolean;
+}
+
 /** Full world snapshot sent by the host to the guest. */
 export interface Snapshot {
   time: number;
@@ -94,6 +109,8 @@ export interface Snapshot {
   players: SnapPlayer[]; // both players (host + guest)
   enemies: SnapEnemy[];
   bullets: SnapBullet[]; // all bullets (player + ai)
+  /** terrain cover walls (indestructible pillars + destructible cover) */
+  walls: SnapWall[];
   /** host's OWN base (bottom of the arena) */
   hostBaseHp: number;
   hostBaseMaxHp: number;

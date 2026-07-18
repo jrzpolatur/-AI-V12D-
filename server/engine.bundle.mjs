@@ -3269,7 +3269,7 @@ var GameEngine = class {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
-      this.emit(true);
+      this.emit(false);
       return;
     }
     if (this.paused) {
@@ -3316,7 +3316,7 @@ var GameEngine = class {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
-      this.emit(true);
+      this.emit(false);
       return;
     }
     this.updatePlayer(dt);
@@ -5252,6 +5252,18 @@ var GameEngine = class {
         kind: b.kind,
         owner: b.owner ?? "self"
       })),
+      // terrain — mirror the exact cover state to the guest so walls (incl.
+      // destruction) render correctly. Skip invisible boundary "air walls".
+      walls: this.walls.filter((w) => !w.invisible).map((w) => ({
+        x: w.x,
+        y: w.y,
+        w: w.w,
+        h: w.h,
+        hp: w.destructible ? Math.max(0, Math.round(w.hp)) : -1,
+        maxHp: w.destructible ? w.maxHp : -1,
+        destructible: w.destructible,
+        glue: !!w.glue
+      })),
       hostBaseHp: Math.max(0, Math.round(this.base.hp)),
       hostBaseMaxHp: this.base.maxHp,
       guestBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
@@ -5500,6 +5512,18 @@ var GameEngine = class {
     this.base.maxHp = s.hostBaseMaxHp;
     this.enemyBase.hp = s.guestBaseHp;
     this.enemyBase.maxHp = s.guestBaseMaxHp;
+    if (s.walls) {
+      this.walls = s.walls.map((sw) => ({
+        x: sw.x,
+        y: sw.y,
+        w: sw.w,
+        h: sw.h,
+        hp: sw.destructible ? sw.hp : Infinity,
+        maxHp: sw.destructible ? sw.maxHp : Infinity,
+        destructible: sw.destructible,
+        glue: sw.glue
+      }));
+    }
     if (s.gameOver && !this.gameOver) {
       const iAmJoiner = this.selfPid === 2;
       let reason;
@@ -5563,6 +5587,8 @@ var GameEngine = class {
       this.drawBase(ctx, ownBase, true);
       this.drawBase(ctx, foeBase, false);
     }
+    this.drawWalls(ctx);
+    this.drawArenaBorder(ctx);
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
       const c = getCharacter(e.character);
@@ -6060,7 +6086,11 @@ var GameEngine = class {
   getSkill(id) {
     return getSkill(id);
   }
+  lastHudEmit = 0;
   emit(immediate = false) {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (!immediate && now - this.lastHudEmit < 50) return;
+    this.lastHudEmit = now;
     void immediate;
     const p = this.player;
     const s = this.skill;
@@ -6200,6 +6230,8 @@ var GameEngine = class {
     this.drawCrosshair(ctx);
     this.drawOverlays(ctx);
   }
+  cityBg = null;
+  cityBgKey = "";
   drawBackground(ctx) {
     const theme = this.sceneTheme;
     const g = ctx.createLinearGradient(0, 0, 0, this.H);
@@ -6221,7 +6253,23 @@ var GameEngine = class {
       ctx.fillRect(0, 0, this.W, this.H);
     }
     if (theme.style === "city") {
-      this.drawCityBackdrop(ctx, theme);
+      ctx.save();
+      ctx.translate(-this.camX, -this.camY);
+      const bg = this.getCityBg();
+      if (bg) ctx.drawImage(bg, 0, 0);
+      else this.drawCityBackdrop(ctx, theme);
+      ctx.restore();
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const sweep = this.time * 0.05 % 1;
+      const sg = ctx.createLinearGradient(0, 0, this.W, 0);
+      const p = sweep * this.W;
+      sg.addColorStop(0, "rgba(217,70,239,0)");
+      sg.addColorStop(Math.min(1, p / this.W), "rgba(217,70,239,0.05)");
+      sg.addColorStop(1, "rgba(217,70,239,0)");
+      ctx.fillStyle = sg;
+      ctx.fillRect(0, 0, this.W, this.H);
+      ctx.restore();
     } else {
       ctx.strokeStyle = theme.gridColor ?? "rgba(130,150,220,0.07)";
       ctx.lineWidth = 1;
@@ -6254,38 +6302,35 @@ var GameEngine = class {
   }
   /**
    * Top-down cyber-city floor: neon "road" grid + glowing building rooftops
-   * with lit windows. Building positions are hashed from world-cell coords so
-   * the skyline scrolls consistently with the camera.
+   * with lit windows. Drawn at WORLD coordinates (no camera offset) so it can
+   * be rendered once into an offscreen canvas (getCityBg) and blitted per frame.
+   * Building positions are hashed from world-cell coords so the skyline is stable.
    */
   drawCityBackdrop(ctx, theme) {
     ctx.strokeStyle = theme.gridColor ?? "rgba(34,211,238,0.10)";
     ctx.lineWidth = 1.5;
     const gstep = 64;
-    const offX = -this.camX % gstep;
-    const offY = -this.camY % gstep;
     ctx.beginPath();
-    for (let x = offX; x <= this.W; x += gstep) {
+    for (let x = 0; x <= this.worldW; x += gstep) {
       ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.H);
+      ctx.lineTo(x, this.worldH);
     }
-    for (let y = offY; y <= this.H; y += gstep) {
+    for (let y = 0; y <= this.worldH; y += gstep) {
       ctx.moveTo(0, y);
-      ctx.lineTo(this.W, y);
+      ctx.lineTo(this.worldW, y);
     }
     ctx.stroke();
     const block = 150;
-    const x0 = Math.floor(this.camX / block) * block;
-    const y0 = Math.floor(this.camY / block) * block;
-    for (let wx = x0; wx <= this.camX + this.W; wx += block) {
-      for (let wy = y0; wy <= this.camY + this.H; wy += block) {
+    for (let wx = 0; wx <= this.worldW; wx += block) {
+      for (let wy = 0; wy <= this.worldH; wy += block) {
         const h = Math.abs(Math.sin(wx * 12.9898 + wy * 78.233) * 43758.5453);
         const f = h - Math.floor(h);
         const f2 = h * 1.7 % 1;
         const pad = 24 + Math.floor(f * 22);
         const bw = block - pad * 2 - Math.floor(f2 * 20);
         const bh = block - pad * 2 - Math.floor((1 - f2) * 16);
-        const bx = wx + pad - this.camX;
-        const by = wy + pad - this.camY;
+        const bx = wx + pad;
+        const by = wy + pad;
         ctx.fillStyle = rgba(theme.wallDark, 0.26);
         roundRect(ctx, bx, by, bw, bh, 7);
         ctx.fill();
@@ -6308,17 +6353,23 @@ var GameEngine = class {
         }
       }
     }
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const sweep = this.time * 0.05 % 1;
-    const sg = ctx.createLinearGradient(0, 0, this.W, 0);
-    const p = sweep * this.W;
-    sg.addColorStop(0, "rgba(217,70,239,0)");
-    sg.addColorStop(Math.min(1, p / this.W), "rgba(217,70,239,0.05)");
-    sg.addColorStop(1, "rgba(217,70,239,0)");
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, this.W, this.H);
-    ctx.restore();
+  }
+  /** Build (once) an offscreen, world-sized canvas of the static city floor and
+   *  cache it by scene + world size. Blitting it each frame is a single
+   *  drawImage instead of hundreds of fills/strokes — a big per-frame win. */
+  getCityBg() {
+    if (typeof document === "undefined") return null;
+    const key = `${this.sceneIndex}|${Math.ceil(this.worldW)}|${Math.ceil(this.worldH)}`;
+    if (this.cityBg && this.cityBgKey === key) return this.cityBg;
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.ceil(this.worldW));
+    c.height = Math.max(1, Math.ceil(this.worldH));
+    const b = c.getContext("2d");
+    if (!b) return null;
+    this.drawCityBackdrop(b, this.sceneTheme);
+    this.cityBg = c;
+    this.cityBgKey = key;
+    return c;
   }
   drawArenaBorder(ctx) {
     ctx.strokeStyle = rgba(this.sceneTheme.accent, 0.35);

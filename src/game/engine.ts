@@ -1426,7 +1426,10 @@ export class GameEngine {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
-      this.emit(true);
+      // NOTE: emit(false) — NOT emit(true). The main loop already throttles HUD
+      // pushes to ~16Hz; an immediate emit here would force a React re-render
+      // every frame (60x/sec) and tank the frame rate in online matches.
+      this.emit(false);
       return;
     }
 
@@ -1484,7 +1487,8 @@ export class GameEngine {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
-      this.emit(true);
+      // emit(false): let the loop's ~16Hz throttle handle HUD updates (see above)
+      this.emit(false);
       return;
     }
 
@@ -3687,6 +3691,20 @@ export class GameEngine {
         kind: b.kind,
         owner: b.owner ?? "self",
       })),
+      // terrain — mirror the exact cover state to the guest so walls (incl.
+      // destruction) render correctly. Skip invisible boundary "air walls".
+      walls: this.walls
+        .filter((w) => !w.invisible)
+        .map((w) => ({
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+          hp: w.destructible ? Math.max(0, Math.round(w.hp)) : -1,
+          maxHp: w.destructible ? w.maxHp : -1,
+          destructible: w.destructible,
+          glue: !!w.glue,
+        })),
       hostBaseHp: Math.max(0, Math.round(this.base.hp)),
       hostBaseMaxHp: this.base.maxHp,
       guestBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
@@ -3982,6 +4000,19 @@ export class GameEngine {
     this.base.maxHp = s.hostBaseMaxHp;
     this.enemyBase.hp = s.guestBaseHp;
     this.enemyBase.maxHp = s.guestBaseMaxHp;
+    // mirror the terrain so cover walls (including destruction) match the server
+    if (s.walls) {
+      this.walls = s.walls.map((sw) => ({
+        x: sw.x,
+        y: sw.y,
+        w: sw.w,
+        h: sw.h,
+        hp: sw.destructible ? sw.hp : Infinity,
+        maxHp: sw.destructible ? sw.maxHp : Infinity,
+        destructible: sw.destructible,
+        glue: sw.glue,
+      }));
+    }
     if (s.gameOver && !this.gameOver) {
       // The host's gameOverReason is from the host's POV; derive the guest's
       // outcome from the base HPs so it is always correct:
@@ -4076,6 +4107,9 @@ export class GameEngine {
       this.drawBase(ctx, ownBase, true);
       this.drawBase(ctx, foeBase, false);
     }
+    // terrain cover walls + arena border (mirrored from the snapshot)
+    this.drawWalls(ctx);
+    this.drawArenaBorder(ctx);
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
       const c = getCharacter(e.character);
@@ -4625,7 +4659,16 @@ export class GameEngine {
     return getSkill(id);
   }
 
+  private lastHudEmit = 0;
   private emit(immediate = false) {
+    // Rate-limit non-immediate HUD pushes to ~20Hz. The main loop already
+    // throttles to ~16Hz, but the multiplayer update path used to call
+    // emit(true) every frame, forcing a React re-render 60x/sec and tanking
+    // the frame rate in online matches. This floor is a safety net so ANY
+    // emit(false) can never become a per-frame re-render.
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (!immediate && now - this.lastHudEmit < 50) return;
+    this.lastHudEmit = now;
     void immediate;
     const p = this.player;
     const s = this.skill;
@@ -4782,6 +4825,9 @@ export class GameEngine {
     this.drawOverlays(ctx);
   }
 
+  private cityBg: HTMLCanvasElement | null = null;
+  private cityBgKey = "";
+
   private drawBackground(ctx: CanvasRenderingContext2D) {
     const theme = this.sceneTheme;
     const g = ctx.createLinearGradient(0, 0, 0, this.H);
@@ -4806,9 +4852,27 @@ export class GameEngine {
       ctx.fillRect(0, 0, this.W, this.H);
     }
 
-    // floor — cyber city renders top-down neon building blocks; others a plain grid
+    // floor — cyber city blits a cached, world-sized neon backdrop (one
+    // drawImage per frame instead of hundreds of fills); other scenes a grid
     if (theme.style === "city") {
-      this.drawCityBackdrop(ctx, theme);
+      ctx.save();
+      ctx.translate(-this.camX, -this.camY);
+      const bg = this.getCityBg();
+      if (bg) ctx.drawImage(bg, 0, 0);
+      else this.drawCityBackdrop(ctx, theme);
+      ctx.restore();
+      // animated magenta sweep (per-frame, screen space)
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const sweep = (this.time * 0.05) % 1;
+      const sg = ctx.createLinearGradient(0, 0, this.W, 0);
+      const p = sweep * this.W;
+      sg.addColorStop(0, "rgba(217,70,239,0)");
+      sg.addColorStop(Math.min(1, p / this.W), "rgba(217,70,239,0.05)");
+      sg.addColorStop(1, "rgba(217,70,239,0)");
+      ctx.fillStyle = sg;
+      ctx.fillRect(0, 0, this.W, this.H);
+      ctx.restore();
     } else {
       ctx.strokeStyle = theme.gridColor ?? "rgba(130,150,220,0.07)";
       ctx.lineWidth = 1;
@@ -4844,45 +4908,41 @@ export class GameEngine {
 
   /**
    * Top-down cyber-city floor: neon "road" grid + glowing building rooftops
-   * with lit windows. Building positions are hashed from world-cell coords so
-   * the skyline scrolls consistently with the camera.
+   * with lit windows. Drawn at WORLD coordinates (no camera offset) so it can
+   * be rendered once into an offscreen canvas (getCityBg) and blitted per frame.
+   * Building positions are hashed from world-cell coords so the skyline is stable.
    */
   private drawCityBackdrop(
     ctx: CanvasRenderingContext2D,
     theme: { accent: string; wallDark: string; gridColor?: string }
   ) {
-    // road grid (brighter neon lines, scrolls with camera)
+    // road grid (neon lines, at world coords)
     ctx.strokeStyle = theme.gridColor ?? "rgba(34,211,238,0.10)";
     ctx.lineWidth = 1.5;
     const gstep = 64;
-    const offX = -this.camX % gstep;
-    const offY = -this.camY % gstep;
     ctx.beginPath();
-    for (let x = offX; x <= this.W; x += gstep) {
+    for (let x = 0; x <= this.worldW; x += gstep) {
       ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.H);
+      ctx.lineTo(x, this.worldH);
     }
-    for (let y = offY; y <= this.H; y += gstep) {
+    for (let y = 0; y <= this.worldH; y += gstep) {
       ctx.moveTo(0, y);
-      ctx.lineTo(this.W, y);
+      ctx.lineTo(this.worldW, y);
     }
     ctx.stroke();
 
-    // building blocks — kept subtle so the single-screen biohazard arena reads
-    // as a faint neon-city floor rather than a wall of blue squares.
+    // building blocks — kept subtle so the arena reads as a faint neon-city floor
     const block = 150;
-    const x0 = Math.floor(this.camX / block) * block;
-    const y0 = Math.floor(this.camY / block) * block;
-    for (let wx = x0; wx <= this.camX + this.W; wx += block) {
-      for (let wy = y0; wy <= this.camY + this.H; wy += block) {
+    for (let wx = 0; wx <= this.worldW; wx += block) {
+      for (let wy = 0; wy <= this.worldH; wy += block) {
         const h = Math.abs(Math.sin(wx * 12.9898 + wy * 78.233) * 43758.5453);
         const f = h - Math.floor(h); // pseudo-random 0..1
         const f2 = (h * 1.7) % 1;
         const pad = 24 + Math.floor(f * 22);
         const bw = block - pad * 2 - Math.floor(f2 * 20);
         const bh = block - pad * 2 - Math.floor((1 - f2) * 16);
-        const bx = wx + pad - this.camX;
-        const by = wy + pad - this.camY;
+        const bx = wx + pad;
+        const by = wy + pad;
 
         // rooftop slab (low alpha so the floor stays in the background)
         ctx.fillStyle = rgba(theme.wallDark, 0.26);
@@ -4911,19 +4971,24 @@ export class GameEngine {
         }
       }
     }
+  }
 
-    // subtle magenta neon sweep for extra cyber flavor
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const sweep = (this.time * 0.05) % 1;
-    const sg = ctx.createLinearGradient(0, 0, this.W, 0);
-    const p = sweep * this.W;
-    sg.addColorStop(0, "rgba(217,70,239,0)");
-    sg.addColorStop(Math.min(1, p / this.W), "rgba(217,70,239,0.05)");
-    sg.addColorStop(1, "rgba(217,70,239,0)");
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, this.W, this.H);
-    ctx.restore();
+  /** Build (once) an offscreen, world-sized canvas of the static city floor and
+   *  cache it by scene + world size. Blitting it each frame is a single
+   *  drawImage instead of hundreds of fills/strokes — a big per-frame win. */
+  private getCityBg(): HTMLCanvasElement | null {
+    if (typeof document === "undefined") return null;
+    const key = `${this.sceneIndex}|${Math.ceil(this.worldW)}|${Math.ceil(this.worldH)}`;
+    if (this.cityBg && this.cityBgKey === key) return this.cityBg;
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.ceil(this.worldW));
+    c.height = Math.max(1, Math.ceil(this.worldH));
+    const b = c.getContext("2d");
+    if (!b) return null;
+    this.drawCityBackdrop(b, this.sceneTheme);
+    this.cityBg = c;
+    this.cityBgKey = key;
+    return c;
   }
 
   private drawArenaBorder(ctx: CanvasRenderingContext2D) {
