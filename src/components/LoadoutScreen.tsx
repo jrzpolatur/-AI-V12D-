@@ -358,7 +358,7 @@ export default function LoadoutScreen({
 }) {
   const [characterId, setCharacterId] = useState("raider");
   const [outfitId, setOutfitId] = useState("tactical");
-  const [gunIds, setGunIds] = useState<string[]>(["smg", "sniper"]);
+  const [gunIds, setGunIds] = useState<string[]>(["mac11", "sniper"]);
   const [skillId, setSkillId] = useState("dash");
   const [gadgetIds, setGadgetIds] = useState<string[]>([
     "turret_mg",
@@ -367,7 +367,7 @@ export default function LoadoutScreen({
   ]);
   const [gameMode, setGameMode] = useState<"defense" | "biohazard">("defense");
 
-  const gunId = gunIds[0] ?? "smg";
+  const gunId = gunIds[0] ?? "mac11";
   const toggleGun = (id: string) => {
     setGunIds((prev) => {
       if (prev.includes(id)) {

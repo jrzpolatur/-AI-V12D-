@@ -15,7 +15,7 @@ const initialHud: HudState = {
   score: 0,
   wave: 0,
   enemiesLeft: 0,
-  gunId: "smg",
+  gunId: "mac11",
   guns: [],
   gunIndex: 0,
   weaponClass: "ranged",
@@ -136,6 +136,7 @@ export default function GameScreen({
 
   // ---- screen shake on hit ----
   const [shake, setShake] = useState({ x: 0, y: 0 });
+  const [peerLeft, setPeerLeft] = useState(false);
   const lastHitFlash = useRef(0);
   const shakeRaf = useRef(0);
   const shakeTime = useRef(0);
@@ -200,13 +201,19 @@ export default function GameScreen({
   const character = getCharacter(loadout.characterId);
   const outfit = getOutfit(loadout.outfitId);
 
-  // Keep the "opponent reconnecting" overlay in sync with transient disconnects.
+  // Keep the "opponent reconnecting" overlay in sync with transient disconnects,
+  // and surface a permanent leave so the player isn't stuck on a frozen screen.
   useEffect(() => {
     if (!net) return;
     const gone = () => engineRef.current?.setReconnecting(true);
     const back = () => engineRef.current?.setReconnecting(false);
+    const left = () => {
+      engineRef.current?.setReconnecting(false);
+      setPeerLeft(true);
+    };
     net.onPeerGone(gone);
     net.onPeerBack(back);
+    net.onPeerLeft(left);
   }, [net]);
 
   const hpPct = hud.maxHp ? hud.hp / hud.maxHp : 0;
@@ -552,6 +559,22 @@ export default function GameScreen({
 
       {/* ============ MOBILE CONTROLS (touch only) ============ */}
       {isTouch && <MobileControls engineRef={engineRef} />}
+
+      {/* ============ OPPONENT LEFT (permanent) ============ */}
+      {peerLeft && !hud.gameOver && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-lg font-bold text-rose-200">对手已离开对局</p>
+            <p className="text-sm text-slate-400">本局已结束</p>
+            <button
+              onClick={onExit}
+              className="mt-1 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-6 py-2 font-bold text-slate-900 transition-transform hover:scale-105"
+            >
+              返回装配
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ============ RECONNECTING (opponent transiently dropped) ============ */}
       {hud.reconnecting && !hud.gameOver && !hud.paused && !hud.connecting && (

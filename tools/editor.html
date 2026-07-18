@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>武器数据编辑器 · NEON STRIKE</title>
+<style>
+  :root {
+    --bg: #0b0f1a; --panel: #131a2b; --panel2: #1b2540;
+    --line: #26314d; --text: #e2e8f0; --muted: #94a3b8; --accent: #22d3ee;
+    --accent2: #a78bfa; --ok: #4ade80; --err: #f87171; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10; padding: 14px 20px;
+    background: rgba(11,15,26,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: 1px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .spacer { flex: 1; }
+  button {
+    cursor: pointer; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); color: var(--text); padding: 8px 14px;
+    font-size: 13px; font-weight: 600; transition: .15s;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: linear-gradient(135deg,#0e7490,#6d28d9); border: none; }
+  button.primary:disabled { opacity: .5; cursor: wait; }
+  button.ghost { background: transparent; }
+  .wrap { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .search { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); min-width: 220px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(320px,1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .card .head {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    border-bottom: 1px solid var(--line); background: rgba(255,255,255,.02);
+  }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,.2); }
+  .card .head .name { font-weight: 700; }
+  .card .head .id { color: var(--muted); font-size: 11px; }
+  .card .body { padding: 10px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .field { display: flex; flex-direction: column; gap: 2px; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .field input[type=text], .field input[type=number] {
+    width: 100%; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line);
+    background: #0e1526; color: var(--text); font-size: 13px;
+  }
+  .field input:focus { outline: none; border-color: var(--accent); }
+  .field.bool { flex-direction: row; align-items: center; gap: 6px; }
+  .field.bool label { text-transform: none; font-size: 12px; color: var(--text); }
+  .dirty { color: var(--warn); font-size: 12px; }
+  .toast {
+    position: fixed; right: 20px; bottom: 20px; max-width: 520px; z-index: 50;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; box-shadow: 0 10px 40px rgba(0,0,0,.5); display: none;
+  }
+  .toast.show { display: block; }
+  .toast .t-title { font-weight: 700; margin-bottom: 4px; }
+  .toast pre {
+    margin: 8px 0 0; max-height: 220px; overflow: auto; font-size: 11px;
+    color: var(--muted); background: #0e1526; padding: 8px; border-radius: 6px;
+    white-space: pre-wrap;
+  }
+  .ok { color: var(--ok); } .err { color: var(--err); }
+</style>
+</head>
+<body>
+<header>
+  <h1>武器数据编辑器</h1>
+  <span class="sub" id="count">加载中…</span>
+  <input class="search" id="search" placeholder="搜索武器名 / id…" />
+  <span class="spacer"></span>
+  <span class="dirty" id="dirty"></span>
+  <button class="ghost" id="reload">重新加载</button>
+  <button class="primary" id="save">保存并同步各端</button>
+</header>
+
+<div class="wrap"><div class="grid" id="grid"></div></div>
+
+<div class="toast" id="toast">
+  <div class="t-title" id="toast-title"></div>
+  <div id="toast-msg"></div>
+  <pre id="toast-log" hidden></pre>
+</div>
+
+<script>
+let guns = [];
+let dirty = false;
+
+// field ordering hint for a tidy layout; unknown keys appended after.
+const ORDER = ["name","desc","weaponClass","shape","iconShape","kind","damage",
+  "fireRate","bulletSpeed","bulletSize","spread","pellets","pierce","parallel",
+  "parallelGap","drift","life","knockback","magazine","reloadTime","barrel",
+  "explosive","explosionRadius","bounces","aimIndicator","semiAuto",
+  "beamRange","heatPerShot","coolRate","meleeRange","meleeArc","slamDamage",
+  "flameCone","flameRange","color","glow","rangeTier"];
+
+const el = (tag, props = {}, kids = []) => {
+  const n = document.createElement(tag);
+  Object.assign(n, props);
+  for (const k of kids) n.append(k);
+  return n;
+};
+
+function markDirty() {
+  dirty = true;
+  document.getElementById("dirty").textContent = "● 有未保存改动";
+}
+
+function orderedKeys(g) {
+  const keys = Object.keys(g);
+  const known = ORDER.filter((k) => keys.includes(k));
+  const rest = keys.filter((k) => !ORDER.includes(k) && k !== "id");
+  return [...known, ...rest];
+}
+
+function fieldFor(g, key) {
+  const val = g[key];
+  const wrap = el("div", { className: "field" });
+  const isFull = key === "desc" || key === "name";
+  if (isFull) wrap.classList.add("full");
+
+  if (typeof val === "boolean") {
+    wrap.classList.remove("full");
+    wrap.classList.add("bool");
+    const cb = el("input", { type: "checkbox", checked: val });
+    cb.addEventListener("change", () => { g[key] = cb.checked; markDirty(); });
+    wrap.append(cb, el("label", { textContent: key }));
+    return wrap;
+  }
+
+  const lab = el("label", { textContent: key });
+  const isNum = typeof val === "number";
+  const inp = el("input", {
+    type: isNum ? "number" : "text",
+    value: val,
+    step: "any",
+  });
+  if (key === "color" || key === "glow") {
+    const sw = el("span", { className: "swatch" });
+    sw.style.background = val;
+    lab.append(" ");
+    lab.append(sw);
+    inp.addEventListener("input", () => { sw.style.background = inp.value; });
+  }
+  inp.addEventListener("change", () => {
+    g[key] = isNum ? (inp.value === "" ? 0 : Number(inp.value)) : inp.value;
+    markDirty();
+  });
+  wrap.append(lab, inp);
+  return wrap;
+}
+
+function render(filter = "") {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  const f = filter.trim().toLowerCase();
+  let shown = 0;
+  for (const g of guns) {
+    if (f && !(`${g.name} ${g.id}`.toLowerCase().includes(f))) continue;
+    shown++;
+    const sw = el("span", { className: "swatch" });
+    sw.style.background = g.glow || g.color || "#666";
+    const head = el("div", { className: "head" }, [
+      sw,
+      el("span", { className: "name", textContent: g.name || "(未命名)" }),
+      el("span", { className: "id", textContent: g.id }),
+    ]);
+    const body = el("div", { className: "body" });
+    for (const k of orderedKeys(g)) body.append(fieldFor(g, k));
+    grid.append(el("div", { className: "card" }, [head, body]));
+  }
+  document.getElementById("count").textContent =
+    `${shown}/${guns.length} 把武器 · 单一数据源 data/guns.json`;
+}
+
+async function load() {
+  const r = await fetch("/api/guns");
+  guns = await r.json();
+  dirty = false;
+  document.getElementById("dirty").textContent = "";
+  render(document.getElementById("search").value);
+}
+
+function toast(title, msg, log, ok) {
+  const t = document.getElementById("toast");
+  document.getElementById("toast-title").innerHTML =
+    `<span class="${ok ? "ok" : "err"}">${title}</span>`;
+  document.getElementById("toast-msg").textContent = msg;
+  const pre = document.getElementById("toast-log");
+  if (log) { pre.hidden = false; pre.textContent = log.slice(-4000); }
+  else pre.hidden = true;
+  t.classList.add("show");
+}
+
+async function save() {
+  const btn = document.getElementById("save");
+  btn.disabled = true;
+  btn.textContent = "构建中…（重编客户端+服务端）";
+  try {
+    const r = await fetch("/api/guns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(guns),
+    });
+    const res = await r.json();
+    if (res.ok) {
+      dirty = false;
+      document.getElementById("dirty").textContent = "";
+      toast("✓ 已保存并同步各端", "dist 客户端与 server 引擎已重建。联机请重启游戏服务器进程。", res.log, true);
+    } else {
+      toast("✗ 保存了数据，但构建失败", "guns.json 已写入，但 npm run build 报错，请看日志。", res.log || res.error, false);
+    }
+  } catch (e) {
+    toast("✗ 请求失败", String(e), "", false);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "保存并同步各端";
+  }
+}
+
+document.getElementById("save").addEventListener("click", save);
+document.getElementById("reload").addEventListener("click", () => {
+  if (dirty && !confirm("有未保存改动，确定重新加载并丢弃？")) return;
+  load();
+});
+document.getElementById("search").addEventListener("input", (e) => render(e.target.value));
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+load();
+</script>
+</body>
+</html>

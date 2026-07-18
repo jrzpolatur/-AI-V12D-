@@ -9,8 +9,8 @@ const root = path.resolve(__dirname, "..");
 const PORT = 8098;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const loadout = (over = {}) => ({
-  characterId: "raider", outfitId: "tactical", skillId: "dash", gunId: "smg",
-  gunIds: ["smg", "akm"], gadgetIds: ["turret_mg", "mine_explosive", "glue_grenade"],
+  characterId: "raider", outfitId: "tactical", skillId: "dash", gunId: "mac11",
+  gunIds: ["mac11", "akm"], gadgetIds: ["turret_mg", "mine_explosive", "glue_grenade"],
   gameMode: "defense", ...over,
 });
 

@@ -1,3 +1,620 @@
+// data/guns.json
+var guns_default = [
+  {
+    id: "silenced_pistol",
+    name: "\u6D88\u97F3\u624B\u67AA",
+    desc: "\u534A\u81EA\u52A8\u6D88\u97F3\u624B\u67AA\uFF0C\u9690\u853D\u7CBE\u51C6",
+    weaponClass: "ranged",
+    shape: "pistol",
+    iconShape: "pistol",
+    damage: 44,
+    fireRate: 7,
+    bulletSpeed: 760,
+    bulletSize: 5,
+    spread: 0.03,
+    pellets: 1,
+    pierce: 0,
+    life: 1.1,
+    knockback: 110,
+    color: "#e2e8f0",
+    glow: "#94a3b8",
+    kind: "bullet",
+    semiAuto: true,
+    barrel: 16,
+    magazine: 22,
+    reloadTime: 1.4,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "mac11",
+    name: "MAC11",
+    desc: "\u8D85\u9AD8\u5C04\u901F\u5FAE\u578B\u51B2\u950B\u67AA\uFF0C\u6CFC\u6C34\u538B\u5236",
+    weaponClass: "ranged",
+    shape: "mac11",
+    iconShape: "mac11",
+    damage: 18,
+    fireRate: 16,
+    bulletSpeed: 840,
+    bulletSize: 4,
+    spread: 0.13,
+    pellets: 1,
+    pierce: 0,
+    life: 0.85,
+    knockback: 60,
+    color: "#a5f3fc",
+    glow: "#22d3ee",
+    kind: "bullet",
+    barrel: 18,
+    magazine: 30,
+    reloadTime: 1.6,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "mp5",
+    name: "MP5",
+    desc: "\u4F24\u5BB3\u9AD8\u4E8E MAC11 \u7684\u7D27\u51D1\u51B2\u950B\u67AA\uFF0C\u5C04\u901F\u7A0D\u4F4E\u4F46\u66F4\u7A33\u66F4\u72E0",
+    weaponClass: "ranged",
+    shape: "mp5",
+    iconShape: "mp5",
+    damage: 26,
+    fireRate: 11,
+    bulletSpeed: 920,
+    bulletSize: 4.5,
+    spread: 0.08,
+    pellets: 1,
+    pierce: 0,
+    life: 0.9,
+    knockback: 90,
+    color: "#a5f3fc",
+    glow: "#22d3ee",
+    kind: "tracer",
+    barrel: 20,
+    magazine: 30,
+    reloadTime: 1.7,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "mortar",
+    name: "\u6295\u5C04\u69B4\u5F39\u70AE",
+    desc: "\u4E13\u5C5E\u7784\u51C6\u6307\u793A\u5668\u7684\u69B4\u5F39\u70AE\uFF1A8 \u53D1\u5F39\u4ED3\uFF0C\u629B\u5C04\u7206\u70B8\uFF0C\u5A01\u529B\u4F4E\u4E8E MGL32",
+    weaponClass: "ranged",
+    shape: "mortar",
+    iconShape: "mortar",
+    damage: 78,
+    fireRate: 1.6,
+    bulletSpeed: 520,
+    bulletSize: 8,
+    spread: 0.03,
+    pellets: 1,
+    pierce: 0,
+    life: 2.2,
+    knockback: 240,
+    color: "#fdba74",
+    glow: "#fb923c",
+    explosive: true,
+    explosionRadius: 70,
+    kind: "grenade",
+    bounces: 1,
+    aimIndicator: true,
+    barrel: 24,
+    magazine: 8,
+    reloadTime: 2.6,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "sniper",
+    name: "\u72D9\u51FB\u67AA",
+    desc: "\u8D85\u9AD8\u4F24\u5BB3\uFF0C\u53EF\u7A7F\u900F\u591A\u4EBA",
+    weaponClass: "ranged",
+    shape: "sniper",
+    iconShape: "sniper",
+    damage: 270,
+    fireRate: 0.9,
+    bulletSpeed: 1750,
+    bulletSize: 6,
+    spread: 0,
+    pellets: 1,
+    pierce: 5,
+    life: 2,
+    knockback: 420,
+    color: "#fca5a5",
+    glow: "#f87171",
+    kind: "tracer",
+    barrel: 30,
+    magazine: 5,
+    reloadTime: 2.8,
+    rangeTier: "\u8FDC"
+  },
+  {
+    id: "rocket",
+    name: "\u706B\u7BAD\u7B52",
+    desc: "\u8303\u56F4\u7206\u70B8\uFF0C\u5A01\u529B\u5DE8\u5927",
+    weaponClass: "ranged",
+    shape: "rocket",
+    iconShape: "rocket",
+    damage: 225,
+    fireRate: 0.72,
+    bulletSpeed: 480,
+    bulletSize: 9,
+    spread: 0.02,
+    pellets: 1,
+    pierce: 0,
+    life: 1.7,
+    knockback: 320,
+    color: "#fda4af",
+    glow: "#fb7185",
+    explosive: true,
+    explosionRadius: 96,
+    kind: "rocket",
+    barrel: 26,
+    magazine: 1,
+    reloadTime: 2,
+    rangeTier: "\u8FDC"
+  },
+  {
+    id: "akm",
+    name: "AKM",
+    desc: "\u5747\u8861\u7684\u7A81\u51FB\u6B65\u67AA\uFF0C\u4E2D\u8FDC\u7A0B\u5168\u80FD",
+    weaponClass: "ranged",
+    shape: "akm",
+    iconShape: "akm",
+    damage: 44,
+    fireRate: 10,
+    bulletSpeed: 940,
+    bulletSize: 5,
+    spread: 0.05,
+    pellets: 1,
+    pierce: 0,
+    life: 1.2,
+    knockback: 150,
+    color: "#fde68a",
+    glow: "#f59e0b",
+    kind: "tracer",
+    barrel: 26,
+    magazine: 30,
+    reloadTime: 2.2,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "fcar",
+    name: "FCAR",
+    desc: "\u91CD\u578B\u7A81\u51FB\u6B65\u67AA\uFF1A\u9AD8\u4F24\u5BB3\u3001\u5C04\u901F\u6162\u3001\u5F39\u5323\u8F83\u5C0F",
+    weaponClass: "ranged",
+    shape: "fcar",
+    iconShape: "fcar",
+    damage: 58,
+    fireRate: 9,
+    bulletSpeed: 1e3,
+    bulletSize: 6,
+    spread: 0.045,
+    pellets: 1,
+    pierce: 1,
+    life: 1.3,
+    knockback: 240,
+    color: "#99f6e4",
+    glow: "#14b8a6",
+    kind: "tracer",
+    barrel: 28,
+    magazine: 20,
+    reloadTime: 2.8,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "pulse",
+    name: "\u8109\u51B2",
+    desc: "\u8FDE\u7EED\u6FC0\u5149\u51B2\u950B\u67AA\uFF0C\u8FC7\u70ED\u540E\u9700\u51B7\u5374",
+    weaponClass: "beam",
+    shape: "pulse",
+    iconShape: "pulse",
+    damage: 335,
+    fireRate: 1,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 50,
+    color: "#a5f3fc",
+    glow: "#22d3ee",
+    kind: "tracer",
+    barrel: 22,
+    beamRange: 780,
+    heatPerShot: 0.62,
+    coolRate: 0.5,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "lightsaber",
+    name: "\u5149\u5251",
+    desc: "\u8FD1\u8DDD\u79BB\u6A2A\u626B\uFF0C\u70AB\u9177\u5149\u6548\uFF0C\u8FDE\u7EED\u6325\u780D",
+    weaponClass: "melee",
+    shape: "lightsaber",
+    iconShape: "lightsaber",
+    damage: 155,
+    fireRate: 3,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 240,
+    color: "#bae6fd",
+    glow: "#38bdf8",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 82,
+    meleeArc: 2.5,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "hammer",
+    name: "\u5927\u9524",
+    desc: "\u5DE6\u952E\u6325\u780D \xB7 \u53F3\u952E\u7838\u5730\uFF08\u62C6\u5899\uFF09",
+    weaponClass: "melee",
+    shape: "hammer",
+    iconShape: "hammer",
+    damage: 120,
+    fireRate: 1.5,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 320,
+    color: "#cbd5e1",
+    glow: "#f59e0b",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 74,
+    meleeArc: 1.8,
+    slamDamage: 280,
+    explosionRadius: 100,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "flamethrower",
+    name: "\u706B\u7130\u55B7\u5C04\u5668",
+    desc: "\u9525\u5F62\u6301\u7EED\u707C\u70E7\uFF0C\u8D34\u8138\u6BC1\u706D\u6027\u8F93\u51FA",
+    weaponClass: "flamethrower",
+    shape: "flamethrower",
+    iconShape: "flamethrower",
+    damage: 190,
+    fireRate: 1,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 30,
+    color: "#fed7aa",
+    glow: "#f97316",
+    kind: "flame",
+    barrel: 24,
+    flameCone: 0.42,
+    flameRange: 150,
+    heatPerShot: 0.35,
+    coolRate: 0.55,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "sa1216",
+    name: "SA1216",
+    desc: "\u4F5C\u6218\u8DDD\u79BB\u8F83\u8FD1\u7684\u8FDE\u55B7\uFF0C\u7206\u53D1\u4F24\u5BB3\u9AD8",
+    weaponClass: "ranged",
+    shape: "sa1216",
+    iconShape: "sa1216",
+    damage: 22,
+    fireRate: 5.5,
+    bulletSpeed: 820,
+    bulletSize: 4.5,
+    spread: 0.18,
+    pellets: 8,
+    pierce: 0,
+    life: 0.45,
+    knockback: 200,
+    color: "#fde68a",
+    glow: "#f59e0b",
+    kind: "pellet",
+    barrel: 22,
+    magazine: 16,
+    reloadTime: 2.6,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "mgl32",
+    name: "MGL32",
+    desc: "\u69B4\u5F39\u53D1\u5C04\u5668\uFF0C\u53CD\u5F39\u4E00\u6B21\u540E\u7206\u70B8",
+    weaponClass: "ranged",
+    shape: "mgl32",
+    iconShape: "mgl32",
+    damage: 110,
+    fireRate: 1.8,
+    bulletSpeed: 560,
+    bulletSize: 8,
+    spread: 0.04,
+    pellets: 1,
+    pierce: 0,
+    life: 2.2,
+    knockback: 260,
+    color: "#fda4af",
+    glow: "#fb7185",
+    explosive: true,
+    explosionRadius: 78,
+    kind: "grenade",
+    bounces: 1,
+    barrel: 22,
+    magazine: 6,
+    reloadTime: 2.4,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "spear",
+    name: "\u957F\u77DB",
+    desc: "\u9177\u70AB\u8FDE\u62DB\u7CFB\u7EDF\uFF0C\u4F4D\u79FB\u540C\u65F6\u9020\u6210\u4F24\u5BB3",
+    weaponClass: "melee",
+    shape: "spear",
+    iconShape: "spear",
+    damage: 68,
+    fireRate: 3.2,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 200,
+    color: "#ddd6fe",
+    glow: "#a78bfa",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 96,
+    meleeArc: 1.1,
+    comboLength: 3,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "drone",
+    name: "\u6D6E\u6E38\u70AE",
+    desc: "\u53D1\u5C04\u79BB\u5B50\u56E2\uFF0C\u78B0\u654C\u4F24\u5BB3\u3001\u4E0D\u4F24\u5EFA\u7B51\u3001\u53CD\u5F393\u6B21",
+    weaponClass: "ranged",
+    shape: "drone",
+    iconShape: "drone",
+    damage: 56,
+    fireRate: 1.6,
+    bulletSpeed: 380,
+    bulletSize: 9,
+    spread: 0.1,
+    pellets: 1,
+    pierce: 99,
+    life: 4.5,
+    knockback: 40,
+    color: "#c7d2fe",
+    glow: "#818cf8",
+    kind: "ion",
+    bounces: 3,
+    ignoreWalls: true,
+    barrel: 14,
+    magazine: 4,
+    reloadTime: 1.8,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "recurve_bow",
+    name: "\u53CD\u66F2\u5F13",
+    desc: "\u84C4\u529B\u8D8A\u4E45\u7BAD\u77E2\u8D8A\u5FEB\u8D8A\u72E0\uFF0C\u6EE1\u84C4\u53EF\u7A7F\u900F",
+    weaponClass: "bow",
+    shape: "recurve_bow",
+    iconShape: "recurve_bow",
+    damage: 44,
+    fireRate: 1.5,
+    bulletSpeed: 600,
+    bulletSize: 5,
+    spread: 0.01,
+    pellets: 1,
+    pierce: 0,
+    life: 1.4,
+    knockback: 80,
+    color: "#fde68a",
+    glow: "#a3e635",
+    kind: "tracer",
+    barrel: 18,
+    maxChargeTime: 1.2,
+    minChargeMult: 0.6,
+    maxChargeMult: 2.2,
+    maxChargeSpeedMult: 2.3,
+    drawSlowMult: 0.7,
+    rangeTier: "\u8FDC"
+  },
+  {
+    id: "riot_shield",
+    name: "\u9632\u7206\u76FE",
+    desc: "\u5DE6\u952E\u6325\u51FB \xB7 \u53F3\u952E\u4E3E\u76FE\u62B5\u6321\u5B50\u5F39",
+    weaponClass: "shield",
+    shape: "riot_shield",
+    iconShape: "riot_shield",
+    damage: 126,
+    fireRate: 1.8,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 200,
+    color: "#bfdbfe",
+    glow: "#3b82f6",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 58,
+    meleeArc: 1.6,
+    shieldHp: 200,
+    shieldMaxHp: 200,
+    shieldArc: 0.7,
+    shieldDuration: 3,
+    shieldRechargeTime: 8,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "shak50",
+    name: "SHAK-50",
+    desc: "\u53CC\u7BA1\u5927\u53E3\u5F84\u6B65\u67AA\xB7\u4E00\u6B21\u5E76\u6392\u4E24\u53D1\xB7\u968F\u8DDD\u79BB\u9010\u6E10\u6269\u6563\xB7\u8FD1\u6218\u7206\u53D1\u5F3A",
+    weaponClass: "ranged",
+    shape: "shak50",
+    iconShape: "shak50",
+    damage: 42,
+    fireRate: 3.4,
+    bulletSpeed: 900,
+    bulletSize: 6,
+    spread: 0,
+    pellets: 2,
+    parallel: 2,
+    parallelGap: 7,
+    drift: 30,
+    pierce: 1,
+    life: 0.7,
+    knockback: 260,
+    color: "#fde68a",
+    glow: "#fbbf24",
+    kind: "tracer",
+    barrel: 22,
+    magazine: 20,
+    reloadTime: 2.2,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "r357",
+    name: "R.357 \u5DE6\u8F6E",
+    desc: "6 \u53D1\u5DE6\u8F6E\u624B\u67AA\xB7\u5355\u53D1\u9AD8\u4F24\u5BB3\xB7\u534A\u81EA\u52A8\u7CBE\u51C6",
+    weaponClass: "ranged",
+    shape: "pistol",
+    iconShape: "pistol",
+    damage: 118,
+    fireRate: 3.2,
+    bulletSpeed: 1e3,
+    bulletSize: 5.5,
+    spread: 0.012,
+    pellets: 1,
+    pierce: 0,
+    life: 1.3,
+    knockback: 180,
+    color: "#e2e8f0",
+    glow: "#cbd5e1",
+    kind: "tracer",
+    semiAuto: true,
+    barrel: 14,
+    magazine: 6,
+    reloadTime: 1.9,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "gold_barrett",
+    name: "\u9EC4\u91D1\u5DF4\u96F7\u7279",
+    desc: "\u9AD8\u4F24\u5BB3\u53CD\u5668\u6750\u72D9\u51FB\xB7\u7A7F\u900F\u6781\u5F3A\xB7\u91D1\u8272\u4F20\u8BF4",
+    weaponClass: "ranged",
+    shape: "sniper",
+    iconShape: "sniper",
+    damage: 320,
+    fireRate: 0.85,
+    bulletSpeed: 1900,
+    bulletSize: 7,
+    spread: 0,
+    pellets: 1,
+    pierce: 8,
+    life: 2.2,
+    knockback: 480,
+    color: "#fde047",
+    glow: "#facc15",
+    kind: "tracer",
+    barrel: 32,
+    magazine: 6,
+    reloadTime: 3,
+    rangeTier: "\u8FDC"
+  },
+  {
+    id: "gatling",
+    name: "\u52A0\u7279\u6797",
+    desc: "\u6781\u9AD8\u5C04\u901F\uFF0C300\u53D1\u5F39\u5BB9\u91CF\uFF0C\u4F46\u5F00\u706B\u524D\u9700\u8981\u9884\u70ED\uFF08\u8F6C\u901F\u63D0\u5347\u540E\u5C04\u901F\u4E0E\u4F24\u5BB3\u624D\u62C9\u6EE1\uFF09",
+    weaponClass: "ranged",
+    shape: "gatling",
+    iconShape: "gatling",
+    damage: 24,
+    fireRate: 19,
+    bulletSpeed: 1050,
+    bulletSize: 4.5,
+    spread: 0.11,
+    pellets: 1,
+    pierce: 0,
+    life: 1,
+    knockback: 55,
+    color: "#fde68a",
+    glow: "#fbbf24",
+    kind: "tracer",
+    barrel: 26,
+    magazine: 300,
+    reloadTime: 3.4,
+    spinup: 0.55,
+    spinDown: 0.9,
+    spinMinMult: 0.18,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "poison_mist",
+    name: "\u6BD2\u96FE\u55B7\u5C04\u673A",
+    desc: "\u5411\u524D\u55B7\u51FA\u5C0F\u8303\u56F4\u6BD2\u96FE\uFF0C\u654C\u4EBA\u505C\u7559\u8D8A\u4E45\u4E2D\u6BD2\u8D8A\u6DF1\u3001\u53D7\u5230\u4F24\u5BB3\u8D8A\u9AD8\uFF08\u4E0E\u6BD2\u6C14\u5730\u96F7\u540C\u6B3E\u5267\u6BD2\uFF09",
+    weaponClass: "poison_mist",
+    shape: "poison_mist",
+    iconShape: "poison_mist",
+    damage: 80,
+    fireRate: 1,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 20,
+    color: "#a3e635",
+    glow: "#84cc16",
+    kind: "flame",
+    barrel: 22,
+    flameCone: 0.34,
+    flameRange: 130,
+    heatPerShot: 0.4,
+    coolRate: 0.6,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "lightning_whip",
+    name: "\u95EA\u7535\u97AD",
+    desc: "\u5FEB\u901F\u5DE6\u53F3\u6325\u52A8\u7529\u51FB\uFF0C\u547D\u4E2D\u654C\u4EBA\u9020\u6210\u51CF\u901F\uFF08\u5BF9\u751F\u5316\u3001\u4EBA\u673A\u4E0E\u5BF9\u624B\u5747\u751F\u6548\uFF09",
+    weaponClass: "melee",
+    shape: "lightning_whip",
+    iconShape: "lightning_whip",
+    damage: 54,
+    fireRate: 6,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 90,
+    color: "#bae6fd",
+    glow: "#38bdf8",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 96,
+    meleeArc: 3.4,
+    whip: true,
+    slowOnHit: 2,
+    rangeTier: "\u8FD1"
+  }
+];
+
 // src/game/content.ts
 var CHARACTERS = [
   {
@@ -167,579 +784,7 @@ var OUTFITS = [
     fireRateBonus: 0.05
   }
 ];
-var GUNS = [
-  {
-    id: "silenced_pistol",
-    name: "\u6D88\u97F3\u624B\u67AA",
-    desc: "\u534A\u81EA\u52A8\u6D88\u97F3\u624B\u67AA\uFF0C\u9690\u853D\u7CBE\u51C6",
-    weaponClass: "ranged",
-    shape: "pistol",
-    iconShape: "pistol",
-    damage: 44,
-    fireRate: 7,
-    // 420 RPM
-    bulletSpeed: 760,
-    bulletSize: 5,
-    spread: 0.03,
-    pellets: 1,
-    pierce: 0,
-    life: 1.1,
-    knockback: 110,
-    color: "#e2e8f0",
-    glow: "#94a3b8",
-    kind: "bullet",
-    semiAuto: true,
-    barrel: 16,
-    magazine: 22,
-    reloadTime: 1.4,
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "smg",
-    name: "\u51B2\u950B\u67AA",
-    desc: "\u9AD8\u5C04\u901F\u6CFC\u6C34\uFF0C\u5355\u53D1\u8F83\u5F31",
-    weaponClass: "ranged",
-    shape: "smg",
-    iconShape: "smg",
-    damage: 18,
-    fireRate: 12,
-    bulletSpeed: 840,
-    bulletSize: 4,
-    spread: 0.13,
-    pellets: 1,
-    pierce: 0,
-    life: 0.85,
-    knockback: 60,
-    color: "#a5f3fc",
-    glow: "#22d3ee",
-    kind: "bullet",
-    barrel: 18,
-    magazine: 30,
-    reloadTime: 1.6,
-    rangeTier: "\u8FD1"
-  },
-  {
-    id: "sniper",
-    name: "\u72D9\u51FB\u67AA",
-    desc: "\u8D85\u9AD8\u4F24\u5BB3\uFF0C\u53EF\u7A7F\u900F\u591A\u4EBA",
-    weaponClass: "ranged",
-    shape: "sniper",
-    iconShape: "sniper",
-    damage: 270,
-    fireRate: 0.9,
-    bulletSpeed: 1750,
-    bulletSize: 6,
-    spread: 0,
-    pellets: 1,
-    pierce: 5,
-    life: 2,
-    knockback: 420,
-    color: "#fca5a5",
-    glow: "#f87171",
-    kind: "tracer",
-    barrel: 30,
-    magazine: 5,
-    reloadTime: 2.8,
-    rangeTier: "\u8FDC"
-  },
-  {
-    id: "rocket",
-    name: "\u706B\u7BAD\u7B52",
-    desc: "\u8303\u56F4\u7206\u70B8\uFF0C\u5A01\u529B\u5DE8\u5927",
-    weaponClass: "ranged",
-    shape: "rocket",
-    iconShape: "rocket",
-    damage: 150,
-    fireRate: 0.72,
-    bulletSpeed: 480,
-    bulletSize: 9,
-    spread: 0.02,
-    pellets: 1,
-    pierce: 0,
-    life: 1.7,
-    knockback: 320,
-    color: "#fda4af",
-    glow: "#fb7185",
-    explosive: true,
-    explosionRadius: 96,
-    kind: "rocket",
-    barrel: 26,
-    magazine: 1,
-    reloadTime: 2,
-    rangeTier: "\u8FDC"
-  },
-  {
-    id: "akm",
-    name: "AKM",
-    desc: "\u5747\u8861\u7684\u7A81\u51FB\u6B65\u67AA\uFF0C\u4E2D\u8FDC\u7A0B\u5168\u80FD",
-    weaponClass: "ranged",
-    shape: "akm",
-    iconShape: "akm",
-    damage: 44,
-    fireRate: 10,
-    bulletSpeed: 940,
-    bulletSize: 5,
-    spread: 0.05,
-    pellets: 1,
-    pierce: 0,
-    life: 1.2,
-    knockback: 150,
-    color: "#fde68a",
-    glow: "#f59e0b",
-    kind: "tracer",
-    barrel: 26,
-    magazine: 30,
-    reloadTime: 2.2,
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "fcar",
-    name: "FCAR",
-    desc: "\u91CD\u578B\u7A81\u51FB\u6B65\u67AA\uFF1A\u9AD8\u4F24\u5BB3\u3001\u5C04\u901F\u6162\u3001\u5F39\u5323\u8F83\u5C0F",
-    weaponClass: "ranged",
-    shape: "fcar",
-    iconShape: "fcar",
-    damage: 58,
-    fireRate: 9,
-    bulletSpeed: 1e3,
-    bulletSize: 6,
-    spread: 0.045,
-    pellets: 1,
-    pierce: 1,
-    life: 1.3,
-    knockback: 240,
-    color: "#99f6e4",
-    glow: "#14b8a6",
-    kind: "tracer",
-    barrel: 28,
-    magazine: 20,
-    reloadTime: 2.8,
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "pulse",
-    name: "\u8109\u51B2",
-    desc: "\u8FDE\u7EED\u6FC0\u5149\u51B2\u950B\u67AA\uFF0C\u8FC7\u70ED\u540E\u9700\u51B7\u5374",
-    weaponClass: "beam",
-    shape: "pulse",
-    iconShape: "pulse",
-    damage: 460,
-    fireRate: 1,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 50,
-    color: "#a5f3fc",
-    glow: "#22d3ee",
-    kind: "tracer",
-    barrel: 22,
-    beamRange: 780,
-    heatPerShot: 0.62,
-    coolRate: 0.5,
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "lightsaber",
-    name: "\u5149\u5251",
-    desc: "\u8FD1\u8DDD\u79BB\u6A2A\u626B\uFF0C\u70AB\u9177\u5149\u6548\uFF0C\u8FDE\u7EED\u6325\u780D",
-    weaponClass: "melee",
-    shape: "lightsaber",
-    iconShape: "lightsaber",
-    damage: 52,
-    fireRate: 7,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 240,
-    color: "#bae6fd",
-    glow: "#38bdf8",
-    kind: "bullet",
-    barrel: 0,
-    meleeRange: 82,
-    meleeArc: 2.5,
-    rangeTier: "\u8FD1"
-  },
-  {
-    id: "hammer",
-    name: "\u5927\u9524",
-    desc: "\u5DE6\u952E\u6325\u780D \xB7 \u53F3\u952E\u7838\u5730\uFF08\u62C6\u5899\uFF09",
-    weaponClass: "melee",
-    shape: "hammer",
-    iconShape: "hammer",
-    damage: 120,
-    fireRate: 1.5,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 320,
-    color: "#cbd5e1",
-    glow: "#f59e0b",
-    kind: "bullet",
-    barrel: 0,
-    meleeRange: 74,
-    meleeArc: 1.8,
-    slamDamage: 280,
-    explosionRadius: 100,
-    rangeTier: "\u8FD1"
-  },
-  // ==================== NEW WEAPONS ====================
-  {
-    id: "flamethrower",
-    name: "\u706B\u7130\u55B7\u5C04\u5668",
-    desc: "\u9525\u5F62\u6301\u7EED\u707C\u70E7\uFF0C\u8D34\u8138\u6BC1\u706D\u6027\u8F93\u51FA",
-    weaponClass: "flamethrower",
-    shape: "flamethrower",
-    iconShape: "flamethrower",
-    damage: 190,
-    fireRate: 1,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 30,
-    color: "#fed7aa",
-    glow: "#f97316",
-    kind: "flame",
-    barrel: 24,
-    flameCone: 0.42,
-    flameRange: 150,
-    heatPerShot: 0.35,
-    coolRate: 0.55,
-    rangeTier: "\u8FD1"
-  },
-  {
-    id: "sa1216",
-    name: "SA1216",
-    desc: "\u4F5C\u6218\u8DDD\u79BB\u8F83\u8FD1\u7684\u8FDE\u55B7\uFF0C\u7206\u53D1\u4F24\u5BB3\u9AD8",
-    weaponClass: "ranged",
-    shape: "sa1216",
-    iconShape: "sa1216",
-    damage: 22,
-    fireRate: 5.5,
-    bulletSpeed: 820,
-    bulletSize: 4.5,
-    spread: 0.26,
-    pellets: 8,
-    pierce: 0,
-    life: 0.45,
-    knockback: 200,
-    color: "#fde68a",
-    glow: "#f59e0b",
-    kind: "pellet",
-    barrel: 22,
-    magazine: 16,
-    reloadTime: 2.6,
-    rangeTier: "\u8FD1"
-  },
-  {
-    id: "mgl32",
-    name: "MGL32",
-    desc: "\u69B4\u5F39\u53D1\u5C04\u5668\uFF0C\u53CD\u5F39\u4E00\u6B21\u540E\u7206\u70B8",
-    weaponClass: "ranged",
-    shape: "mgl32",
-    iconShape: "mgl32",
-    damage: 120,
-    fireRate: 1.8,
-    bulletSpeed: 560,
-    bulletSize: 8,
-    spread: 0.04,
-    pellets: 1,
-    pierce: 0,
-    life: 2.2,
-    knockback: 260,
-    color: "#fda4af",
-    glow: "#fb7185",
-    explosive: true,
-    explosionRadius: 78,
-    kind: "grenade",
-    bounces: 1,
-    barrel: 22,
-    magazine: 6,
-    reloadTime: 2.4,
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "spear",
-    name: "\u957F\u77DB",
-    desc: "\u9177\u70AB\u8FDE\u62DB\u7CFB\u7EDF\uFF0C\u4F4D\u79FB\u540C\u65F6\u9020\u6210\u4F24\u5BB3",
-    weaponClass: "melee",
-    shape: "spear",
-    iconShape: "spear",
-    damage: 68,
-    fireRate: 3.2,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 200,
-    color: "#ddd6fe",
-    glow: "#a78bfa",
-    kind: "bullet",
-    barrel: 0,
-    meleeRange: 96,
-    meleeArc: 1.1,
-    comboLength: 3,
-    rangeTier: "\u8FD1"
-  },
-  {
-    id: "drone",
-    name: "\u6D6E\u6E38\u70AE",
-    desc: "\u53D1\u5C04\u79BB\u5B50\u56E2\uFF0C\u78B0\u654C\u4F24\u5BB3\u3001\u4E0D\u4F24\u5EFA\u7B51\u3001\u53CD\u5F393\u6B21",
-    weaponClass: "ranged",
-    shape: "drone",
-    iconShape: "drone",
-    damage: 56,
-    fireRate: 1.6,
-    bulletSpeed: 380,
-    bulletSize: 9,
-    spread: 0.1,
-    pellets: 1,
-    pierce: 99,
-    life: 4.5,
-    knockback: 40,
-    color: "#c7d2fe",
-    glow: "#818cf8",
-    kind: "ion",
-    bounces: 3,
-    ignoreWalls: true,
-    barrel: 14,
-    magazine: 4,
-    reloadTime: 1.8,
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "recurve_bow",
-    name: "\u53CD\u66F2\u5F13",
-    desc: "\u84C4\u529B\u8D8A\u4E45\u7BAD\u77E2\u8D8A\u5FEB\u8D8A\u72E0\uFF0C\u6EE1\u84C4\u53EF\u7A7F\u900F",
-    weaponClass: "bow",
-    shape: "recurve_bow",
-    iconShape: "recurve_bow",
-    damage: 44,
-    fireRate: 1.5,
-    bulletSpeed: 600,
-    bulletSize: 5,
-    spread: 0.01,
-    pellets: 1,
-    pierce: 0,
-    life: 1.4,
-    knockback: 80,
-    color: "#fde68a",
-    glow: "#a3e635",
-    kind: "tracer",
-    barrel: 18,
-    maxChargeTime: 1.2,
-    minChargeMult: 0.6,
-    maxChargeMult: 2.2,
-    maxChargeSpeedMult: 2.3,
-    drawSlowMult: 0.7,
-    rangeTier: "\u8FDC"
-  },
-  {
-    id: "riot_shield",
-    name: "\u9632\u7206\u76FE",
-    desc: "\u5DE6\u952E\u6325\u51FB \xB7 \u53F3\u952E\u4E3E\u76FE\u62B5\u6321\u5B50\u5F39",
-    weaponClass: "shield",
-    shape: "riot_shield",
-    iconShape: "riot_shield",
-    damage: 56,
-    fireRate: 1.8,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 200,
-    color: "#bfdbfe",
-    glow: "#3b82f6",
-    kind: "bullet",
-    barrel: 0,
-    meleeRange: 58,
-    meleeArc: 1.6,
-    shieldHp: 200,
-    shieldMaxHp: 200,
-    shieldArc: 0.7,
-    shieldDuration: 3,
-    shieldRechargeTime: 8,
-    rangeTier: "\u8FD1"
-  },
-  {
-    id: "shak50",
-    name: "SHAK-50",
-    desc: "\u53CC\u7BA1\u5927\u53E3\u5F84\u6B65\u67AA\xB7\u4E00\u6B21\u5E76\u6392\u4E24\u53D1\xB7\u968F\u8DDD\u79BB\u9010\u6E10\u6269\u6563\xB7\u8FD1\u6218\u7206\u53D1\u5F3A",
-    weaponClass: "ranged",
-    shape: "shak50",
-    iconShape: "shak50",
-    damage: 52,
-    fireRate: 3.4,
-    bulletSpeed: 900,
-    bulletSize: 6,
-    spread: 0,
-    pellets: 2,
-    parallel: 2,
-    parallelGap: 7,
-    drift: 70,
-    pierce: 1,
-    life: 0.7,
-    knockback: 260,
-    color: "#fde68a",
-    glow: "#fbbf24",
-    kind: "tracer",
-    barrel: 22,
-    magazine: 12,
-    reloadTime: 2.2,
-    rangeTier: "\u8FD1"
-  },
-  // ==================== NEW WEAPONS (this update) ====================
-  {
-    id: "r357",
-    name: "R.357 \u5DE6\u8F6E",
-    desc: "6 \u53D1\u5DE6\u8F6E\u624B\u67AA\xB7\u5355\u53D1\u9AD8\u4F24\u5BB3\xB7\u534A\u81EA\u52A8\u7CBE\u51C6",
-    weaponClass: "ranged",
-    shape: "pistol",
-    iconShape: "pistol",
-    damage: 78,
-    fireRate: 3.2,
-    bulletSpeed: 1e3,
-    bulletSize: 5.5,
-    spread: 0.012,
-    pellets: 1,
-    pierce: 0,
-    life: 1.3,
-    knockback: 180,
-    color: "#e2e8f0",
-    glow: "#cbd5e1",
-    kind: "tracer",
-    semiAuto: true,
-    barrel: 14,
-    magazine: 6,
-    reloadTime: 1.9,
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "gold_barrett",
-    name: "\u9EC4\u91D1\u5DF4\u96F7\u7279",
-    desc: "\u9AD8\u4F24\u5BB3\u53CD\u5668\u6750\u72D9\u51FB\xB7\u7A7F\u900F\u6781\u5F3A\xB7\u91D1\u8272\u4F20\u8BF4",
-    weaponClass: "ranged",
-    shape: "sniper",
-    iconShape: "sniper",
-    damage: 320,
-    fireRate: 0.85,
-    bulletSpeed: 1900,
-    bulletSize: 7,
-    spread: 0,
-    pellets: 1,
-    pierce: 8,
-    life: 2.2,
-    knockback: 480,
-    color: "#fde047",
-    glow: "#facc15",
-    kind: "tracer",
-    barrel: 32,
-    magazine: 6,
-    reloadTime: 3,
-    rangeTier: "\u8FDC"
-  },
-  // ==================== BIOHAZARD / NEW WEAPONS ====================
-  {
-    id: "gatling",
-    name: "\u52A0\u7279\u6797",
-    desc: "\u6781\u9AD8\u5C04\u901F\uFF0C300\u53D1\u5F39\u5BB9\u91CF\uFF0C\u4F46\u5F00\u706B\u524D\u9700\u8981\u9884\u70ED\uFF08\u8F6C\u901F\u63D0\u5347\u540E\u5C04\u901F\u4E0E\u4F24\u5BB3\u624D\u62C9\u6EE1\uFF09",
-    weaponClass: "ranged",
-    shape: "gatling",
-    iconShape: "gatling",
-    damage: 24,
-    fireRate: 19,
-    // very high once spun up
-    bulletSpeed: 1050,
-    bulletSize: 4.5,
-    spread: 0.11,
-    pellets: 1,
-    pierce: 0,
-    life: 1,
-    knockback: 55,
-    color: "#fde68a",
-    glow: "#fbbf24",
-    kind: "tracer",
-    barrel: 26,
-    magazine: 300,
-    reloadTime: 3.4,
-    spinup: 0.55,
-    // seconds to reach full spin
-    spinDown: 0.9,
-    // seconds to spin back down
-    spinMinMult: 0.18,
-    // damage/firerate floor at zero spin
-    rangeTier: "\u4E2D"
-  },
-  {
-    id: "poison_mist",
-    name: "\u6BD2\u96FE\u55B7\u5C04\u673A",
-    desc: "\u5411\u524D\u55B7\u51FA\u5C0F\u8303\u56F4\u6BD2\u96FE\uFF0C\u654C\u4EBA\u505C\u7559\u8D8A\u4E45\u4E2D\u6BD2\u8D8A\u6DF1\u3001\u53D7\u5230\u4F24\u5BB3\u8D8A\u9AD8\uFF08\u4E0E\u6BD2\u6C14\u5730\u96F7\u540C\u6B3E\u5267\u6BD2\uFF09",
-    weaponClass: "poison_mist",
-    shape: "poison_mist",
-    iconShape: "poison_mist",
-    damage: 80,
-    // base poison ramp rate reference
-    fireRate: 1,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 20,
-    color: "#a3e635",
-    glow: "#84cc16",
-    kind: "flame",
-    barrel: 22,
-    flameCone: 0.34,
-    flameRange: 130,
-    heatPerShot: 0.4,
-    coolRate: 0.6,
-    rangeTier: "\u8FD1"
-  },
-  // ===================== BIOHAZARD / NEW WEAPONS (this update) =====================
-  {
-    id: "lightning_whip",
-    name: "\u95EA\u7535\u97AD",
-    desc: "\u5FEB\u901F\u5DE6\u53F3\u6325\u52A8\u7529\u51FB\uFF0C\u547D\u4E2D\u654C\u4EBA\u9020\u6210\u51CF\u901F\uFF08\u5BF9\u751F\u5316\u3001\u4EBA\u673A\u4E0E\u5BF9\u624B\u5747\u751F\u6548\uFF09",
-    weaponClass: "melee",
-    shape: "lightning_whip",
-    iconShape: "lightning_whip",
-    damage: 34,
-    fireRate: 9,
-    bulletSpeed: 0,
-    bulletSize: 0,
-    spread: 0,
-    pellets: 0,
-    pierce: 0,
-    life: 0,
-    knockback: 90,
-    color: "#bae6fd",
-    glow: "#38bdf8",
-    kind: "bullet",
-    barrel: 0,
-    meleeRange: 96,
-    meleeArc: 3.4,
-    whip: true,
-    slowOnHit: 2,
-    rangeTier: "\u8FD1"
-  }
-];
+var GUNS = guns_default;
 var SKILLS = [
   {
     id: "dash",
@@ -1129,8 +1174,8 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
       ctx.fill();
       break;
     }
-    // ---------------- SMG ----------------
-    case "smg": {
+    // ---------------- MAC11 ----------------
+    case "mac11": {
       body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
       body(10, -1.8, 7, 3.6, STEEL_L, STEEL_D, 1.5);
       block(-11, -2.4, 6, 4.8, STEEL_D, 1.5);
@@ -1142,6 +1187,33 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
       block(5, -5, 3, 1.6, STEEL_D, 0.5);
       ctx.fillStyle = gun.glow;
       roundRect(ctx, 16, -1.2, 2.4, 2.4, 1);
+      ctx.fill();
+      break;
+    }
+    // ---------------- MP5 ----------------
+    case "mp5": {
+      body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
+      body(10, -1.8, 8, 3.6, STEEL_L, STEEL_D, 1.5);
+      block(-11, -2.4, 6, 4.8, STEEL_D, 1.5);
+      ctx.save();
+      ctx.translate(2, 3);
+      ctx.rotate(0.5);
+      block(-1.6, 0, 4, 12, STEEL_D, 1.5);
+      ctx.restore();
+      block(5, -5, 3, 1.6, STEEL_D, 0.5);
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 17, -1.2, 2.4, 2.4, 1);
+      ctx.fill();
+      break;
+    }
+    // ---------------- MORTAR (投射榴弹炮) ----------------
+    case "mortar": {
+      block(-3, -3, 8, 6, STEEL_D, 2);
+      body(2, -3.2, 20, 6.4, STEEL_X, STEEL, 2.5);
+      body(20, -3.6, 3, 7.2, STEEL_L, STEEL_D, 1.5);
+      block(-9, -2, 6, 4, STEEL_D, 1.5);
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 21, -2, 2.4, 4, 1);
       ctx.fill();
       break;
     }
@@ -2227,8 +2299,15 @@ var SoundManager = class {
       case "pistol":
         this.tone(420, 0.08, "square", 0.18, 180);
         break;
-      case "smg":
-        this.tone(520, 0.05, "square", 0.1, 260);
+      case "mac11":
+        this.tone(520, 0.04, "square", 0.1, 280);
+        break;
+      case "mp5":
+        this.tone(480, 0.06, "square", 0.13, 240);
+        break;
+      case "mortar":
+        this.tone(180, 0.18, "sawtooth", 0.2, 70);
+        this.noiseBurst(0.12, 0.12, 700, 0.5);
         break;
       case "shotgun":
         this.noiseBurst(0.18, 0.35, 900, 0.6);
@@ -2325,6 +2404,27 @@ var RUNTIME_DEFAULTS = {
 var RUNTIME = { ...RUNTIME_DEFAULTS };
 
 // src/game/engine.ts
+var COIN_STYLE = {
+  whip: ["#7dd3fc", "#e0f2fe", "#a5f3fc", "#fbbf24"],
+  saber: ["#a5b4fc", "#c7d2fe", "#fde68a", "#ffffff"],
+  explosive: ["#fb923c", "#fca5a5", "#fbbf24", "#fde68a"],
+  fire: ["#fb923c", "#f97316", "#fde68a", "#fbbf24"],
+  poison: ["#a3e635", "#84cc16", "#bef264", "#fde68a"],
+  pierce: ["#fbbf24", "#fde68a", "#fcd34d"],
+  rapid: ["#fde68a", "#fbbf24", "#fcd34d"],
+  bullet: ["#fbbf24", "#fde68a"]
+};
+function killStyleOf(w) {
+  if (!w) return "bullet";
+  if (w === "lightning_whip") return "whip";
+  if (w === "lightsaber") return "saber";
+  if (w === "rocket" || w === "mgl32" || w === "grenade" || w.startsWith("explosive") || w === "mortar") return "explosive";
+  if (w === "flamethrower" || w === "fire_grenade" || w === "mine_fire") return "fire";
+  if (w === "poison_mist" || w === "mine_poison") return "poison";
+  if (w === "recurve_bow" || w === "drone" || w === "spear") return "pierce";
+  if (w === "gatling" || w === "pulse" || w === "akm" || w === "fcar" || w === "shak50" || w === "sa1216" || w === "mac11" || w === "mp5" || w === "silenced_pistol" || w === "r357" || w === "gold_barrett") return "rapid";
+  return "bullet";
+}
 var KEYS_MOVE = /* @__PURE__ */ new Set([
   "KeyW",
   "KeyA",
@@ -3440,7 +3540,8 @@ var GameEngine = class {
         owner: this.player === this.foe ? "foe" : "self",
         trail: g.kind === "tracer",
         bounces: g.bounces,
-        ignoreWalls: g.ignoreWalls
+        ignoreWalls: g.ignoreWalls,
+        weapon: g.id
       });
     }
     if (g.magazine !== void 0) ws.ammo -= 1;
@@ -3453,7 +3554,7 @@ var GameEngine = class {
       140,
       0.25
     );
-    if (g.id === "rocket" || g.id === "sniper" || g.id === "fcar" || g.id === "sa1216" || g.id === "mgl32") {
+    if (g.id === "rocket" || g.id === "sniper" || g.id === "fcar" || g.id === "sa1216" || g.id === "mgl32" || g.id === "mortar") {
       p.x -= Math.cos(base) * 3;
       p.y -= Math.sin(base) * 3;
       this.shake = Math.min(14, this.shake + (g.id === "rocket" || g.id === "mgl32" ? 7 : 4));
@@ -3514,7 +3615,7 @@ var GameEngine = class {
       if (d <= range + e.size) {
         const ang = Math.atan2(dy, dx);
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          this.damageEnemy(e, dmg * dmgMult, Math.cos(ang) * g.knockback, Math.sin(ang) * g.knockback);
+          this.damageEnemy(e, dmg * dmgMult, Math.cos(ang) * g.knockback, Math.sin(ang) * g.knockback, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
           if (isSaber) {
             e.electrifiedTime = 0.7;
             e.electrifiedGlow = g.glow;
@@ -3583,7 +3684,7 @@ var GameEngine = class {
       if (d <= radius + e.size) {
         const fall = 1 - d / (radius + e.size);
         const a = Math.atan2(e.y - p.y, e.x - p.x);
-        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), Math.cos(a) * 420, Math.sin(a) * 420);
+        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), Math.cos(a) * 420, Math.sin(a) * 420, false, { weapon: g.id, dx: Math.cos(a), dy: Math.sin(a) });
       }
     }
     const opp = this.meleeOpponent();
@@ -3616,7 +3717,9 @@ var GameEngine = class {
           hit.enemy,
           g.damage * this.character.damageMult * dt,
           0,
-          0
+          0,
+          false,
+          { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) }
         );
         if (Math.random() < 0.7)
           this.spawnParticles(hit.point.x, hit.point.y, g.glow, 2, 120, 0.22);
@@ -3685,7 +3788,7 @@ var GameEngine = class {
           const ang = Math.atan2(dy, dx);
           if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
             const fall = 1 - d / (range + e.size);
-            this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0);
+            this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0, false, { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) });
             e.burnT = Math.max(e.burnT, 1.2);
             e.burnDps = Math.max(e.burnDps, dps * 0.25);
           }
@@ -3830,7 +3933,8 @@ var GameEngine = class {
       explosionRadius: 0,
       kind: g.kind,
       hit: /* @__PURE__ */ new Set(),
-      trail: true
+      trail: true,
+      weapon: g.id
     });
     sound.shoot("sniper");
     this.spawnParticles(bx, by, g.glow, 4, 120, 0.25);
@@ -4073,7 +4177,9 @@ var GameEngine = class {
               e,
               b.damage,
               Math.cos(Math.atan2(b.vy, b.vx)) * b.knockback,
-              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback
+              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback,
+              false,
+              { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
             );
             if (b.pierce <= 0) {
               dead = true;
@@ -4688,7 +4794,7 @@ var GameEngine = class {
       }
     }
   }
-  damageEnemy(e, dmg, kbx, kby, silent = false) {
+  damageEnemy(e, dmg, kbx, kby, silent = false, src) {
     if (e.hp <= 0) return;
     dmg *= RUNTIME.playerDamageMult;
     e.hp -= dmg;
@@ -4700,6 +4806,7 @@ var GameEngine = class {
     const kbScale = 0.045 / (e.type === "boss" ? 6 : 1);
     e.x += kbx * kbScale;
     e.y += kby * kbScale;
+    if (src) e.lastSrc = { weapon: src.weapon, dx: src.dx ?? 0, dy: src.dy ?? 0 };
     this.spawnParticles(
       e.x,
       e.y,
@@ -4726,43 +4833,96 @@ var GameEngine = class {
     const med = e.type === "tank" || e.behavior === "brute" || e.behavior === "bloater";
     const goldAmount = big ? 80 : med ? 18 : e.type === "shooter" || e.behavior === "spitter" ? 10 : 6;
     this.gold += goldAmount;
-    this.effects.push({
-      type: "coinburst",
-      x: e.x,
-      y: e.y,
-      t: 0,
-      duration: 0.5,
-      radius: e.size * 3,
-      color: "#fbbf24"
-    });
-    this.effects.push({
-      type: "shock",
-      x: e.x,
-      y: e.y,
-      t: 0,
-      duration: 0.35,
-      radius: e.size * 2.4,
-      color: "#fde68a"
-    });
-    this.shake = Math.min(22, this.shake + (big ? 20 : med ? 10 : 5));
-    const coinCount = big ? 40 : med ? 18 : 10;
-    for (let i = 0; i < coinCount; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = 120 + Math.random() * 280;
-      this.particles.push({
-        x: e.x,
-        y: e.y,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 120,
-        life: 0.8 + Math.random() * 0.5,
-        maxLife: 1.3,
-        color: Math.random() < 0.5 ? "#fbbf24" : "#fde68a",
-        size: 2.5 + Math.random() * 2.5,
-        shrink: false,
-        gravity: 520,
-        coin: true,
-        spin: Math.random() * Math.PI * 2
-      });
+    const ksrc = e.lastSrc;
+    const style = killStyleOf(ksrc?.weapon ?? "");
+    let dx = ksrc?.dx ?? 0;
+    let dy = ksrc?.dy ?? 0;
+    const dl = Math.hypot(dx, dy);
+    if (dl > 1e-3) {
+      dx /= dl;
+      dy /= dl;
+    } else {
+      dx = 0;
+      dy = 0;
+    }
+    const bio = this.gameMode === "biohazard";
+    if (bio) {
+      this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.5, radius: e.size * 3, color: "#fbbf24" });
+      this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.35, radius: e.size * 2.4, color: "#fde68a" });
+      this.shake = Math.min(22, this.shake + (big ? 20 : med ? 10 : 5));
+      const coinCount = big ? 54 : med ? 26 : 14;
+      for (let i = 0; i < coinCount; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 120 + Math.random() * 280;
+        const flight = 0.35 + Math.random() * 0.15;
+        this.particles.push({
+          x: e.x,
+          y: e.y,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp - 120,
+          life: flight + 1,
+          maxLife: flight + 1,
+          color: Math.random() < 0.5 ? "#fbbf24" : "#fde68a",
+          size: 2.5 + Math.random() * 2.5,
+          shrink: false,
+          gravity: 520,
+          coin: true,
+          spin: Math.random() * Math.PI * 2,
+          flight,
+          rest: 1,
+          landed: false
+        });
+      }
+    } else {
+      const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
+      const ringR = e.size * (big ? 4 : style === "explosive" ? 3.4 : 3);
+      this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: big ? 0.72 : 0.55, radius: ringR, color: pal[0], style, dirX: dx, dirY: dy });
+      this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.42, radius: ringR * 0.82, color: pal[1] });
+      this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
+      const coinCount = big ? 64 : med ? 32 : 18;
+      for (let i = 0; i < coinCount; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 140 + Math.random() * 320;
+        let vx = Math.cos(a) * sp;
+        let vy = Math.sin(a) * sp - 120;
+        if (dx !== 0 || dy !== 0) {
+          vx = vx * 0.35 + dx * sp;
+          vy = vy * 0.35 + dy * sp - 60;
+        }
+        const flight = 0.35 + Math.random() * 0.15;
+        this.particles.push({
+          x: e.x,
+          y: e.y,
+          vx,
+          vy,
+          life: flight + 1,
+          maxLife: flight + 1,
+          color: pal[Math.random() * pal.length | 0],
+          size: 2.5 + Math.random() * 3,
+          shrink: false,
+          gravity: 540,
+          coin: true,
+          spin: Math.random() * Math.PI * 2,
+          flight,
+          rest: 1,
+          landed: false
+        });
+      }
+      if (style === "explosive") {
+        this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.85, radius: ringR * 1.5, color: "#fb923c", style: "explosive", dirX: dx, dirY: dy });
+        this.spawnParticles(e.x, e.y, "#fb923c", big ? 22 : 12, 330, 0.6);
+      } else if (style === "whip") {
+        this.effects.push({ type: "whip", x: e.x, y: e.y, t: 0, duration: 0.22, range: e.size * 3, radius: e.size * 3, color: "#7dd3fc", angle: dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : 0, arc: 0 });
+        this.spawnParticles(e.x, e.y, "#7dd3fc", 14, 280, 0.5);
+        this.spawnParticles(e.x, e.y, "#e0f2fe", 8, 200, 0.4);
+      } else if (style === "saber") {
+        this.spawnParticles(e.x, e.y, "#a5b4fc", 12, 260, 0.5);
+      } else if (style === "fire") {
+        this.spawnParticles(e.x, e.y, "#fb923c", 16, 240, 0.6);
+        this.spawnParticles(e.x, e.y, "#fde68a", 8, 160, 0.4);
+      } else if (style === "poison") {
+        this.spawnParticles(e.x, e.y, "#a3e635", 16, 240, 0.6);
+      }
     }
     this.spawnParticles(e.x, e.y, e.glow, big ? 30 : 12, 220, 0.5);
     this.spawnParticles(e.x, e.y, e.color, big ? 20 : 6, 160, 0.4);
@@ -5239,8 +5399,10 @@ var GameEngine = class {
     if (this.foe)
       this.simulatePeer(this.foe, fB, this.foeGuns, this.foeGadgets, this.foeGadgetCd, dt);
     this.simulateWorld(dt);
-    if (this.gameMode !== "biohazard" && this.base.hp <= 0 && !this.gameOver)
-      this.endGame("\u57FA\u5730\u5931\u5B88\uFF0C\u4F60\u8F93\u4E86\uFF01");
+    if (this.gameMode !== "biohazard" && !this.gameOver) {
+      if (this.base.hp <= 0) this.endGame("\u57FA\u5730\u5931\u5B88\uFF0C\u4F60\u8F93\u4E86\uFF01");
+      else if (this.enemyBase.hp <= 0) this.endGame("\u654C\u65B9\u57FA\u5730\u5DF2\u6467\u6BC1\uFF0C\u4F60\u8D62\u4E86\uFF01");
+    }
   }
   /** Server: begin the match once both peers are present. */
   serverStartMatch() {
@@ -5251,7 +5413,7 @@ var GameEngine = class {
   setReconnecting(v) {
     if (this.reconnecting === v) return;
     this.reconnecting = v;
-    this.syncHud();
+    this.emit(true);
   }
   /**
    * Server: register peer B (the second socket) from their loadout and assign
@@ -5339,10 +5501,17 @@ var GameEngine = class {
     this.enemyBase.hp = s.guestBaseHp;
     this.enemyBase.maxHp = s.guestBaseMaxHp;
     if (s.gameOver && !this.gameOver) {
+      const iAmJoiner = this.selfPid === 2;
       let reason;
-      if (s.guestBaseHp <= 0) reason = "\u5931\u8D25\uFF0C\u57FA\u5730\u5931\u5B88";
-      else if (s.hostBaseHp <= 0) reason = "\u80DC\u5229\uFF01\u654C\u65B9\u57FA\u5730\u5DF2\u6467\u6BC1";
-      else reason = "\u80DC\u5229\uFF01\u5BF9\u624B\u5DF2\u88AB\u51FB\u8D25";
+      if (iAmJoiner) {
+        if (s.guestBaseHp <= 0) reason = "\u5931\u8D25\uFF0C\u57FA\u5730\u5931\u5B88";
+        else if (s.hostBaseHp <= 0) reason = "\u80DC\u5229\uFF01\u654C\u65B9\u57FA\u5730\u5DF2\u6467\u6BC1";
+        else reason = "\u80DC\u5229\uFF01\u5BF9\u624B\u5DF2\u88AB\u51FB\u8D25";
+      } else {
+        if (s.hostBaseHp <= 0) reason = "\u5931\u8D25\uFF0C\u57FA\u5730\u5931\u5B88";
+        else if (s.guestBaseHp <= 0) reason = "\u80DC\u5229\uFF01\u654C\u65B9\u57FA\u5730\u5DF2\u6467\u6BC1";
+        else reason = "\u80DC\u5229\uFF01\u5BF9\u624B\u5DF2\u88AB\u51FB\u8D25";
+      }
       this.endGame(reason);
     }
   }
@@ -5389,8 +5558,10 @@ var GameEngine = class {
       return prev;
     };
     if (this.gameMode !== "biohazard") {
-      this.drawBase(ctx, this.enemyBase, true);
-      this.drawBase(ctx, this.base, false);
+      const ownBase = this.selfPid === 2 ? this.enemyBase : this.base;
+      const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
+      this.drawBase(ctx, ownBase, true);
+      this.drawBase(ctx, foeBase, false);
     }
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
@@ -5468,7 +5639,7 @@ var GameEngine = class {
     });
     this.shake = Math.min(14, this.shake + 5);
   }
-  explode(x, y, radius, damage, color) {
+  explode(x, y, radius, damage, color, srcWpn) {
     this.effects.push({
       type: "explosion",
       x,
@@ -5501,7 +5672,9 @@ var GameEngine = class {
             e,
             damage * (0.5 + fall * 0.5),
             Math.cos(a) * 260 * fall,
-            Math.sin(a) * 260 * fall
+            Math.sin(a) * 260 * fall,
+            false,
+            { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) }
           );
         }
       }
@@ -5537,16 +5710,33 @@ var GameEngine = class {
   updateParticles(dt) {
     const next = [];
     for (const p of this.particles) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      if (p.gravity) p.vy += p.gravity * dt;
-      else {
-        p.vx *= 0.92;
-        p.vy *= 0.92;
+      if (p.coin) {
+        if (!p.landed) {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          if (p.gravity) p.vy += p.gravity * dt;
+          p.flight = (p.flight ?? 0) - dt;
+          if (p.flight <= 0) {
+            p.landed = true;
+            p.vx = 0;
+            p.vy = 0;
+          }
+        }
+        if (p.spin !== void 0) p.spin += dt * 12;
+        p.life -= dt;
+        if (p.life > 0) next.push(p);
+      } else {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.gravity) p.vy += p.gravity * dt;
+        else {
+          p.vx *= 0.92;
+          p.vy *= 0.92;
+        }
+        if (p.spin !== void 0) p.spin += dt * 12;
+        p.life -= dt;
+        if (p.life > 0) next.push(p);
       }
-      if (p.spin !== void 0) p.spin += dt * 12;
-      p.life -= dt;
-      if (p.life > 0) next.push(p);
     }
     this.particles = next;
   }
@@ -5927,12 +6117,14 @@ var GameEngine = class {
       dashChargePct,
       effects: this.getEffects(),
       gadgets,
-      // Each side shows ITS OWN base as "己方基地". On the guest, its own base
-      // is the top one (this.enemyBase), so the mapping is swapped vs the host.
-      baseHp: Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)),
-      baseMaxHp: this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)),
-      enemyBaseMaxHp: this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp,
+      // Each side shows ITS OWN base as "己方基地". The joiner (pid 2) defends
+      // the top base (this.enemyBase); the creator (pid 1) defends the bottom
+      // one (this.base). Use selfPid (not mode) so the authoritative path — where
+      // BOTH peers run as "guest" — still orients each client correctly.
+      baseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.enemyBase.hp : this.base.hp)),
+      baseMaxHp: this.selfPid === 2 ? this.enemyBase.maxHp : this.base.maxHp,
+      enemyBaseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.base.hp : this.enemyBase.hp)),
+      enemyBaseMaxHp: this.selfPid === 2 ? this.base.maxHp : this.enemyBase.maxHp,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
@@ -6001,6 +6193,7 @@ var GameEngine = class {
       }
     }
     this.drawAimPreview(ctx);
+    if (this.gun.aimIndicator) this.drawLauncherIndicator(ctx);
     this.drawBullets(ctx);
     this.drawEffects(ctx);
     ctx.restore();
@@ -6014,8 +6207,8 @@ var GameEngine = class {
     g.addColorStop(1, theme.bgBottom);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, this.W, this.H);
-    const myBase = this.mode === "guest" ? this.enemyBase : this.base;
-    const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
+    const myBase = this.selfPid === 2 ? this.enemyBase : this.base;
+    const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
     const blobs = [
       [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
       [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"]
@@ -6508,13 +6701,15 @@ var GameEngine = class {
     for (const p of this.particles) {
       const a = Math.max(0, p.life / p.maxLife);
       if (p.coin) {
-        const w = Math.abs(Math.cos(p.spin ?? 0)) * p.size + 1;
+        const flightA = Math.min(1, Math.max(0, p.life / 0.3));
+        const w = p.landed ? p.size * 1.3 : Math.abs(Math.cos(p.spin ?? 0)) * p.size + 1;
+        const h = p.landed ? p.size * 0.5 : p.size;
         ctx.globalCompositeOperation = "source-over";
-        ctx.fillStyle = rgba(p.color, Math.min(1, a * 1.5));
+        ctx.fillStyle = rgba(p.color, Math.min(1, a * 1.5) * flightA);
         ctx.beginPath();
-        ctx.ellipse(p.x, p.y, w, p.size, 0, 0, Math.PI * 2);
+        ctx.ellipse(p.x, p.y, w, h, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = rgba("#92400e", a);
+        ctx.strokeStyle = rgba("#92400e", a * flightA);
         ctx.lineWidth = 0.8;
         ctx.stroke();
         ctx.globalCompositeOperation = "lighter";
@@ -6847,6 +7042,53 @@ var GameEngine = class {
       ctx.restore();
     }
   }
+  /** Jagged, flickering ring used for explosive coin-bursts. */
+  drawJaggedRing(ctx, x, y, r, color, alpha, lw) {
+    const n = 30;
+    ctx.strokeStyle = rgba(color, alpha);
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = i / n * Math.PI * 2;
+      const jr = r * (1 + Math.sin(a * 5 + this.time * 12) * 0.07 + (Math.random() - 0.5) * 0.06);
+      const px = x + Math.cos(a) * jr;
+      const py = y + Math.sin(a) * jr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+  /** A single animated, forked lightning bolt drawn along +x from the origin.
+   *  Uses this.time + per-frame jitter so it crackles like a living whip. */
+  drawBolt(ctx, len, lateral, color, core, life, seed) {
+    const segs = 8;
+    const jag = (1 - life) * 13 + 3;
+    const tip = lateral + Math.sin(this.time * 24 + seed) * 7 * (1 - life);
+    const yAt = (f) => lateral * (1 - f) + tip * f + Math.sin(f * 8 + this.time * 20 + seed) * jag * Math.sin(f * Math.PI) + (Math.random() - 0.5) * (1 - life) * 6;
+    const path = (col, lw) => {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      ctx.moveTo(0, lateral * 0.25);
+      for (let i = 1; i <= segs; i++) {
+        const f = i / segs;
+        ctx.lineTo(len * f, yAt(f));
+      }
+      ctx.stroke();
+    };
+    path(rgba(color, (1 - life) * 0.7), 4 * (1 - life) + 1.5);
+    path(rgba(core, (1 - life) * 0.95), 1.6 * (1 - life) + 0.6);
+    const fk = 0.55;
+    const bx = len * fk;
+    const by = yAt(fk);
+    ctx.strokeStyle = rgba(core, (1 - life) * 0.5);
+    ctx.lineWidth = 1 + (1 - life);
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx + len * 0.22, by + (lateral >= 0 ? 1 : -1) * (14 + Math.random() * 10));
+    ctx.stroke();
+  }
   drawBullets(ctx) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -6933,25 +7175,48 @@ var GameEngine = class {
         ctx.arc(e.x, e.y, e.radius * (0.4 + k * 0.6), 0, Math.PI * 2);
         ctx.stroke();
       } else if (e.type === "coinburst") {
-        const r = e.radius * (0.3 + k * 1.2);
-        ctx.strokeStyle = rgba("#fde68a", (1 - k) * 0.95);
-        ctx.lineWidth = 6 * (1 - k) + 1;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.strokeStyle = rgba("#fbbf24", (1 - k) * 0.6);
-        ctx.lineWidth = 3 * (1 - k) + 0.5;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, r * 0.7, 0, Math.PI * 2);
-        ctx.stroke();
+        const style = e.style ?? "bullet";
+        const c1 = (COIN_STYLE[style] ?? COIN_STYLE.bullet)[0];
+        const c2 = (COIN_STYLE[style] ?? COIN_STYLE.bullet)[1] ?? "#fbbf24";
+        const r = e.radius * (0.3 + k * 1.25);
+        if (style === "explosive") {
+          this.drawJaggedRing(ctx, e.x, e.y, r, c1, (1 - k) * 0.95, 7 * (1 - k) + 2);
+          this.drawJaggedRing(ctx, e.x, e.y, r * 0.66, c2, (1 - k) * 0.7, 3.5 * (1 - k) + 1);
+        } else {
+          ctx.strokeStyle = rgba(c1, (1 - k) * 0.95);
+          ctx.lineWidth = 6 * (1 - k) + 1;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.strokeStyle = rgba(c2, (1 - k) * 0.6);
+          ctx.lineWidth = 3 * (1 - k) + 0.5;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r * 0.7, 0, Math.PI * 2);
+          ctx.stroke();
+        }
         const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
         rg.addColorStop(0, rgba("#ffffff", (1 - k) * 0.5));
-        rg.addColorStop(0.5, rgba("#fde68a", (1 - k) * 0.3));
-        rg.addColorStop(1, rgba("#fbbf24", 0));
+        rg.addColorStop(0.5, rgba(c1, (1 - k) * 0.3));
+        rg.addColorStop(1, rgba(c2, 0));
         ctx.fillStyle = rg;
         ctx.beginPath();
         ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
         ctx.fill();
+        const dx = e.dirX ?? 0, dy = e.dirY ?? 0;
+        const dl = Math.hypot(dx, dy);
+        if (dl > 0.01) {
+          const ang = Math.atan2(dy, dx);
+          ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.9);
+          ctx.lineWidth = 5 * (1 - k) + 1.5;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r * 0.92, ang - 0.9, ang + 0.9);
+          ctx.stroke();
+          ctx.strokeStyle = rgba(c1, (1 - k) * 0.8);
+          ctx.lineWidth = 9 * (1 - k) + 2;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r * 0.92, ang - 0.5, ang + 0.5);
+          ctx.stroke();
+        }
       } else if (e.type === "slash") {
         ctx.save();
         ctx.translate(e.x, e.y);
@@ -7008,23 +7273,20 @@ var GameEngine = class {
         ctx.rotate(e.angle ?? 0);
         ctx.globalCompositeOperation = "lighter";
         const range = e.range ?? 90;
-        const phase = e.arc ?? 0;
-        const segs = 6;
-        const bolt = (w, col) => {
-          ctx.strokeStyle = col;
-          ctx.lineWidth = w;
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          for (let i = 1; i <= segs; i++) {
-            const f = i / segs;
-            const x = range * f;
-            const y = Math.sin(f * Math.PI * 3 + phase) * 16 * (1 - f);
-            ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-        };
-        bolt(9 * (1 - k) + 2, rgba(e.color, (1 - k) * 0.7));
-        bolt(3 * (1 - k) + 1, rgba("#ffffff", (1 - k) * 0.95));
+        const life = e.t / e.duration;
+        const seed = (e.arc ?? 0) * 17.3;
+        const halo = ctx.createRadialGradient(range * 0.4, 0, 0, range * 0.4, 0, range * 0.6);
+        halo.addColorStop(0, rgba(e.color, (1 - life) * 0.22));
+        halo.addColorStop(1, rgba(e.color, 0));
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(range * 0.4, 0, range * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        const bolts = 3;
+        for (let bi = 0; bi < bolts; bi++) {
+          const lateral = (bi - (bolts - 1) / 2) * 8;
+          this.drawBolt(ctx, range, lateral, e.color, "#ffffff", life, seed + bi * 6.1);
+        }
         ctx.restore();
       } else if (e.type === "slam") {
         const r = e.radius * (0.3 + k);
@@ -7175,6 +7437,51 @@ var GameEngine = class {
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(tx, ty, 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  /** Deployable-style targeting marker for the 投射榴弹炮: a dashed line, a
+   *  max-range ring and a coverage circle sized to the blast radius. */
+  drawLauncherIndicator(ctx) {
+    if (this.gameOver || this.paused) return;
+    const p = this.player;
+    const g = this.gun;
+    const radius = g.explosionRadius ?? 60;
+    let tx = this.mouse.x;
+    let ty = this.mouse.y;
+    const maxD = (g.bulletSpeed ?? 500) * (g.life ?? 2) * 0.9;
+    let dx = tx - p.x;
+    let dy = ty - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (d > maxD) {
+      dx = dx / d * maxD;
+      dy = dy / d * maxD;
+    }
+    tx = Math.max(20, Math.min(this.worldW - 20, p.x + dx));
+    ty = Math.max(20, Math.min(this.worldH - 20, p.y + dy));
+    const col = g.glow;
+    ctx.save();
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = rgba(col, 0.5);
+    ctx.beginPath();
+    ctx.moveTo(p.x - this.camX, p.y - this.camY);
+    ctx.lineTo(tx - this.camX, ty - this.camY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = rgba(col, 0.22);
+    ctx.beginPath();
+    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = rgba(col, 0.95);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tx - this.camX, ty - this.camY, 6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }

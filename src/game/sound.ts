@@ -96,8 +96,15 @@ class SoundManager {
       case "pistol":
         this.tone(420, 0.08, "square", 0.18, 180);
         break;
-      case "smg":
-        this.tone(520, 0.05, "square", 0.1, 260);
+      case "mac11":
+        this.tone(520, 0.04, "square", 0.1, 280);
+        break;
+      case "mp5":
+        this.tone(480, 0.06, "square", 0.13, 240);
+        break;
+      case "mortar":
+        this.tone(180, 0.18, "sawtooth", 0.2, 70);
+        this.noiseBurst(0.12, 0.12, 700, 0.5);
         break;
       case "shotgun":
         this.noiseBurst(0.18, 0.35, 900, 0.6);

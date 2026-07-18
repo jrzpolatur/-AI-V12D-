@@ -44,12 +44,16 @@ export class Net {
   /** dynamic listeners (used by GameScreen, which doesn't own the Net instance) */
   private peerGoneCbs: (() => void)[] = [];
   private peerBackCbs: (() => void)[] = [];
+  private peerLeftCbs: (() => void)[] = [];
 
   onPeerGone(cb: () => void) {
     this.peerGoneCbs.push(cb);
   }
   onPeerBack(cb: () => void) {
     this.peerBackCbs.push(cb);
+  }
+  onPeerLeft(cb: () => void) {
+    this.peerLeftCbs.push(cb);
   }
 
   constructor(private events: NetEvents = {}) {}
@@ -188,7 +192,13 @@ export class Net {
         break;
       case "start":
         this.pendingFind = null;
-        this.youPid = (m as { youPid?: number }).youPid ?? this.youPid;
+        // The authoritative server sends an explicit `youPid` (1/2). The relay
+        // server does NOT, so fall back to the role derived from playerMode:
+        // host = creator = pid 1, guest = joiner = pid 2. Without this, relay
+        // clients kept youPid = 0, so the engine's selfPid became 0 and the
+        // guest could never locate its own avatar in the snapshot.
+        this.youPid =
+          (m as { youPid?: number }).youPid ?? (this.mode === "host" ? 1 : 2);
         this.setStatus("ready");
         this.events.onStart?.();
         break;
@@ -206,6 +216,7 @@ export class Net {
         break;
       case "peerLeft":
         this.events.onPeerLeft?.();
+        this.peerLeftCbs.forEach((c) => c());
         break;
       case "error":
         // a "room expired" error means our previous match is gone: forget it so

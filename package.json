@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.4.9",
+  "version": "0.4.10",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,8 @@
     "server": "node server/relay.mjs",
     "start": "node server/authoritative.mjs",
     "build:engine": "esbuild src/game/engine.ts --bundle --format=esm --platform=node --outfile=server/engine.bundle.mjs",
+    "editor": "node scripts/editor-server.mjs",
+    "extract:guns": "node scripts/extract-guns.mjs",
     "server:auth": "node server/authoritative.mjs",
     "smoke:server": "node scripts/smoke-server.mjs",
     "smoke:ws": "node scripts/smoke-ws.mjs"

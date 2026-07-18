@@ -7,8 +7,8 @@ const loadoutA = {
   characterId: "raider",
   outfitId: "tactical",
   skillId: "dash",
-  gunId: "smg",
-  gunIds: ["smg", "akm"],
+  gunId: "mac11",
+  gunIds: ["mac11", "akm"],
   gadgetIds: ["turret_mg", "mine_explosive", "glue_grenade"],
   gameMode: "defense",
 };
@@ -17,7 +17,7 @@ const loadoutB = {
   outfitId: "night",
   skillId: "shield",
   gunId: "akm",
-  gunIds: ["akm", "smg"],
+  gunIds: ["akm", "mac11"],
   gadgetIds: ["turret_cannon", "mine_poison", "fire_grenade"],
   gameMode: "defense",
 };

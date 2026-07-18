@@ -6,6 +6,35 @@ import { RUNTIME } from "./runtimeConfig";
 import type { NetMode, InputFrame, Snapshot, SnapPlayer } from "../net/protocol";
 import type { Net } from "../net/Net";
 
+/** Coin-burst palettes keyed by kill style (drives ring tint + coin colors). */
+const COIN_STYLE: Record<string, string[]> = {
+  whip: ["#7dd3fc", "#e0f2fe", "#a5f3fc", "#fbbf24"],
+  saber: ["#a5b4fc", "#c7d2fe", "#fde68a", "#ffffff"],
+  explosive: ["#fb923c", "#fca5a5", "#fbbf24", "#fde68a"],
+  fire: ["#fb923c", "#f97316", "#fde68a", "#fbbf24"],
+  poison: ["#a3e635", "#84cc16", "#bef264", "#fde68a"],
+  pierce: ["#fbbf24", "#fde68a", "#fcd34d"],
+  rapid: ["#fde68a", "#fbbf24", "#fcd34d"],
+  bullet: ["#fbbf24", "#fde68a"],
+};
+
+/** Map a weapon id to a coin-burst kill style. */
+function killStyleOf(w: string): string {
+  if (!w) return "bullet";
+  if (w === "lightning_whip") return "whip";
+  if (w === "lightsaber") return "saber";
+  if (w === "rocket" || w === "mgl32" || w === "grenade" || w.startsWith("explosive") || w === "mortar") return "explosive";
+  if (w === "flamethrower" || w === "fire_grenade" || w === "mine_fire") return "fire";
+  if (w === "poison_mist" || w === "mine_poison") return "poison";
+  if (w === "recurve_bow" || w === "drone" || w === "spear") return "pierce";
+  if (
+    w === "gatling" || w === "pulse" || w === "akm" || w === "fcar" ||
+    w === "shak50" || w === "sa1216" || w === "mac11" || w === "mp5" || w === "silenced_pistol" ||
+    w === "r357" || w === "gold_barrett"
+  ) return "rapid";
+  return "bullet";
+}
+
 export interface Loadout {
   characterId: string;
   outfitId: string;
@@ -183,6 +212,8 @@ interface Bullet {
   /** sideways drift velocity so parallel shots fan apart over flight (px/s) */
   driftX?: number;
   driftY?: number;
+  /** weapon id that fired this bullet (for styled coin-burst kill FX) */
+  weapon?: string;
 }
 
 interface Enemy {
@@ -245,6 +276,8 @@ interface Enemy {
   /** spore cloud params */
   cloudRadius?: number;
   cloudDamage?: number;
+  /** what landed the killing blow — used to style the coin-burst FX (non-biohazard) */
+  lastSrc?: { weapon: string; dx: number; dy: number };
 }
 
 interface EnemyBullet {
@@ -275,6 +308,12 @@ interface Particle {
   /** whether this particle renders as a spinning coin */
   coin?: boolean;
   spin?: number;
+  /** remaining flight time before the coin "lands" on the ground */
+  flight?: number;
+  /** remaining time the landed coin lingers on the ground */
+  rest?: number;
+  /** true once the coin has landed and is resting */
+  landed?: boolean;
 }
 
 interface Effect {
@@ -293,6 +332,10 @@ interface Effect {
   slow?: number;
   /** enemies already inside (for field effects) */
   tickT?: number;
+  /** styled coin-burst FX: kill style (whip/saber/explosive/...) + bullet direction */
+  style?: string;
+  dirX?: number;
+  dirY?: number;
 }
 
 interface Pickup {
@@ -1732,6 +1775,7 @@ export class GameEngine {
         trail: g.kind === "tracer",
         bounces: g.bounces,
         ignoreWalls: g.ignoreWalls,
+        weapon: g.id,
       });
     }
     if (g.magazine !== undefined) ws.ammo -= 1;
@@ -1744,7 +1788,7 @@ export class GameEngine {
       140,
       0.25
     );
-    if (g.id === "rocket" || g.id === "sniper" || g.id === "fcar" || g.id === "sa1216" || g.id === "mgl32") {
+    if (g.id === "rocket" || g.id === "sniper" || g.id === "fcar" || g.id === "sa1216" || g.id === "mgl32" || g.id === "mortar") {
       p.x -= Math.cos(base) * 3;
       p.y -= Math.sin(base) * 3;
       this.shake = Math.min(14, this.shake + (g.id === "rocket" || g.id === "mgl32" ? 7 : 4));
@@ -1816,7 +1860,7 @@ export class GameEngine {
       if (d <= range + e.size) {
         const ang = Math.atan2(dy, dx);
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          this.damageEnemy(e, dmg * dmgMult, Math.cos(ang) * g.knockback, Math.sin(ang) * g.knockback);
+          this.damageEnemy(e, dmg * dmgMult, Math.cos(ang) * g.knockback, Math.sin(ang) * g.knockback, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
           if (isSaber) {
             e.electrifiedTime = 0.7;
             e.electrifiedGlow = g.glow;
@@ -1887,7 +1931,7 @@ export class GameEngine {
       if (d <= radius + e.size) {
         const fall = 1 - d / (radius + e.size);
         const a = Math.atan2(e.y - p.y, e.x - p.x);
-        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), Math.cos(a) * 420, Math.sin(a) * 420);
+        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), Math.cos(a) * 420, Math.sin(a) * 420, false, { weapon: g.id, dx: Math.cos(a), dy: Math.sin(a) });
       }
     }
     // player-vs-player slam (hammer)
@@ -1922,7 +1966,9 @@ export class GameEngine {
           hit.enemy,
           g.damage * this.character.damageMult * dt,
           0,
-          0
+          0,
+          false,
+          { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) }
         );
         if (Math.random() < 0.7)
           this.spawnParticles(hit.point.x, hit.point.y, g.glow, 2, 120, 0.22);
@@ -1994,7 +2040,7 @@ export class GameEngine {
           const ang = Math.atan2(dy, dx);
           if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
             const fall = 1 - d / (range + e.size);
-            this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0);
+            this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0, false, { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) });
             e.burnT = Math.max(e.burnT, 1.2);
             e.burnDps = Math.max(e.burnDps, dps * 0.25);
           }
@@ -2152,6 +2198,7 @@ export class GameEngine {
       kind: g.kind,
       hit: new Set(),
       trail: true,
+      weapon: g.id,
     });
     sound.shoot("sniper");
     this.spawnParticles(bx, by, g.glow, 4, 120, 0.25);
@@ -2434,7 +2481,9 @@ export class GameEngine {
               e,
               b.damage,
               Math.cos(Math.atan2(b.vy, b.vx)) * b.knockback,
-              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback
+              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback,
+              false,
+              { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
             );
             if (b.pierce <= 0) {
               dead = true;
@@ -3129,7 +3178,8 @@ export class GameEngine {
     dmg: number,
     kbx: number,
     kby: number,
-    silent = false
+    silent = false,
+    src?: { weapon: string; dx?: number; dy?: number }
   ) {
     if (e.hp <= 0) return;
     dmg *= RUNTIME.playerDamageMult;
@@ -3142,6 +3192,7 @@ export class GameEngine {
     const kbScale = 0.045 / (e.type === "boss" ? 6 : 1);
     e.x += kbx * kbScale;
     e.y += kby * kbScale;
+    if (src) e.lastSrc = { weapon: src.weapon, dx: src.dx ?? 0, dy: src.dy ?? 0 };
     this.spawnParticles(
       e.x,
       e.y,
@@ -3171,47 +3222,83 @@ export class GameEngine {
     const med = e.type === "tank" || e.behavior === "brute" || e.behavior === "bloater";
     const goldAmount = big ? 80 : med ? 18 : e.type === "shooter" || e.behavior === "spitter" ? 10 : 6;
     this.gold += goldAmount;
-    // shockwave ring
-    this.effects.push({
-      type: "coinburst",
-      x: e.x,
-      y: e.y,
-      t: 0,
-      duration: 0.5,
-      radius: e.size * 3,
-      color: "#fbbf24",
-    });
-    this.effects.push({
-      type: "shock",
-      x: e.x,
-      y: e.y,
-      t: 0,
-      duration: 0.35,
-      radius: e.size * 2.4,
-      color: "#fde68a",
-    });
-    // big screen shake for impactful kills
-    this.shake = Math.min(22, this.shake + (big ? 20 : med ? 10 : 5));
-    // coin particles — spinning, gravity-affected
-    const coinCount = big ? 40 : med ? 18 : 10;
-    for (let i = 0; i < coinCount; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = 120 + Math.random() * 280;
-      this.particles.push({
-        x: e.x,
-        y: e.y,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 120,
-        life: 0.8 + Math.random() * 0.5,
-        maxLife: 1.3,
-        color: Math.random() < 0.5 ? "#fbbf24" : "#fde68a",
-        size: 2.5 + Math.random() * 2.5,
-        shrink: false,
-        gravity: 520,
-        coin: true,
-        spin: Math.random() * Math.PI * 2,
-      });
+
+    // what landed the killing blow (weapon id + bullet direction)
+    const ksrc = e.lastSrc;
+    const style = killStyleOf(ksrc?.weapon ?? "");
+    let dx = ksrc?.dx ?? 0;
+    let dy = ksrc?.dy ?? 0;
+    const dl = Math.hypot(dx, dy);
+    if (dl > 0.001) { dx /= dl; dy /= dl; } else { dx = 0; dy = 0; }
+
+    const bio = this.gameMode === "biohazard";
+    if (bio) {
+      // biohazard keeps the classic simple radial burst
+      this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.5, radius: e.size * 3, color: "#fbbf24" });
+      this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.35, radius: e.size * 2.4, color: "#fde68a" });
+      this.shake = Math.min(22, this.shake + (big ? 20 : med ? 10 : 5));
+      const coinCount = big ? 54 : med ? 26 : 14;
+      for (let i = 0; i < coinCount; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 120 + Math.random() * 280;
+        const flight = 0.35 + Math.random() * 0.15;
+        this.particles.push({
+          x: e.x, y: e.y,
+          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120,
+          life: flight + 1.0, maxLife: flight + 1.0,
+          color: Math.random() < 0.5 ? "#fbbf24" : "#fde68a",
+          size: 2.5 + Math.random() * 2.5, shrink: false,
+          gravity: 520, coin: true, spin: Math.random() * Math.PI * 2,
+          flight, rest: 1.0, landed: false,
+        });
+      }
+    } else {
+      // enhanced, weapon- & direction-aware burst (everywhere except biohazard)
+      const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
+      const ringR = e.size * (big ? 4 : style === "explosive" ? 3.4 : 3);
+      // styled shockwave + coinburst (direction-aware so coins fly with the bullet)
+      this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: big ? 0.72 : 0.55, radius: ringR, color: pal[0], style, dirX: dx, dirY: dy });
+      this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.42, radius: ringR * 0.82, color: pal[1] });
+      this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
+      // directional spray of spinning coins
+      const coinCount = big ? 64 : med ? 32 : 18;
+      for (let i = 0; i < coinCount; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 140 + Math.random() * 320;
+        let vx = Math.cos(a) * sp;
+        let vy = Math.sin(a) * sp - 120;
+        if (dx !== 0 || dy !== 0) {
+          vx = vx * 0.35 + dx * sp;
+          vy = vy * 0.35 + dy * sp - 60;
+        }
+        const flight = 0.35 + Math.random() * 0.15;
+        this.particles.push({
+          x: e.x, y: e.y, vx, vy,
+          life: flight + 1.0, maxLife: flight + 1.0,
+          color: pal[(Math.random() * pal.length) | 0],
+          size: 2.5 + Math.random() * 3, shrink: false,
+          gravity: 540, coin: true, spin: Math.random() * Math.PI * 2,
+          flight, rest: 1.0, landed: false,
+        });
+      }
+      // weapon-specific flourish
+      if (style === "explosive") {
+        this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.85, radius: ringR * 1.5, color: "#fb923c", style: "explosive", dirX: dx, dirY: dy });
+        this.spawnParticles(e.x, e.y, "#fb923c", big ? 22 : 12, 330, 0.6);
+      } else if (style === "whip") {
+        this.effects.push({ type: "whip", x: e.x, y: e.y, t: 0, duration: 0.22, range: e.size * 3, radius: e.size * 3, color: "#7dd3fc", angle: dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : 0, arc: 0 });
+        this.spawnParticles(e.x, e.y, "#7dd3fc", 14, 280, 0.5);
+        this.spawnParticles(e.x, e.y, "#e0f2fe", 8, 200, 0.4);
+      } else if (style === "saber") {
+        this.spawnParticles(e.x, e.y, "#a5b4fc", 12, 260, 0.5);
+      } else if (style === "fire") {
+        this.spawnParticles(e.x, e.y, "#fb923c", 16, 240, 0.6);
+        this.spawnParticles(e.x, e.y, "#fde68a", 8, 160, 0.4);
+      } else if (style === "poison") {
+        this.spawnParticles(e.x, e.y, "#a3e635", 16, 240, 0.6);
+      }
     }
+
     // body debris particles
     this.spawnParticles(e.x, e.y, e.glow, big ? 30 : 12, 220, 0.5);
     this.spawnParticles(e.x, e.y, e.color, big ? 20 : 6, 160, 0.4);
@@ -3777,8 +3864,13 @@ export class GameEngine {
     if (this.foe)
       this.simulatePeer(this.foe, fB, this.foeGuns, this.foeGadgets, this.foeGadgetCd, dt);
     this.simulateWorld(dt);
-    if (this.gameMode !== "biohazard" && this.base.hp <= 0 && !this.gameOver)
-      this.endGame("基地失守，你输了！");
+    if (this.gameMode !== "biohazard" && !this.gameOver) {
+    // In PvP the match ends when EITHER base is destroyed — the base owner
+    // loses. The previous check only tested `this.base` (pid 1 / creator), so
+    // if the joiner's (pid 2) base fell the game would never end.
+    if (this.base.hp <= 0) this.endGame("基地失守，你输了！");
+    else if (this.enemyBase.hp <= 0) this.endGame("敌方基地已摧毁，你赢了！");
+  }
   }
 
   /** Server: begin the match once both peers are present. */
@@ -3791,7 +3883,7 @@ export class GameEngine {
   setReconnecting(v: boolean) {
     if (this.reconnecting === v) return;
     this.reconnecting = v;
-    this.syncHud();
+    this.emit(true);
   }
 
   /**
@@ -3896,10 +3988,22 @@ export class GameEngine {
       //   - my (top) base destroyed -> I lose
       //   - host (bottom) base destroyed -> I win
       //   - otherwise (host player down) -> I win
+      // Derive the outcome from the base HPs relative to THIS client's role.
+      // The snapshot's hostBaseHp/guestBaseHp are always in the creator's
+      // (pid 1) perspective, so a pid 1 client must read them oppositely to a
+      // pid 2 client. The old code assumed the guest perspective and therefore
+      // showed the host/client the wrong win/lose text.
+      const iAmJoiner = this.selfPid === 2;
       let reason: string;
-      if (s.guestBaseHp <= 0) reason = "失败，基地失守";
-      else if (s.hostBaseHp <= 0) reason = "胜利！敌方基地已摧毁";
-      else reason = "胜利！对手已被击败";
+      if (iAmJoiner) {
+        if (s.guestBaseHp <= 0) reason = "失败，基地失守";
+        else if (s.hostBaseHp <= 0) reason = "胜利！敌方基地已摧毁";
+        else reason = "胜利！对手已被击败";
+      } else {
+        if (s.hostBaseHp <= 0) reason = "失败，基地失守";
+        else if (s.guestBaseHp <= 0) reason = "胜利！敌方基地已摧毁";
+        else reason = "胜利！对手已被击败";
+      }
       this.endGame(reason);
     }
   }
@@ -3962,10 +4066,15 @@ export class GameEngine {
       return prev;
     };
 
-    // Guest: its own base is the top one (this.enemyBase), the host's is bottom.
+    // Each side renders ITS OWN base at the bottom of its own screen. The
+    // joiner (pid 2) defends the world's top base (this.enemyBase); the creator
+    // (pid 1) defends the bottom one (this.base). Use selfPid so the
+    // authoritative path (both peers run as "guest") orients correctly.
     if (this.gameMode !== "biohazard") {
-      this.drawBase(ctx, this.enemyBase, true);
-      this.drawBase(ctx, this.base, false);
+      const ownBase = this.selfPid === 2 ? this.enemyBase : this.base;
+      const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
+      this.drawBase(ctx, ownBase, true);
+      this.drawBase(ctx, foeBase, false);
     }
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
@@ -4052,7 +4161,8 @@ export class GameEngine {
     y: number,
     radius: number,
     damage: number,
-    color: string
+    color: string,
+    srcWpn?: string
   ) {
     this.effects.push({
       type: "explosion",
@@ -4086,7 +4196,9 @@ export class GameEngine {
             e,
             damage * (0.5 + fall * 0.5),
             Math.cos(a) * 260 * fall,
-            Math.sin(a) * 260 * fall
+            Math.sin(a) * 260 * fall,
+            false,
+            { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) }
           );
         }
       }
@@ -4133,16 +4245,34 @@ export class GameEngine {
   private updateParticles(dt: number) {
     const next: Particle[] = [];
     for (const p of this.particles) {
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      if (p.gravity) p.vy += p.gravity * dt;
-      else {
-        p.vx *= 0.92;
-        p.vy *= 0.92;
+      if (p.coin) {
+        // coins arc briefly, then land and linger on the ground for ~1s
+        if (!p.landed) {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          if (p.gravity) p.vy += p.gravity * dt;
+          p.flight = (p.flight ?? 0) - dt;
+          if (p.flight <= 0) {
+            p.landed = true;
+            p.vx = 0;
+            p.vy = 0;
+          }
+        }
+        if (p.spin !== undefined) p.spin += dt * 12;
+        p.life -= dt;
+        if (p.life > 0) next.push(p);
+      } else {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.gravity) p.vy += p.gravity * dt;
+        else {
+          p.vx *= 0.92;
+          p.vy *= 0.92;
+        }
+        if (p.spin !== undefined) p.spin += dt * 12;
+        p.life -= dt;
+        if (p.life > 0) next.push(p);
       }
-      if (p.spin !== undefined) p.spin += dt * 12;
-      p.life -= dt;
-      if (p.life > 0) next.push(p);
     }
     this.particles = next;
   }
@@ -4557,12 +4687,14 @@ export class GameEngine {
       dashChargePct: dashChargePct,
       effects: this.getEffects(),
       gadgets,
-      // Each side shows ITS OWN base as "己方基地". On the guest, its own base
-      // is the top one (this.enemyBase), so the mapping is swapped vs the host.
-      baseHp: Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)),
-      baseMaxHp: this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)),
-      enemyBaseMaxHp: this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp,
+      // Each side shows ITS OWN base as "己方基地". The joiner (pid 2) defends
+      // the top base (this.enemyBase); the creator (pid 1) defends the bottom
+      // one (this.base). Use selfPid (not mode) so the authoritative path — where
+      // BOTH peers run as "guest" — still orients each client correctly.
+      baseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.enemyBase.hp : this.base.hp)),
+      baseMaxHp: this.selfPid === 2 ? this.enemyBase.maxHp : this.base.maxHp,
+      enemyBaseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.base.hp : this.enemyBase.hp)),
+      enemyBaseMaxHp: this.selfPid === 2 ? this.base.maxHp : this.enemyBase.maxHp,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
@@ -4639,6 +4771,8 @@ export class GameEngine {
     }
     // gadget aiming preview (selection highlight + throw/deploy hint)
     this.drawAimPreview(ctx);
+    // weapon aim indicator (投射榴弹炮 — deployable-style target marker)
+    if (this.gun.aimIndicator) this.drawLauncherIndicator(ctx);
     this.drawBullets(ctx);
     this.drawEffects(ctx);
 
@@ -4658,8 +4792,8 @@ export class GameEngine {
 
     // blobs at base positions (in world space, but we draw in screen space)
     // own base glows blue, opponent's glows red — for both host and guest
-    const myBase = this.mode === "guest" ? this.enemyBase : this.base;
-    const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
+    const myBase = this.selfPid === 2 ? this.enemyBase : this.base;
+    const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
     const blobs: [number, number, string][] = [
       [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
       [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"],
@@ -5207,14 +5341,19 @@ export class GameEngine {
     for (const p of this.particles) {
       const a = Math.max(0, p.life / p.maxLife);
       if (p.coin) {
-        // spinning coin — draw as ellipse to simulate rotation
-        const w = Math.abs(Math.cos(p.spin ?? 0)) * p.size + 1;
+        // spinning coin — ellipse simulates rotation; once landed it lies flat
+        // and stays put, fading only in its final 0.3s on the ground.
+        const flightA = Math.min(1, Math.max(0, p.life / 0.3));
+        const w = p.landed
+          ? p.size * 1.3
+          : Math.abs(Math.cos(p.spin ?? 0)) * p.size + 1;
+        const h = p.landed ? p.size * 0.5 : p.size;
         ctx.globalCompositeOperation = "source-over";
-        ctx.fillStyle = rgba(p.color, Math.min(1, a * 1.5));
+        ctx.fillStyle = rgba(p.color, Math.min(1, a * 1.5) * flightA);
         ctx.beginPath();
-        ctx.ellipse(p.x, p.y, w, p.size, 0, 0, Math.PI * 2);
+        ctx.ellipse(p.x, p.y, w, h, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = rgba("#92400e", a);
+        ctx.strokeStyle = rgba("#92400e", a * flightA);
         ctx.lineWidth = 0.8;
         ctx.stroke();
         ctx.globalCompositeOperation = "lighter";
@@ -5587,6 +5726,77 @@ export class GameEngine {
     }
   }
 
+  /** Jagged, flickering ring used for explosive coin-bursts. */
+  private drawJaggedRing(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    r: number,
+    color: string,
+    alpha: number,
+    lw: number
+  ) {
+    const n = 30;
+    ctx.strokeStyle = rgba(color, alpha);
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const jr =
+        r * (1 + Math.sin(a * 5 + this.time * 12) * 0.07 + (Math.random() - 0.5) * 0.06);
+      const px = x + Math.cos(a) * jr;
+      const py = y + Math.sin(a) * jr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  /** A single animated, forked lightning bolt drawn along +x from the origin.
+   *  Uses this.time + per-frame jitter so it crackles like a living whip. */
+  private drawBolt(
+    ctx: CanvasRenderingContext2D,
+    len: number,
+    lateral: number,
+    color: string,
+    core: string,
+    life: number,
+    seed: number
+  ) {
+    const segs = 8;
+    const jag = (1 - life) * 13 + 3;
+    const tip = lateral + Math.sin(this.time * 24 + seed) * 7 * (1 - life);
+    const yAt = (f: number) =>
+      lateral * (1 - f) +
+      tip * f +
+      Math.sin(f * 8 + this.time * 20 + seed) * jag * Math.sin(f * Math.PI) +
+      (Math.random() - 0.5) * (1 - life) * 6;
+    const path = (col: string, lw: number) => {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      ctx.moveTo(0, lateral * 0.25);
+      for (let i = 1; i <= segs; i++) {
+        const f = i / segs;
+        ctx.lineTo(len * f, yAt(f));
+      }
+      ctx.stroke();
+    };
+    path(rgba(color, (1 - life) * 0.7), 4 * (1 - life) + 1.5);
+    path(rgba(core, (1 - life) * 0.95), 1.6 * (1 - life) + 0.6);
+    // a forking branch partway down the bolt
+    const fk = 0.55;
+    const bx = len * fk;
+    const by = yAt(fk);
+    ctx.strokeStyle = rgba(core, (1 - life) * 0.5);
+    ctx.lineWidth = 1 + (1 - life);
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx + len * 0.22, by + (lateral >= 0 ? 1 : -1) * (14 + Math.random() * 10));
+    ctx.stroke();
+  }
+
   private drawBullets(ctx: CanvasRenderingContext2D) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -5685,27 +5895,52 @@ export class GameEngine {
         ctx.arc(e.x, e.y, e.radius * (0.4 + k * 0.6), 0, Math.PI * 2);
         ctx.stroke();
       } else if (e.type === "coinburst") {
-        // expanding golden shockwave — high impact
-        const r = e.radius * (0.3 + k * 1.2);
-        ctx.strokeStyle = rgba("#fde68a", (1 - k) * 0.95);
-        ctx.lineWidth = 6 * (1 - k) + 1;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.strokeStyle = rgba("#fbbf24", (1 - k) * 0.6);
-        ctx.lineWidth = 3 * (1 - k) + 0.5;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, r * 0.7, 0, Math.PI * 2);
-        ctx.stroke();
-        // bright flash
+        // expanding shockwave — tinted by kill style, biased by bullet direction
+        const style = e.style ?? "bullet";
+        const c1 = (COIN_STYLE[style] ?? COIN_STYLE.bullet)[0];
+        const c2 = (COIN_STYLE[style] ?? COIN_STYLE.bullet)[1] ?? "#fbbf24";
+        const r = e.radius * (0.3 + k * 1.25);
+        if (style === "explosive") {
+          // aggressive jagged double ring
+          this.drawJaggedRing(ctx, e.x, e.y, r, c1, (1 - k) * 0.95, 7 * (1 - k) + 2);
+          this.drawJaggedRing(ctx, e.x, e.y, r * 0.66, c2, (1 - k) * 0.7, 3.5 * (1 - k) + 1);
+        } else {
+          ctx.strokeStyle = rgba(c1, (1 - k) * 0.95);
+          ctx.lineWidth = 6 * (1 - k) + 1;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.strokeStyle = rgba(c2, (1 - k) * 0.6);
+          ctx.lineWidth = 3 * (1 - k) + 0.5;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r * 0.7, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        // bright flash core
         const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
         rg.addColorStop(0, rgba("#ffffff", (1 - k) * 0.5));
-        rg.addColorStop(0.5, rgba("#fde68a", (1 - k) * 0.3));
-        rg.addColorStop(1, rgba("#fbbf24", 0));
+        rg.addColorStop(0.5, rgba(c1, (1 - k) * 0.3));
+        rg.addColorStop(1, rgba(c2, 0));
         ctx.fillStyle = rg;
         ctx.beginPath();
         ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
         ctx.fill();
+        // directional leading crescent — coins spray with the bullet's travel
+        const dx = e.dirX ?? 0, dy = e.dirY ?? 0;
+        const dl = Math.hypot(dx, dy);
+        if (dl > 0.01) {
+          const ang = Math.atan2(dy, dx);
+          ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.9);
+          ctx.lineWidth = 5 * (1 - k) + 1.5;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r * 0.92, ang - 0.9, ang + 0.9);
+          ctx.stroke();
+          ctx.strokeStyle = rgba(c1, (1 - k) * 0.8);
+          ctx.lineWidth = 9 * (1 - k) + 2;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, r * 0.92, ang - 0.5, ang + 0.5);
+          ctx.stroke();
+        }
       } else if (e.type === "slash") {
         ctx.save();
         ctx.translate(e.x, e.y);
@@ -5762,29 +5997,28 @@ export class GameEngine {
         ctx.fill();
         ctx.restore();
       } else if (e.type === "whip") {
-        // jagged lightning bolt slashed from the player toward the swing side
+        // living, crackling energy whip — several forking bolts + glow halo
         ctx.save();
         ctx.translate(e.x, e.y);
         ctx.rotate(e.angle ?? 0);
         ctx.globalCompositeOperation = "lighter";
         const range = e.range ?? 90;
-        const phase = e.arc ?? 0;
-        const segs = 6;
-        const bolt = (w: number, col: string) => {
-          ctx.strokeStyle = col;
-          ctx.lineWidth = w;
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          for (let i = 1; i <= segs; i++) {
-            const f = i / segs;
-            const x = range * f;
-            const y = Math.sin(f * Math.PI * 3 + phase) * 16 * (1 - f);
-            ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-        };
-        bolt(9 * (1 - k) + 2, rgba(e.color, (1 - k) * 0.7));
-        bolt(3 * (1 - k) + 1, rgba("#ffffff", (1 - k) * 0.95));
+        const life = e.t / e.duration;
+        const seed = (e.arc ?? 0) * 17.3;
+        // soft glow halo trailing the whip stroke
+        const halo = ctx.createRadialGradient(range * 0.4, 0, 0, range * 0.4, 0, range * 0.6);
+        halo.addColorStop(0, rgba(e.color, (1 - life) * 0.22));
+        halo.addColorStop(1, rgba(e.color, 0));
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(range * 0.4, 0, range * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        // multiple forking bolts so it reads as a thrashing whip, not a stiff line
+        const bolts = 3;
+        for (let bi = 0; bi < bolts; bi++) {
+          const lateral = (bi - (bolts - 1) / 2) * 8;
+          this.drawBolt(ctx, range, lateral, e.color, "#ffffff", life, seed + bi * 6.1);
+        }
         ctx.restore();
       } else if (e.type === "slam") {
         const r = e.radius * (0.3 + k);
@@ -5975,6 +6209,55 @@ export class GameEngine {
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(tx, ty, 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Deployable-style targeting marker for the 投射榴弹炮: a dashed line, a
+   *  max-range ring and a coverage circle sized to the blast radius. */
+  private drawLauncherIndicator(ctx: CanvasRenderingContext2D) {
+    if (this.gameOver || this.paused) return;
+    const p = this.player;
+    const g = this.gun;
+    const radius = g.explosionRadius ?? 60;
+    // aim point = the crosshair (world coords)
+    let tx = this.mouse.x;
+    let ty = this.mouse.y;
+    const maxD = (g.bulletSpeed ?? 500) * (g.life ?? 2) * 0.9;
+    let dx = tx - p.x;
+    let dy = ty - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (d > maxD) {
+      dx = (dx / d) * maxD;
+      dy = (dy / d) * maxD;
+    }
+    tx = Math.max(20, Math.min(this.worldW - 20, p.x + dx));
+    ty = Math.max(20, Math.min(this.worldH - 20, p.y + dy));
+    const col = g.glow;
+    ctx.save();
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = rgba(col, 0.5);
+    ctx.beginPath();
+    ctx.moveTo(p.x - this.camX, p.y - this.camY);
+    ctx.lineTo(tx - this.camX, ty - this.camY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // blast coverage at the target
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = rgba(col, 0.22);
+    ctx.beginPath();
+    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = rgba(col, 0.95);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    // center marker
+    ctx.beginPath();
+    ctx.arc(tx - this.camX, ty - this.camY, 6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }

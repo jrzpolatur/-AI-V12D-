@@ -2,14 +2,14 @@
 import { GameEngine } from "../server/engine.bundle.mjs";
 
 const loadout = (over = {}) => ({
-  characterId: "raider", outfitId: "tactical", skillId: "dash", gunId: "smg",
-  gunIds: ["smg", "akm"], gadgetIds: ["turret_mg", "mine_explosive", "glue_grenade"],
+  characterId: "raider", outfitId: "tactical", skillId: "dash", gunId: "mac11",
+  gunIds: ["mac11", "akm"], gadgetIds: ["turret_mg", "mine_explosive", "glue_grenade"],
   gameMode: "defense", ...over,
 });
 
 const eng = new GameEngine(null, loadout(), () => {}, { mode: "server" });
 eng.startHeadless();
-eng.setupServerMatch(loadout({ characterId: "juggernaut", gunId: "akm", gunIds: ["akm", "smg"] }), 1, 2);
+eng.setupServerMatch(loadout({ characterId: "juggernaut", gunId: "akm", gunIds: ["akm", "mac11"] }), 1, 2);
 eng.serverStartMatch();
 
 const fA = { keys: ["KeyD"], mx: 400, my: 300, vmx: 0, vmy: 0, firing: true, gadget: -1, weaponSwitch: false, skill: false, reload: false };

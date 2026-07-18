@@ -15,8 +15,8 @@ export default function App() {
   const [loadout, setLoadout] = useState<Loadout>({
     characterId: "raider",
     outfitId: "tactical",
-    gunId: "smg",
-    gunIds: ["smg", "sniper"],
+    gunId: "mac11",
+    gunIds: ["mac11", "sniper"],
     skillId: "dash",
     gadgetIds: ["turret_mg", "turret_cannon", "mine_explosive"],
   });

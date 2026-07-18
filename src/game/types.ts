@@ -154,6 +154,10 @@ export interface GunDef {
   // ---- range tier label for display ----
   rangeTier?: "近" | "中" | "远";
 
+  // ---- aim indicator (投射榴弹炮) ----
+  /** if true, draw a deployable-style targeting marker while this gun is active */
+  aimIndicator?: boolean;
+
   // ---- bow system (recurve bow) ----
   /** max charge time in seconds */
   maxChargeTime?: number;

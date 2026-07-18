@@ -100,8 +100,8 @@ export function drawWeapon(
       ctx.fill();
       break;
     }
-    // ---------------- SMG ----------------
-    case "smg": {
+    // ---------------- MAC11 ----------------
+    case "mac11": {
       body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
       body(10, -1.8, 7, 3.6, STEEL_L, STEEL_D, 1.5); // barrel
       block(-11, -2.4, 6, 4.8, STEEL_D, 1.5); // stock
@@ -113,6 +113,33 @@ export function drawWeapon(
       block(5, -5, 3, 1.6, STEEL_D, 0.5); // sight
       ctx.fillStyle = gun.glow;
       roundRect(ctx, 16, -1.2, 2.4, 2.4, 1);
+      ctx.fill();
+      break;
+    }
+    // ---------------- MP5 ----------------
+    case "mp5": {
+      body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
+      body(10, -1.8, 8, 3.6, STEEL_L, STEEL_D, 1.5); // longer barrel
+      block(-11, -2.4, 6, 4.8, STEEL_D, 1.5); // stock
+      ctx.save();
+      ctx.translate(2, 3);
+      ctx.rotate(0.5);
+      block(-1.6, 0, 4, 12, STEEL_D, 1.5); // magazine
+      ctx.restore();
+      block(5, -5, 3, 1.6, STEEL_D, 0.5); // sight
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 17, -1.2, 2.4, 2.4, 1);
+      ctx.fill();
+      break;
+    }
+    // ---------------- MORTAR (投射榴弹炮) ----------------
+    case "mortar": {
+      block(-3, -3, 8, 6, STEEL_D, 2); // breech
+      body(2, -3.2, 20, 6.4, STEEL_X, STEEL, 2.5); // long launch tube
+      body(20, -3.6, 3, 7.2, STEEL_L, STEEL_D, 1.5); // muzzle ring
+      block(-9, -2, 6, 4, STEEL_D, 1.5); // grip/stock
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 21, -2, 2.4, 4, 1);
       ctx.fill();
       break;
     }
@@ -1370,7 +1397,7 @@ export function drawWeaponIcon(
         ctx.closePath();
       }, glow);
       break;
-    case "smg":
+    case "mac11":
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-8.5, -2.2);
@@ -1398,6 +1425,49 @@ export function drawWeaponIcon(
         ctx.lineTo(2.2, 7);
         ctx.lineTo(-1.3, 7);
         ctx.lineTo(-1.3, 2.6);
+      });
+      break;
+    case "mp5":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8.5, -2.2);
+        ctx.lineTo(7, -2.2);
+        ctx.lineTo(7, -0.4);
+        ctx.lineTo(2, -0.4);
+        ctx.lineTo(2, 0.6);
+        ctx.lineTo(8, 0.6);
+        ctx.lineTo(8, 2.2);
+        ctx.lineTo(2, 2.2);
+        ctx.lineTo(2, 8.5);
+        ctx.lineTo(-1.5, 8.5);
+        ctx.lineTo(-1.5, 2.2);
+        ctx.lineTo(-8.5, 2.2);
+        ctx.closePath();
+      });
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(2.2, 2.6);
+        ctx.lineTo(2.2, 8);
+        ctx.lineTo(-1.3, 8);
+        ctx.lineTo(-1.3, 2.6);
+      });
+      break;
+    case "mortar":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-3, -2.4);
+        ctx.lineTo(8, -2.4);
+        ctx.lineTo(8, -0.8);
+        ctx.lineTo(1, -0.8);
+        ctx.lineTo(1, 0.8);
+        ctx.lineTo(8, 0.8);
+        ctx.lineTo(8, 2.4);
+        ctx.lineTo(-3, 2.4);
+        ctx.lineTo(-3, 1.4);
+        ctx.lineTo(-6, 1.4);
+        ctx.lineTo(-6, -1.4);
+        ctx.lineTo(-3, -1.4);
+        ctx.closePath();
       });
       break;
     case "shotgun":
