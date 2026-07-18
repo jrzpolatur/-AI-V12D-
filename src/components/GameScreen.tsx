@@ -55,6 +55,8 @@ const initialHud: HudState = {
   shieldActive: false,
   shieldCdPct: 1,
   hitFlash: 0,
+  isNet: false,
+  matchTimeLeft: null,
 };
 
 /** Small canvas that renders a weapon's vector silhouette icon. */
@@ -294,15 +296,26 @@ export default function GameScreen({
           </div>
         )}
 
-        {/* Center: wave + enemies */}
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
-            <span className="text-xs text-slate-400">波次</span>
-            <span className="text-lg font-bold text-white">{hud.wave}</span>
-            <span className="ml-2 text-xs text-slate-400">敌人</span>
-            <span className="text-lg font-bold text-rose-300">{hud.enemiesLeft}</span>
+        {/* Center: wave + enemies (single-player) OR match timer (online) */}
+        {hud.isNet ? (
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
+              <span className="text-xs text-slate-400">剩余</span>
+              <span className="text-lg font-bold text-amber-300">
+                {hud.matchTimeLeft != null ? `${Math.ceil(hud.matchTimeLeft)}s` : "--"}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
+              <span className="text-xs text-slate-400">波次</span>
+              <span className="text-lg font-bold text-white">{hud.wave}</span>
+              <span className="ml-2 text-xs text-slate-400">敌人</span>
+              <span className="text-lg font-bold text-rose-300">{hud.enemiesLeft}</span>
+            </div>
+          </div>
+        )}
 
         {/* Right: score + gold + controls */}
         <div className="flex flex-col items-end gap-1">

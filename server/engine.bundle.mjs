@@ -2439,6 +2439,7 @@ var MAX_DASH_CHARGES = 3;
 var DASH_RECHARGE = 5;
 var GADGET_DEPLOY_DIST = 240;
 var GADGET_THROW_DIST = 280;
+var MATCH_DURATION = 175;
 var EMPTY_FRAME = {
   keys: [],
   mx: 0,
@@ -2478,6 +2479,11 @@ var GameEngine = class {
   /** host-authored effects mirrored from the latest snapshot (guest/authoritative) */
   netEffects = [];
   netFxPrev = 0;
+  /** host-authored grenades + deployables mirrored so the guest can render them */
+  netGrenades = [];
+  netDeployables = [];
+  /** host clock (from the latest snapshot) so the guest can show match time left */
+  lastSnapTime = 0;
   /** stable ids for effects so the guest can keep animating them across snapshots */
   fxIds = /* @__PURE__ */ new WeakMap();
   fxSeq = 1;
@@ -3142,6 +3148,7 @@ var GameEngine = class {
     if (this.mode === "guest") {
       if (e.code === "KeyQ" || e.code === "Space") {
         this.pendSkill = true;
+        this.localSkillCooldown();
         e.preventDefault();
       } else if (e.code === "KeyR") {
         this.pendReload = true;
@@ -3190,6 +3197,7 @@ var GameEngine = class {
         if (g) {
           if (this.mode === "guest") {
             this.pendGadget = idx;
+            this.gadgetCd.set(g.id, g.cooldown);
           } else if ((this.gadgetCd.get(g.id) ?? 0) <= 0) {
             this.deployGadget(idx, this.mouse.x, this.mouse.y);
           }
@@ -3204,6 +3212,7 @@ var GameEngine = class {
     if (e.button === 2) {
       if (this.mode === "guest") {
         this.pendSkill = true;
+        this.localSkillCooldown();
         e.preventDefault();
         return;
       }
@@ -3322,6 +3331,19 @@ var GameEngine = class {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      for (const [k, v] of this.gadgetCd) {
+        if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
+      }
+      if (this.skillCd > 0) this.skillCd -= dt;
+      if (this.dashCharges < MAX_DASH_CHARGES) {
+        this.dashRecharge += dt;
+        if (this.dashRecharge >= DASH_RECHARGE) {
+          this.dashRecharge = 0;
+          this.dashCharges = Math.min(MAX_DASH_CHARGES, this.dashCharges + 1);
+        }
+      } else {
+        this.dashRecharge = 0;
+      }
       this.emit(false);
       return;
     }
@@ -5221,6 +5243,8 @@ var GameEngine = class {
         cdPct: Math.min(1, (gadgetCd.get(g.id) ?? 0) / g.cooldown),
         deployed: 0
       })),
+      ammo: this.gun.magazine !== void 0 ? this.weaponStates.get(this.gun.id)?.ammo ?? null : null,
+      magazine: this.gun.magazine ?? null,
       electrified: p.electrifiedTime ?? 0,
       electrifiedGlow: p.electrifiedGlow ?? "#38bdf8"
     };
@@ -5293,6 +5317,28 @@ var GameEngine = class {
           dirY: e.dirY
         };
       }),
+      grenades: this.grenades.map((gr) => ({
+        x: gr.x,
+        y: gr.y,
+        vx: gr.vx,
+        vy: gr.vy,
+        life: gr.life,
+        fuse: gr.fuse,
+        kind: gr.kind
+      })),
+      deployables: this.deployables.map((d) => ({
+        kind: d.kind,
+        x: d.x,
+        y: d.y,
+        angle: d.angle,
+        hp: d.hp,
+        maxHp: d.maxHp,
+        life: d.life,
+        armed: d.armed,
+        radius: d.radius,
+        color: d.color,
+        size: d.size
+      })),
       hostBaseHp: Math.max(0, Math.round(this.base.hp)),
       hostBaseMaxHp: this.base.maxHp,
       guestBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
@@ -5419,6 +5465,9 @@ var GameEngine = class {
     this.updatePickups(dt);
     this.tickRespawns(dt);
     if (this.matchLive) this.updateWaves(dt);
+    if (this.mode !== "local" && this.matchLive && !this.gameOver && this.time >= MATCH_DURATION) {
+      this.endGame("\u65F6\u95F4\u5230\uFF01");
+    }
   }
   /**
    * Authoritative fixed-step update driven by the Node server. Both peers are
@@ -5513,6 +5562,10 @@ var GameEngine = class {
       if (me.gunIndex != null && me.gunIndex >= 0 && me.gunIndex < this.guns.length) {
         this.gunIndex = me.gunIndex;
       }
+      if (me.ammo !== null && me.ammo !== void 0) {
+        const w = this.weaponStates.get(this.gun.id);
+        if (w) w.ammo = me.ammo;
+      }
       this.player.electrifiedTime = me.electrified;
       this.player.electrifiedGlow = me.electrifiedGlow;
     }
@@ -5538,6 +5591,9 @@ var GameEngine = class {
     this.gold = s.gold;
     this.peerReady = true;
     this.netEffects = s.effects ? s.effects.map((e) => ({ ...e })) : [];
+    this.netGrenades = s.grenades ? s.grenades.map((g) => ({ ...g })) : [];
+    this.netDeployables = s.deployables ? s.deployables.map((d) => ({ ...d, targets: [] })) : [];
+    this.lastSnapTime = s.time;
     this.base.hp = s.hostBaseHp;
     this.base.maxHp = s.hostBaseMaxHp;
     this.enemyBase.hp = s.guestBaseHp;
@@ -5569,7 +5625,6 @@ var GameEngine = class {
       this.endGame(reason);
     }
   }
-  /** Draw a player avatar as a colored circle + barrel (used for the foe / net). */
   /** Draw a networked player (me or foe) with the full character silhouette —
    *  including the held weapon, skin/outfit + hat — instead of the crude circle.
    *  Resolves the gun def from the player's own weapon list via `gunList`. */
@@ -5632,6 +5687,16 @@ var GameEngine = class {
     }
     this.drawWalls(ctx);
     this.drawArenaBorder(ctx);
+    {
+      const rg = this.grenades;
+      const rd = this.deployables;
+      this.grenades = this.netGrenades;
+      this.deployables = this.netDeployables;
+      this.drawGrenades(ctx);
+      this.drawDeployables(ctx);
+      this.grenades = rg;
+      this.deployables = rd;
+    }
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
       const c = getCharacter(e.character);
@@ -6071,6 +6136,7 @@ var GameEngine = class {
       p.dashTime = s.duration;
       p.iframes = Math.max(p.iframes, s.duration + 0.12);
       this.spawnParticles(p.x, p.y, s.color, 18, 200, 0.4);
+      this.pushSkillCast(p.x, p.y, s.color, p.angle);
       sound.skill();
       this.emit(true);
       return;
@@ -6106,7 +6172,22 @@ var GameEngine = class {
         break;
       }
     }
+    this.pushSkillCast(p.x, p.y, s.color, p.angle);
     this.emit(true);
+  }
+  /** Push a one-shot burst effect so a skill cast is visibly telegraphed
+   *  (rendered locally AND mirrored to the guest via the effects snapshot). */
+  pushSkillCast(x, y, color, angle) {
+    this.effects.push({ type: "skillcast", x, y, t: 0, duration: 0.5, radius: 64, color, angle });
+  }
+  /** Guest-side mirror of the skill cooldown so the HUD shows the skill/CD state
+   *  (the host is authoritative and actually runs the skill; we only age it here). */
+  localSkillCooldown() {
+    if (this.skill.id === "dash") {
+      if (this.dashCharges > 0) this.dashCharges -= 1;
+    } else {
+      this.skillCd = this.skill.cooldown;
+    }
   }
   // ----------------------------------------------------------------- HUD
   getEffects() {
@@ -6235,7 +6316,9 @@ var GameEngine = class {
       shieldMaxHp: this.gun.shieldMaxHp ?? null,
       shieldActive: p.shieldBlockTime > 0,
       shieldCdPct: p.shieldCd > 0 ? 1 - p.shieldCd / (this.gun.shieldRechargeTime ?? 8) : 1,
-      hitFlash: p.flash
+      hitFlash: p.flash,
+      isNet: this.mode !== "local",
+      matchTimeLeft: this.mode === "local" ? null : Math.max(0, MATCH_DURATION - (this.mode === "guest" ? this.lastSnapTime : this.time))
     };
     this.onHud(hud);
   }
@@ -7443,6 +7526,21 @@ var GameEngine = class {
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.radius * (0.4 + k * 0.8), 0, Math.PI * 2);
         ctx.stroke();
+      } else if (e.type === "skillcast") {
+        const r = e.radius * (0.4 + k * 1.1);
+        ctx.strokeStyle = rgba(e.color, (1 - k) * 0.9);
+        ctx.lineWidth = 4 * (1 - k) + 1.5;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
+        rg.addColorStop(0, rgba("#ffffff", (1 - k) * 0.6));
+        rg.addColorStop(0.5, rgba(e.color, (1 - k) * 0.35));
+        rg.addColorStop(1, rgba(e.color, 0));
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
     ctx.restore();

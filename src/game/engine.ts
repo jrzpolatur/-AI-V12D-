@@ -126,6 +126,10 @@ export interface HudState {
   hitFlash: number;
   /** net: opponent transiently disconnected; show "reconnecting" overlay */
   reconnecting: boolean;
+  /** true when playing an online match (host/guest) */
+  isNet: boolean;
+  /** seconds remaining in an online match (null in single-player) */
+  matchTimeLeft: number | null;
 }
 
 interface Player {
@@ -317,7 +321,7 @@ interface Particle {
 }
 
 interface Effect {
-  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip";
+  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip" | "skillcast";
   x: number;
   y: number;
   t: number;
@@ -439,6 +443,8 @@ const DASH_RECHARGE = 5; // seconds per charge
 // grenade may be placed/lobbed from the player.
 const GADGET_DEPLOY_DIST = 240;
 const GADGET_THROW_DIST = 280;
+/** Online PvP match time limit (seconds). The host ends the match at this point. */
+const MATCH_DURATION = 175;
 /** A neutral input frame used when a peer hasn't sent one yet (stand still). */
 const EMPTY_FRAME: InputFrame = {
   keys: [],
@@ -482,6 +488,11 @@ export class GameEngine {
   /** host-authored effects mirrored from the latest snapshot (guest/authoritative) */
   private netEffects: SnapEffect[] = [];
   private netFxPrev = 0;
+  /** host-authored grenades + deployables mirrored so the guest can render them */
+  private netGrenades: Grenade[] = [];
+  private netDeployables: Deployable[] = [];
+  /** host clock (from the latest snapshot) so the guest can show match time left */
+  private lastSnapTime = 0;
   /** stable ids for effects so the guest can keep animating them across snapshots */
   private fxIds = new WeakMap<object, number>();
   private fxSeq = 1;
@@ -1273,6 +1284,7 @@ export class GameEngine {
     if (this.mode === "guest") {
       if (e.code === "KeyQ" || e.code === "Space") {
         this.pendSkill = true;
+        this.localSkillCooldown();
         e.preventDefault();
       } else if (e.code === "KeyR") {
         this.pendReload = true;
@@ -1330,6 +1342,8 @@ export class GameEngine {
           if (this.mode === "guest") {
             // host will deploy at our aim position (sent via next input frame)
             this.pendGadget = idx;
+            // local visual cooldown so the HUD shows the gadget on CD
+            this.gadgetCd.set(g.id, g.cooldown);
           } else if ((this.gadgetCd.get(g.id) ?? 0) <= 0) {
             this.deployGadget(idx, this.mouse.x, this.mouse.y);
           }
@@ -1345,6 +1359,7 @@ export class GameEngine {
       // guest only records intent; host simulates the skill/shield/slam
       if (this.mode === "guest") {
         this.pendSkill = true;
+        this.localSkillCooldown();
         e.preventDefault();
         return;
       }
@@ -1493,6 +1508,21 @@ export class GameEngine {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      // tick local cooldown read-outs so the HUD shows gadget/skill/dash CD
+      // correctly (the guest runs no world sim, so it must age these itself)
+      for (const [k, v] of this.gadgetCd) {
+        if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
+      }
+      if (this.skillCd > 0) this.skillCd -= dt;
+      if (this.dashCharges < MAX_DASH_CHARGES) {
+        this.dashRecharge += dt;
+        if (this.dashRecharge >= DASH_RECHARGE) {
+          this.dashRecharge = 0;
+          this.dashCharges = Math.min(MAX_DASH_CHARGES, this.dashCharges + 1);
+        }
+      } else {
+        this.dashRecharge = 0;
+      }
       // emit(false): let the loop's ~16Hz throttle handle HUD updates (see above)
       this.emit(false);
       return;
@@ -3659,6 +3689,8 @@ export class GameEngine {
         cdPct: Math.min(1, (gadgetCd.get(g.id) ?? 0) / g.cooldown),
         deployed: 0,
       })),
+      ammo: this.gun.magazine !== undefined ? this.weaponStates.get(this.gun.id)?.ammo ?? null : null,
+      magazine: this.gun.magazine ?? null,
       electrified: p.electrifiedTime ?? 0,
       electrifiedGlow: p.electrifiedGlow ?? "#38bdf8",
     };
@@ -3734,6 +3766,28 @@ export class GameEngine {
           dirY: e.dirY,
         } satisfies SnapEffect;
       }),
+      grenades: this.grenades.map((gr) => ({
+        x: gr.x,
+        y: gr.y,
+        vx: gr.vx,
+        vy: gr.vy,
+        life: gr.life,
+        fuse: gr.fuse,
+        kind: gr.kind,
+      })),
+      deployables: this.deployables.map((d) => ({
+        kind: d.kind,
+        x: d.x,
+        y: d.y,
+        angle: d.angle,
+        hp: d.hp,
+        maxHp: d.maxHp,
+        life: d.life,
+        armed: d.armed,
+        radius: d.radius,
+        color: d.color,
+        size: d.size,
+      })),
       hostBaseHp: Math.max(0, Math.round(this.base.hp)),
       hostBaseMaxHp: this.base.maxHp,
       guestBaseHp: Math.max(0, Math.round(this.enemyBase.hp)),
@@ -3888,6 +3942,10 @@ export class GameEngine {
     this.updatePickups(dt);
     this.tickRespawns(dt);
     if (this.matchLive) this.updateWaves(dt);
+    // online PvP time limit — end the match at MATCH_DURATION seconds
+    if (this.mode !== "local" && this.matchLive && !this.gameOver && this.time >= MATCH_DURATION) {
+      this.endGame("时间到！");
+    }
   }
 
   /**
@@ -3996,6 +4054,11 @@ export class GameEngine {
       if (me.gunIndex != null && me.gunIndex >= 0 && me.gunIndex < this.guns.length) {
         this.gunIndex = me.gunIndex;
       }
+      // keep the guest's ammo read-out in sync with the host's authoritative value
+      if (me.ammo !== null && me.ammo !== undefined) {
+        const w = this.weaponStates.get(this.gun.id);
+        if (w) w.ammo = me.ammo;
+      }
       this.player.electrifiedTime = me.electrified;
       this.player.electrifiedGlow = me.electrifiedGlow;
     }
@@ -4025,6 +4088,12 @@ export class GameEngine {
     // mirror the host's visual effects so explosions / sweeps / shockwaves show
     // on the guest side too (the guest runs no world simulation of its own).
     this.netEffects = s.effects ? s.effects.map((e) => ({ ...e })) : [];
+    // mirror thrown grenades + deployed gadgets so the guest can render them
+    this.netGrenades = s.grenades ? s.grenades.map((g) => ({ ...g }) as Grenade) : [];
+    this.netDeployables = s.deployables
+      ? s.deployables.map((d) => ({ ...d, targets: [] }) as unknown as Deployable)
+      : [];
+    this.lastSnapTime = s.time;
     // Map the two world bases to OUR perspective:
     //   host's base (bottom) is the OPPONENT from the guest's side
     //   guest's base (top)   is OUR OWN base
@@ -4160,6 +4229,17 @@ export class GameEngine {
     // terrain cover walls + arena border (mirrored from the snapshot)
     this.drawWalls(ctx);
     this.drawArenaBorder(ctx);
+    // mirror the host's thrown grenades + deployed gadgets (the guest runs no sim)
+    {
+      const rg = this.grenades;
+      const rd = this.deployables;
+      this.grenades = this.netGrenades;
+      this.deployables = this.netDeployables;
+      this.drawGrenades(ctx);
+      this.drawDeployables(ctx);
+      this.grenades = rg;
+      this.deployables = rd;
+    }
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
       const c = getCharacter(e.character);
@@ -4648,6 +4728,7 @@ export class GameEngine {
       p.dashTime = s.duration;
       p.iframes = Math.max(p.iframes, s.duration + 0.12);
       this.spawnParticles(p.x, p.y, s.color, 18, 200, 0.4);
+      this.pushSkillCast(p.x, p.y, s.color, p.angle);
       sound.skill();
       this.emit(true);
       return;
@@ -4685,7 +4766,24 @@ export class GameEngine {
         break;
       }
     }
+    this.pushSkillCast(p.x, p.y, s.color, p.angle);
     this.emit(true);
+  }
+
+  /** Push a one-shot burst effect so a skill cast is visibly telegraphed
+   *  (rendered locally AND mirrored to the guest via the effects snapshot). */
+  private pushSkillCast(x: number, y: number, color: string, angle: number) {
+    this.effects.push({ type: "skillcast", x, y, t: 0, duration: 0.5, radius: 64, color, angle });
+  }
+
+  /** Guest-side mirror of the skill cooldown so the HUD shows the skill/CD state
+   *  (the host is authoritative and actually runs the skill; we only age it here). */
+  private localSkillCooldown() {
+    if (this.skill.id === "dash") {
+      if (this.dashCharges > 0) this.dashCharges -= 1;
+    } else {
+      this.skillCd = this.skill.cooldown;
+    }
   }
 
   // ----------------------------------------------------------------- HUD
@@ -4828,6 +4926,11 @@ export class GameEngine {
       shieldActive: p.shieldBlockTime > 0,
       shieldCdPct: p.shieldCd > 0 ? 1 - p.shieldCd / (this.gun.shieldRechargeTime ?? 8) : 1,
       hitFlash: p.flash,
+      isNet: this.mode !== "local",
+      matchTimeLeft:
+        this.mode === "local"
+          ? null
+          : Math.max(0, MATCH_DURATION - (this.mode === "guest" ? this.lastSnapTime : this.time)),
     };
     this.onHud(hud);
   }
@@ -6198,6 +6301,22 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.radius * (0.4 + k * 0.8), 0, Math.PI * 2);
         ctx.stroke();
+      } else if (e.type === "skillcast") {
+        // bright expanding ring + core flash when a skill is cast
+        const r = e.radius * (0.4 + k * 1.1);
+        ctx.strokeStyle = rgba(e.color, (1 - k) * 0.9);
+        ctx.lineWidth = 4 * (1 - k) + 1.5;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
+        rg.addColorStop(0, rgba("#ffffff", (1 - k) * 0.6));
+        rg.addColorStop(0.5, rgba(e.color, (1 - k) * 0.35));
+        rg.addColorStop(1, rgba(e.color, 0));
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
     ctx.restore();

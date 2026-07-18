@@ -54,6 +54,10 @@ export interface SnapPlayer {
   shieldHp: number | null;
   shieldMaxHp: number | null;
   gadgets: { id: string; ready: boolean; cdPct: number; deployed: number }[];
+  /** live magazine ammo (null for weapons without a magazine) */
+  ammo: number | null;
+  /** magazine capacity (null for weapons without a magazine) */
+  magazine: number | null;
   /** >0 = electrified by a lightsaber hit (guest renders crackling arcs) */
   electrified: number;
   electrifiedGlow: string;
@@ -82,6 +86,32 @@ export interface SnapBullet {
   glow: string;
   kind: string;
   owner: "self" | "foe" | "enemy";
+}
+
+/** A thrown grenade (mirrored so the guest can render it mid-flight). */
+export interface SnapGrenade {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  fuse: number;
+  kind: "frag" | "glue" | "fire";
+}
+
+/** A deployed gadget (turret / mine / healing station) mirrored to the guest. */
+export interface SnapDeployable {
+  kind: string; // GadgetKind
+  x: number;
+  y: number;
+  angle: number;
+  hp: number;
+  maxHp: number;
+  life: number;
+  armed: number;
+  radius: number;
+  color: string;
+  size: number;
 }
 
 /** Terrain cover walls (indestructible pillars + destructible cover). Sent every
@@ -113,6 +143,10 @@ export interface Snapshot {
   walls: SnapWall[];
   /** host-simulated visual effects mirrored to the guest (explosions, sweeps, ...) */
   effects: SnapEffect[];
+  /** thrown grenades mirrored to the guest so they render mid-flight */
+  grenades: SnapGrenade[];
+  /** deployed gadgets (turrets / mines / healing stations) mirrored to the guest */
+  deployables: SnapDeployable[];
   /** host's OWN base (bottom of the arena) */
   hostBaseHp: number;
   hostBaseMaxHp: number;
