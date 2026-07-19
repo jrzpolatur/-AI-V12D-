@@ -63,7 +63,7 @@ export default function App() {
         <h1 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-5xl font-black tracking-tight text-transparent">
           NEON STRIKE
         </h1>
-        <p className="mt-2 text-sm text-slate-400">2D 俯视角射击 · 守护基地</p>
+        <p className="mt-2 text-sm text-slate-400">2D 俯视角射击 · 生化生存与人机对战</p>
       </div>
       <div className="flex w-72 flex-col gap-3">
         <button

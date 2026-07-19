@@ -31,7 +31,7 @@ const initialHud: HudState = {
   skillCooldownPct: 1,
   skillReady: true,
   warmup: 0,
-  mode: "defense",
+  mode: "biohazard",
   dashCharges: 3,
   maxDashCharges: 3,
   dashChargePct: 1,

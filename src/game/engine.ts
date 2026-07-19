@@ -43,9 +43,9 @@ export interface Loadout {
   skillId: string;
   /** carried gadgets (max 3). Empty -> first 3 GADGETS. */
   gadgetIds?: string[];
-  /** single-player sub-mode: defend the base (default), biohazard survival,
-   *  or offline deathmatch (you + 3 AI bots, first to 15 kills wins) */
-  gameMode?: "defense" | "biohazard" | "deathmatch";
+  /** single-player sub-mode: biohazard survival, or offline deathmatch
+   *  (you + 3 AI bots, first to 15 kills wins) */
+  gameMode?: "biohazard" | "deathmatch";
 }
 
 /** One row of the deathmatch leaderboard. */
@@ -102,7 +102,7 @@ export interface HudState {
   /** gatling spin-up 0..1 (0 = cold, 1 = full fire rate) */
   warmup: number;
   /** single-player sub-mode */
-  mode: "defense" | "biohazard" | "deathmatch";
+  mode: "biohazard" | "deathmatch";
   /** deathmatch leaderboard (4 combatants). Absent in other modes. */
   dm?: DmEntry[];
   /** kill target to win the deathmatch */
@@ -624,7 +624,7 @@ export class GameEngine {
   private authoritative = false;
   private net: Net | null = null;
   /** single-player sub-mode */
-  private gameMode: "defense" | "biohazard" | "deathmatch" = "defense";
+  private gameMode: "biohazard" | "deathmatch" = "biohazard";
   private selfPid = 0;
   private peerPid = 0;
   private peerName = "";
@@ -757,7 +757,7 @@ export class GameEngine {
     this.character = getCharacter(loadout.characterId);
     this.outfit = getOutfit(loadout.outfitId);
     this.skill = getSkill(loadout.skillId);
-    this.gameMode = loadout.gameMode ?? "defense";
+    this.gameMode = loadout.gameMode ?? "biohazard";
     // Every player (single-player AND multiplayer) uses only the two weapons
     // chosen in their loadout. In multiplayer the host also tracks the foe's
     // own weapon list (this.foeGuns) so both avatars respect their own picks.
@@ -998,7 +998,7 @@ export class GameEngine {
     this.beamHit = null;
     this.flameActive = false;
     this.banner = {
-      text: this.gameMode === "biohazard" ? "生化危机 · 活下去！" : "守护基地！",
+      text: this.gameMode === "biohazard" ? "生化危机 · 活下去！" : "死亡竞赛 · 先杀 15 人获胜！",
       t: 2.2,
     };
     this.enemyId = 1;

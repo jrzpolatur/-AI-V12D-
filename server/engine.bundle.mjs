@@ -2532,7 +2532,7 @@ var GameEngine = class {
   authoritative = false;
   net = null;
   /** single-player sub-mode */
-  gameMode = "defense";
+  gameMode = "biohazard";
   selfPid = 0;
   peerPid = 0;
   peerName = "";
@@ -2650,7 +2650,7 @@ var GameEngine = class {
     this.character = getCharacter(loadout.characterId);
     this.outfit = getOutfit(loadout.outfitId);
     this.skill = getSkill(loadout.skillId);
-    this.gameMode = loadout.gameMode ?? "defense";
+    this.gameMode = loadout.gameMode ?? "biohazard";
     this.guns = loadout.gunIds && loadout.gunIds.length > 0 ? loadout.gunIds.map((id) => GUNS.find((g) => g.id === id) ?? GUNS[0]).slice(0, 2) : [GUNS.find((g) => g.id === loadout.gunId) ?? GUNS[0]];
     const chosen = (loadout.gadgetIds ?? []).map((id) => GADGETS.find((g) => g.id === id)).filter((g) => !!g).slice(0, 3);
     this.gadgets = chosen.length > 0 ? chosen : GADGETS.slice(0, 3);
@@ -2852,7 +2852,7 @@ var GameEngine = class {
     this.beamHit = null;
     this.flameActive = false;
     this.banner = {
-      text: this.gameMode === "biohazard" ? "\u751F\u5316\u5371\u673A \xB7 \u6D3B\u4E0B\u53BB\uFF01" : "\u5B88\u62A4\u57FA\u5730\uFF01",
+      text: this.gameMode === "biohazard" ? "\u751F\u5316\u5371\u673A \xB7 \u6D3B\u4E0B\u53BB\uFF01" : "\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 15 \u4EBA\u83B7\u80DC\uFF01",
       t: 2.2
     };
     this.enemyId = 1;

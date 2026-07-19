@@ -1,4 +1,4 @@
-// Shared networking types for 1v1 co-op-base-defense + PvP.
+// Shared networking types for 1v1 deathmatch PvP + co-op.
 // Kept free of engine imports so both client and (future) tooling can use them.
 
 export type NetMode = "local" | "host" | "guest" | "server";

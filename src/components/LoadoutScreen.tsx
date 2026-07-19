@@ -389,9 +389,11 @@ export default function LoadoutScreen({
     }
     return ["turret_mg", "turret_cannon", "mine_explosive"];
   });
-  const [gameMode, setGameMode] = useState<"defense" | "biohazard" | "deathmatch">(
-    () => (localStorage.getItem("dm_loadout.gameMode") as "defense" | "biohazard" | "deathmatch") || "defense"
-  );
+  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch">(() => {
+    const m = localStorage.getItem("dm_loadout.gameMode");
+    // sanitise a stale "defense" value from before the mode was removed
+    return m === "biohazard" || m === "deathmatch" ? m : "biohazard";
+  });
 
   // remember the last picked loadout so quitting & re-entering doesn't force a
   // full re-selection every time.
@@ -474,7 +476,7 @@ export default function LoadoutScreen({
             NEON STRIKE
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            2D 俯视角射击 · 守护基地 · 自由搭配人物、服饰、枪械、技能与道具
+            2D 俯视角射击 · 生化生存与人机对战 · 自由搭配人物、服饰、枪械、技能与道具
           </p>
         </header>
 
@@ -643,15 +645,6 @@ export default function LoadoutScreen({
         </div>
 
             <Section label="游戏模式（单机）">
-              <PickCard
-                active={gameMode === "defense"}
-                accent="#38bdf8"
-                onClick={() => setGameMode("defense")}
-              >
-                <span className="text-xl">🏛️</span>
-                <span className="text-xs font-semibold">守护基地</span>
-                <span className="text-[10px] text-slate-400">经典 PvE 守点</span>
-              </PickCard>
               <PickCard
                 active={gameMode === "biohazard"}
                 accent="#a3e635"
