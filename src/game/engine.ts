@@ -238,6 +238,10 @@ interface Combatant {
   wander?: number;
   strafeDir?: number;
   strafeTimer?: number;
+  /** hysteresis timer so weapon switches don't flip-flop every frame */
+  weaponCd?: number;
+  /** spacing timer between gadget deployments */
+  gadgetTimer?: number;
 }
 
 interface Bullet {
@@ -4367,7 +4371,8 @@ export class GameEngine {
     if (intent.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
     if (intent.skill) this.activateSkill();
     if (intent.reload) this.reloadCurrent();
-    if (intent.gadget >= 0) this.deployGadget(intent.gadget, this.mouse.x, this.mouse.y);
+    if (intent.gadget >= 0)
+      this.deployGadget(intent.gadget, intent.gadgetX ?? this.mouse.x, intent.gadgetY ?? this.mouse.y);
     // write bot state back
     c.gunIndex = this.gunIndex;
     c.skillCd = this.skillCd;
@@ -4398,14 +4403,29 @@ export class GameEngine {
     this.activeId = sActive;
   }
 
-  /** Bot decision-making: pick a target, aim, strafe/approach/retreat, fire,
-   *  and occasionally use a skill or deploy a gadget. Returns one-shot actions. */
+  /** Effective engagement range of a gun (px), used by bot target-range logic. */
+  private gunEffRange(g: GunDef): number {
+    if (g.weaponClass === "beam") return g.beamRange ?? 600;
+    if (g.weaponClass === "flamethrower") return g.flameRange ?? 260;
+    if (g.weaponClass === "poison_mist") return 320;
+    if (g.weaponClass === "melee" || g.weaponClass === "shield")
+      return (g.meleeRange ?? 64) + 12;
+    // bow / ranged: travel = speed * lifetime
+    return (g.bulletSpeed ?? 700) * (g.life ?? 1);
+  }
+
+  /** Bot decision-making: pick a target, lead-aim, pick the best weapon for the
+   *  distance, strafe/approach/retreat, fire aggressively on line-of-sight, and
+   *  use skills / deploy gadgets situationally. Returns one-shot actions. */
   private botThink(
     c: Combatant,
     dt: number
-  ): { weaponSwitch: boolean; skill: boolean; reload: boolean; gadget: number } {
+  ): { weaponSwitch: boolean; skill: boolean; reload: boolean; gadget: number; gadgetX?: number; gadgetY?: number } {
     const p = c.player;
-    const intent = { weaponSwitch: false, skill: false, reload: false, gadget: -1 };
+    const intent = { weaponSwitch: false, skill: false, reload: false, gadget: -1 } as {
+      weaponSwitch: boolean; skill: boolean; reload: boolean; gadget: number;
+      gadgetX?: number; gadgetY?: number;
+    };
     // pick the nearest living opponent
     let target: Player | null = null;
     let bestD = Infinity;
@@ -4422,24 +4442,53 @@ export class GameEngine {
       this.virtualMove.y = 0;
       return intent;
     }
-    // aim at the target
-    this.mouse.x = target.x;
-    this.mouse.y = target.y;
     const dist = Math.sqrt(bestD);
     const ang = Math.atan2(target.y - p.y, target.x - p.x);
-    // periodic re-decision of strafe / approach / retreat
+
+    // ---- smart weapon selection by distance (with hysteresis) ----
+    c.weaponCd = (c.weaponCd ?? 0) - dt;
+    if (c.guns.length > 1 && (c.weaponCd ?? 0) <= 0) {
+      let best = c.gunIndex;
+      let bestScore = -Infinity;
+      for (let i = 0; i < c.guns.length; i++) {
+        const gg = c.guns[i];
+        const r = this.gunEffRange(gg);
+        const dps = gg.damage * gg.fireRate * (gg.pellets ?? 1) * (gg.parallel ?? 1);
+        let score: number;
+        if (dist <= r * 1.05) {
+          // usable range: reward dps, peak when distance sits in the sweet spot
+          const util = 1 - Math.abs(dist - r * 0.6) / (r + 1);
+          score = dps * (0.5 + Math.max(0, util));
+        } else {
+          score = dps * 0.05 - (dist - r); // out of reach -> strongly penalised
+        }
+        if (score > bestScore) { bestScore = score; best = i; }
+      }
+      if (best !== c.gunIndex) {
+        this.gunIndex = best;
+        c.weaponCd = 1.2; // avoid flip-flopping between guns
+      }
+    }
+    const g = this.gun;
+
+    // ---- aim with light target leading so moving foes get hit ----
+    const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
+    this.mouse.x = target.x + target.vx * lead;
+    this.mouse.y = target.y + target.vy * lead;
+
+    // ---- periodic re-decision of strafe / approach / retreat ----
     c.strafeTimer = (c.strafeTimer ?? 0) - dt;
     if (c.strafeTimer <= 0) {
-      c.strafeTimer = 0.7 + Math.random() * 1.3;
+      c.strafeTimer = 0.6 + Math.random() * 1.0;
       const r = Math.random();
-      if (r < 0.45) c.strafeDir = c.strafeDir === 1 ? -1 : 1; // flip strafe
-      else if (r < 0.72) c.strafeDir = 0; // approach
+      if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1; // flip strafe
+      else if (r < 0.82) c.strafeDir = 0; // approach
       else c.strafeDir = 2; // retreat
     }
     let mvx = 0, mvy = 0;
     if (c.strafeDir === 0) {
       mvx = Math.cos(ang); mvy = Math.sin(ang);
-      if (dist < 170) { mvx = 0; mvy = 0; } // hold position when close
+      if (dist < 150) { mvx = 0; mvy = 0; } // hold position when point-blank
     } else if (c.strafeDir === 2) {
       mvx = -Math.cos(ang); mvy = -Math.sin(ang); // back off
     } else {
@@ -4448,30 +4497,77 @@ export class GameEngine {
     }
     this.virtualMove.x = mvx;
     this.virtualMove.y = mvy;
-    // fire if we have line of sight and are roughly aiming at the target
-    const facing = Math.abs(this.angleDiff(Math.atan2(target.y - p.y, target.x - p.x), p.angle));
+
+    // ---- fire aggressively: anything we can see, within this gun's range ----
     const los = this.botLOS(p.x, p.y, target.x, target.y);
-    const g = this.gun;
-    this.firing = los && dist < 640 && facing < 0.7;
-    // skill usage (e.g. dash to escape when an enemy is too close)
+    const inRange = dist < this.gunEffRange(g) + 40;
+    const facing = Math.abs(this.angleDiff(ang, p.angle));
+    this.firing = los && inRange && facing < 1.2;
+
+    // ---- skill usage: dash to dodge / escape, others offensively or when hurt ----
     if (c.skillCd <= 0) {
-      if (c.skill.id === "dash" && dist < 200 && Math.random() < 0.5) intent.skill = true;
-      else if (Math.random() < 0.012) intent.skill = true;
+      const lowHp = p.hp < p.maxHp * 0.45;
+      if (c.skill.id === "dash") {
+        if ((dist < 220 || lowHp) && Math.random() < 0.6) intent.skill = true;
+      } else if ((inRange && los) || lowHp) {
+        if (Math.random() < 0.25) intent.skill = true;
+      }
     }
-    // deploy a gadget occasionally when one is off cooldown
-    if (c.gadgets.length) {
+
+    // ---- gadget usage: situational, spaced out so bots don't spam ----
+    c.gadgetTimer = (c.gadgetTimer ?? 0) - dt;
+    if (c.gadgets.length && (c.gadgetTimer ?? 0) <= 0) {
       for (const gd of c.gadgets) {
-        if ((c.gadgetCd.get(gd.id) ?? 0) <= 0 && Math.random() < 0.02) {
+        if ((c.gadgetCd.get(gd.id) ?? 0) > 0) continue;
+        let deploy = false;
+        let tx = target.x, ty = target.y;
+        switch (gd.kind) {
+          case "healing_station":
+            deploy = p.hp < p.maxHp * 0.7;
+            tx = p.x; ty = p.y; // stand in it
+            break;
+          case "turret_mg":
+          case "turret_cannon":
+            deploy = dist > 180 && los; // add ranged suppression
+            tx = p.x + Math.cos(ang) * 130;
+            ty = p.y + Math.sin(ang) * 130;
+            break;
+          case "mine_explosive":
+          case "mine_poison":
+          case "mine_fire":
+            deploy = dist < 220; // trap a closing foe
+            tx = p.x + Math.cos(ang) * 90;
+            ty = p.y + Math.sin(ang) * 90;
+            break;
+          case "glue_grenade":
+          case "fire_grenade":
+            deploy = dist < 360 && los;
+            tx = target.x; ty = target.y;
+            break;
+          default:
+            deploy = los && dist < 360;
+            tx = target.x; ty = target.y;
+        }
+        if (deploy && Math.random() < 0.6) {
           intent.gadget = c.gadgets.indexOf(gd);
+          intent.gadgetX = tx;
+          intent.gadgetY = ty;
+          c.gadgetTimer = 2.5 + Math.random() * 2;
           break;
         }
       }
     }
-    // reload / swap weapon if the current mag is empty
+
+    // ---- reload / swap if the current mag is dry ----
     const ws = this.weaponStates.get(g.id)!;
     if (g.magazine !== undefined && ws.ammo <= 0 && ws.reload <= 0) {
-      if (c.guns.length > 1) intent.weaponSwitch = true;
-      else intent.reload = true;
+      if (c.guns.length > 1) {
+        const alt = c.guns.findIndex(
+          (gg, i) => i !== this.gunIndex && ((this.weaponStates.get(gg.id)?.ammo ?? 0) > 0 || gg.magazine === undefined)
+        );
+        if (alt >= 0) this.gunIndex = alt; // switch to a loaded gun
+        else intent.reload = true;
+      } else intent.reload = true;
     }
     return intent;
   }

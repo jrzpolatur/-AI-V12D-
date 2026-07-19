@@ -5807,7 +5807,8 @@ var GameEngine = class {
     if (intent.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
     if (intent.skill) this.activateSkill();
     if (intent.reload) this.reloadCurrent();
-    if (intent.gadget >= 0) this.deployGadget(intent.gadget, this.mouse.x, this.mouse.y);
+    if (intent.gadget >= 0)
+      this.deployGadget(intent.gadget, intent.gadgetX ?? this.mouse.x, intent.gadgetY ?? this.mouse.y);
     c.gunIndex = this.gunIndex;
     c.skillCd = this.skillCd;
     c.dashCharges = this.dashCharges;
@@ -5834,8 +5835,18 @@ var GameEngine = class {
     this.virtualMove.y = svmy;
     this.activeId = sActive;
   }
-  /** Bot decision-making: pick a target, aim, strafe/approach/retreat, fire,
-   *  and occasionally use a skill or deploy a gadget. Returns one-shot actions. */
+  /** Effective engagement range of a gun (px), used by bot target-range logic. */
+  gunEffRange(g) {
+    if (g.weaponClass === "beam") return g.beamRange ?? 600;
+    if (g.weaponClass === "flamethrower") return g.flameRange ?? 260;
+    if (g.weaponClass === "poison_mist") return 320;
+    if (g.weaponClass === "melee" || g.weaponClass === "shield")
+      return (g.meleeRange ?? 64) + 12;
+    return (g.bulletSpeed ?? 700) * (g.life ?? 1);
+  }
+  /** Bot decision-making: pick a target, lead-aim, pick the best weapon for the
+   *  distance, strafe/approach/retreat, fire aggressively on line-of-sight, and
+   *  use skills / deploy gadgets situationally. Returns one-shot actions. */
   botThink(c, dt) {
     const p = c.player;
     const intent = { weaponSwitch: false, skill: false, reload: false, gadget: -1 };
@@ -5857,23 +5868,50 @@ var GameEngine = class {
       this.virtualMove.y = 0;
       return intent;
     }
-    this.mouse.x = target.x;
-    this.mouse.y = target.y;
     const dist = Math.sqrt(bestD);
     const ang = Math.atan2(target.y - p.y, target.x - p.x);
+    c.weaponCd = (c.weaponCd ?? 0) - dt;
+    if (c.guns.length > 1 && (c.weaponCd ?? 0) <= 0) {
+      let best = c.gunIndex;
+      let bestScore = -Infinity;
+      for (let i = 0; i < c.guns.length; i++) {
+        const gg = c.guns[i];
+        const r = this.gunEffRange(gg);
+        const dps = gg.damage * gg.fireRate * (gg.pellets ?? 1) * (gg.parallel ?? 1);
+        let score;
+        if (dist <= r * 1.05) {
+          const util = 1 - Math.abs(dist - r * 0.6) / (r + 1);
+          score = dps * (0.5 + Math.max(0, util));
+        } else {
+          score = dps * 0.05 - (dist - r);
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          best = i;
+        }
+      }
+      if (best !== c.gunIndex) {
+        this.gunIndex = best;
+        c.weaponCd = 1.2;
+      }
+    }
+    const g = this.gun;
+    const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
+    this.mouse.x = target.x + target.vx * lead;
+    this.mouse.y = target.y + target.vy * lead;
     c.strafeTimer = (c.strafeTimer ?? 0) - dt;
     if (c.strafeTimer <= 0) {
-      c.strafeTimer = 0.7 + Math.random() * 1.3;
+      c.strafeTimer = 0.6 + Math.random() * 1;
       const r = Math.random();
-      if (r < 0.45) c.strafeDir = c.strafeDir === 1 ? -1 : 1;
-      else if (r < 0.72) c.strafeDir = 0;
+      if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1;
+      else if (r < 0.82) c.strafeDir = 0;
       else c.strafeDir = 2;
     }
     let mvx = 0, mvy = 0;
     if (c.strafeDir === 0) {
       mvx = Math.cos(ang);
       mvy = Math.sin(ang);
-      if (dist < 170) {
+      if (dist < 150) {
         mvx = 0;
         mvy = 0;
       }
@@ -5887,26 +5925,72 @@ var GameEngine = class {
     }
     this.virtualMove.x = mvx;
     this.virtualMove.y = mvy;
-    const facing = Math.abs(this.angleDiff(Math.atan2(target.y - p.y, target.x - p.x), p.angle));
     const los = this.botLOS(p.x, p.y, target.x, target.y);
-    const g = this.gun;
-    this.firing = los && dist < 640 && facing < 0.7;
+    const inRange = dist < this.gunEffRange(g) + 40;
+    const facing = Math.abs(this.angleDiff(ang, p.angle));
+    this.firing = los && inRange && facing < 1.2;
     if (c.skillCd <= 0) {
-      if (c.skill.id === "dash" && dist < 200 && Math.random() < 0.5) intent.skill = true;
-      else if (Math.random() < 0.012) intent.skill = true;
+      const lowHp = p.hp < p.maxHp * 0.45;
+      if (c.skill.id === "dash") {
+        if ((dist < 220 || lowHp) && Math.random() < 0.6) intent.skill = true;
+      } else if (inRange && los || lowHp) {
+        if (Math.random() < 0.25) intent.skill = true;
+      }
     }
-    if (c.gadgets.length) {
+    c.gadgetTimer = (c.gadgetTimer ?? 0) - dt;
+    if (c.gadgets.length && (c.gadgetTimer ?? 0) <= 0) {
       for (const gd of c.gadgets) {
-        if ((c.gadgetCd.get(gd.id) ?? 0) <= 0 && Math.random() < 0.02) {
+        if ((c.gadgetCd.get(gd.id) ?? 0) > 0) continue;
+        let deploy = false;
+        let tx = target.x, ty = target.y;
+        switch (gd.kind) {
+          case "healing_station":
+            deploy = p.hp < p.maxHp * 0.7;
+            tx = p.x;
+            ty = p.y;
+            break;
+          case "turret_mg":
+          case "turret_cannon":
+            deploy = dist > 180 && los;
+            tx = p.x + Math.cos(ang) * 130;
+            ty = p.y + Math.sin(ang) * 130;
+            break;
+          case "mine_explosive":
+          case "mine_poison":
+          case "mine_fire":
+            deploy = dist < 220;
+            tx = p.x + Math.cos(ang) * 90;
+            ty = p.y + Math.sin(ang) * 90;
+            break;
+          case "glue_grenade":
+          case "fire_grenade":
+            deploy = dist < 360 && los;
+            tx = target.x;
+            ty = target.y;
+            break;
+          default:
+            deploy = los && dist < 360;
+            tx = target.x;
+            ty = target.y;
+        }
+        if (deploy && Math.random() < 0.6) {
           intent.gadget = c.gadgets.indexOf(gd);
+          intent.gadgetX = tx;
+          intent.gadgetY = ty;
+          c.gadgetTimer = 2.5 + Math.random() * 2;
           break;
         }
       }
     }
     const ws = this.weaponStates.get(g.id);
     if (g.magazine !== void 0 && ws.ammo <= 0 && ws.reload <= 0) {
-      if (c.guns.length > 1) intent.weaponSwitch = true;
-      else intent.reload = true;
+      if (c.guns.length > 1) {
+        const alt = c.guns.findIndex(
+          (gg, i) => i !== this.gunIndex && ((this.weaponStates.get(gg.id)?.ammo ?? 0) > 0 || gg.magazine === void 0)
+        );
+        if (alt >= 0) this.gunIndex = alt;
+        else intent.reload = true;
+      } else intent.reload = true;
     }
     return intent;
   }
