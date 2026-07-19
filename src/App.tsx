@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import LoadoutScreen from "./components/LoadoutScreen";
 import GameScreen from "./components/GameScreen";
 import LobbyScreen from "./components/LobbyScreen";
@@ -20,17 +20,6 @@ export default function App() {
     skillId: "dash",
     gadgetIds: ["turret_mg", "turret_cannon", "mine_explosive"],
   });
-
-  const [fullscreen, setFullscreen] = useState(false);
-  useEffect(() => {
-    const onFs = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
-  }, []);
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.();
-  };
 
   if (screen === "game") {
     return (
@@ -59,8 +48,6 @@ export default function App() {
   if (screen === "loadout") {
     return (
       <LoadoutScreen
-        initialLoadout={loadout}
-        onChange={setLoadout}
         onConfirm={(l) => {
           setLoadout(l);
           setScreen("game");
@@ -71,13 +58,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100">
-      <button
-        onClick={toggleFullscreen}
-        className="absolute right-4 top-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
-      >
-        {fullscreen ? "退出全屏" : "全屏"}
-      </button>
+    <div className="flex min-h-screen w-full flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100">
       <div className="text-center">
         <h1 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-5xl font-black tracking-tight text-transparent">
           NEON STRIKE

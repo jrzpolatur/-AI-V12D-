@@ -54,6 +54,9 @@ const initialHud: HudState = {
   shieldActive: false,
   shieldCdPct: 1,
   hitFlash: 0,
+  reconnecting: false,
+  isNet: false,
+  matchTimeLeft: null,
 };
 
 /** Small canvas that renders a weapon's vector silhouette icon. */
@@ -131,19 +134,7 @@ export default function GameScreen({
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>(initialHud);
   const [muted, setMuted] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
   const isTouch = useMemo(() => isTouchDevice(), []);
-
-  // keep the fullscreen button in sync (e.g. Esc exits FS)
-  useEffect(() => {
-    const onFs = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
-  }, []);
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.();
-  };
 
   // ---- screen shake on hit ----
   const [shake, setShake] = useState({ x: 0, y: 0 });
@@ -222,8 +213,47 @@ export default function GameScreen({
 
       {/* ============ TOP BAR ============ */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-start justify-between p-3 sm:p-4">
-        {/* Base HP (left) + Enemy base HP — hidden in biohazard */}
-        {hud.mode === "defense" ? (
+        {/* Deathmatch leaderboard — shown instead of base bars */}
+        {hud.mode === "deathmatch" ? (
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-fuchsia-200/90">
+              <span>🤖</span>
+              <span>死亡竞赛</span>
+            </div>
+            {(hud.dm ?? []).map((e) => (
+              <div
+                key={e.id}
+                className={cn(
+                  "flex items-center gap-2 text-[11px]",
+                  e.you ? "font-bold text-white" : "text-slate-300"
+                )}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ background: e.color }}
+                />
+                <span className="w-16 truncate">{e.you ? "你" : e.name}</span>
+                <span className="tabular-nums">{e.kills}</span>
+                {e.dead && <span className="text-[9px] text-rose-400">倒下</span>}
+              </div>
+            ))}
+            <div className="text-[10px] text-slate-400">
+              先杀 {hud.dmTarget} 人胜
+            </div>
+          </div>
+        ) : hud.mode === "biohazard" ? (
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-lime-200/90">
+              <span>☣</span>
+              <span>生化危机 · 生存</span>
+            </div>
+            <div className="text-[10px] text-slate-400">消灭所有来犯尸潮</div>
+            <div className="mt-1 text-[10px] text-slate-500">
+              击杀{" "}
+              <span className="font-bold text-lime-300">{hud.kills}</span>
+            </div>
+          </div>
+        ) : (
           <div className="flex flex-col items-start gap-1">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-sky-200/90">
               <span>🏛️</span>
@@ -261,36 +291,9 @@ export default function GameScreen({
               {hud.enemyBaseHp} / {hud.enemyBaseMaxHp}
             </div>
           </div>
-        ) : hud.mode === "biohazard" ? (
-          <div className="flex flex-col items-start gap-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-lime-200/90">
-              <span>☣</span>
-              <span>生化危机 · 生存</span>
-            </div>
-            <div className="text-[10px] text-slate-400">消灭所有来犯尸潮</div>
-            <div className="mt-1 text-[10px] text-slate-500">
-              击杀{" "}
-              <span className="font-bold text-lime-300">{hud.kills}</span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-start gap-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-pink-200/90">
-              <span>🤖</span>
-              <span>人机对战</span>
-            </div>
-            <div className="text-[10px] text-slate-400">
-              你{" "}
-              <span className="font-bold text-emerald-300">{hud.kills}</span> / {hud.dmTarget} 杀
-            </div>
-            <div className="text-[10px] text-slate-400">
-              机器人{" "}
-              <span className="font-bold text-rose-300">{hud.botKills}</span> / {hud.dmTarget} 杀
-            </div>
-          </div>
         )}
 
-        {/* Center: wave + enemies (hidden in deathmatch) */}
+        {/* Center: wave + enemies — hidden in deathmatch */}
         {hud.mode !== "deathmatch" && (
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
@@ -321,13 +324,6 @@ export default function GameScreen({
               title={muted ? "开启声音" : "静音"}
             >
               {muted ? "🔇" : "🔊"}
-            </button>
-            <button
-              onClick={toggleFullscreen}
-              className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
-              title={fullscreen ? "退出全屏" : "全屏"}
-            >
-              {fullscreen ? "🗗" : "⛶"}
             </button>
             <button
               onClick={onExit}
@@ -601,7 +597,12 @@ export default function GameScreen({
               {hud.gameOverReason}
             </h2>
             <p className="mb-5 text-sm text-slate-400">
-              {hud.gameOverReason.includes("基地") ? "防线失守…" : "你倒下了…"}
+              {hud.gameOverReason.includes("基地")
+                ? "防线失守…"
+                : hud.gameOverReason.includes("获胜") ||
+                  hud.gameOverReason.includes("赢")
+                ? "胜利！"
+                : "你倒下了…"}
             </p>
             <div className="mb-5 grid grid-cols-4 gap-2">
               <Stat label="分数" value={hud.score.toLocaleString()} />
