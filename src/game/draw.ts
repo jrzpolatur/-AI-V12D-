@@ -679,6 +679,45 @@ export function drawWeapon(
       ctx.restore();
       break;
     }
+    // ---------------- LEWIS MACHINE GUN ----------------
+    case "lewis": {
+      body(-9, -4.5, 20, 9, STEEL_X, STEEL, 2.5); // receiver
+      body(9, -2, 14, 4, STEEL_L, STEEL_D, 1.5); // long barrel
+      block(11, -4, 10, 2, STEEL_D, 1); // cooling shroud
+      block(-4, -6.5, 9, 5, STEEL_D, 1.5); // pan magazine (top)
+      block(-13, -2.4, 7, 4.8, STEEL_D, 1.5); // stock
+      ctx.save();
+      ctx.translate(0, 3);
+      ctx.rotate(0.42);
+      block(-2, 0, 5, 10, STEEL_D, 2); // magazine well
+      ctx.restore();
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 24, -1, 2.6, 2.4, 1);
+      ctx.fill();
+      break;
+    }
+    // ---------------- PLASMA RIFLE ----------------
+    case "plasma_rifle": {
+      body(-6, -4.5, 18, 9, STEEL_X, STEEL, 2.5); // body
+      body(10, -2.4, 12, 4.8, STEEL_L, STEEL_D, 1.5); // barrel housing
+      block(3, -7, 10, 3, "#6d28d9", 1.5); // energy cell
+      block(5, -6.4, 6, 1, "#c4b5fd", 0.5); // cell highlight
+      block(-12, -2.4, 7, 4.8, STEEL_D, 1.5); // stock
+      ctx.save();
+      ctx.translate(0, 3);
+      ctx.rotate(0.42);
+      block(-2, 0, 5, 9, STEEL_D, 2);
+      ctx.restore();
+      // glowing plasma muzzle
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.beginPath();
+      ctx.arc(23, 0, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
     default: {
       body(-4, -4.5, gun.barrel + 6, 9, STEEL, STEEL_D, 3);
     }
@@ -2031,6 +2070,52 @@ export function drawWeaponIcon(
         ctx.closePath();
       }, rgba(glow, 0.85));
       break;
+    case "lewis":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9, -2.4);
+        ctx.lineTo(8, -2.4);
+        ctx.lineTo(8, -0.4);
+        ctx.lineTo(-2, -0.4);
+        ctx.lineTo(-2, 1);
+        ctx.lineTo(3, 1);
+        ctx.lineTo(3, 2.4);
+        ctx.lineTo(-1, 2.4);
+        ctx.lineTo(-1, 6);
+        ctx.lineTo(-3, 6);
+        ctx.lineTo(-3, 2.4);
+        ctx.lineTo(-9, 2.4);
+        ctx.closePath();
+      });
+      // pan magazine on top
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(0, -4.6, 3.2, 0, Math.PI * 2);
+      }, rgba(glow, 0.85));
+      break;
+    case "plasma_rifle":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8, -2.2);
+        ctx.lineTo(7, -2.2);
+        ctx.lineTo(7, -0.4);
+        ctx.lineTo(-2, -0.4);
+        ctx.lineTo(-2, 1);
+        ctx.lineTo(3, 1);
+        ctx.lineTo(3, 2.2);
+        ctx.lineTo(-1, 2.2);
+        ctx.lineTo(-1, 6);
+        ctx.lineTo(-3, 6);
+        ctx.lineTo(-3, 2.2);
+        ctx.lineTo(-8, 2.2);
+        ctx.closePath();
+      });
+      // glowing plasma muzzle
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(11, -1.2, 2.6, 0, Math.PI * 2);
+      }, rgba(glow, 0.9));
+      break;
     case "lightning_whip":
       // handle
       body(() => {
@@ -2174,6 +2259,15 @@ export function drawGadgetIcon(
         ctx.lineTo(-7, 2);
         ctx.lineTo(-7, -2);
         ctx.lineTo(-2, -2);
+      });
+      break;
+    case "poison_grenade":
+      sil(() => {
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        // toxic droplets rising
+        ctx.moveTo(-2, -5);
+        ctx.lineTo(0, -9);
+        ctx.lineTo(2, -5);
       });
       break;
     default:

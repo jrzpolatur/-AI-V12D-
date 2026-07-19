@@ -191,6 +191,16 @@ export interface GunDef {
   spinDown?: number;
   /** damage multiplier at zero spin (ramps to 1 at full spin) */
   spinMinMult?: number;
+
+  // ---- burst fire (e.g. plasma rifle 3-round burst) ----
+  /** rounds fired per trigger pull (semi-auto fires the whole burst at once) */
+  burst?: number;
+  /** angular spread between burst rounds in radians */
+  burstSpread?: number;
+
+  // ---- wall piercing (e.g. plasma rifle) ----
+  /** 0..1 chance each individual bullet ignores walls (passes through) */
+  wallPierceChance?: number;
 }
 
 export interface SkillDef {
@@ -214,6 +224,7 @@ export type GadgetKind =
   | "mine_fire"
   | "glue_grenade"
   | "fire_grenade"
+  | "poison_grenade"
   | "healing_station";
 
 export interface GadgetDef {

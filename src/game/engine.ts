@@ -428,7 +428,7 @@ interface Grenade {
   vy: number;
   life: number;
   fuse: number;
-  kind: "frag" | "glue" | "fire";
+  kind: "frag" | "glue" | "fire" | "poison";
 }
 
 interface Wall {
@@ -2189,85 +2189,93 @@ export class GameEngine {
     const useParallel = (g.parallel ?? 1) > 1;
     const gap = g.parallelGap ?? 8;
     const drift = g.drift ?? 0;
-    for (let i = 0; i < g.pellets; i++) {
-      let a: number;
-      let bx: number;
-      let by: number;
-      let driftX = 0;
-      let driftY = 0;
-      if (useParallel) {
-        // parallel side-by-side shots that drift apart as they travel
-        const off = i - (g.pellets - 1) / 2;
-        const lateral = off * gap;
-        bx = p.x + Math.cos(base) * (p.size + g.barrel) + Math.cos(perp) * lateral;
-        by = p.y + Math.sin(base) * (p.size + g.barrel) + Math.sin(perp) * lateral;
-        a = base;
-        const sign = off === 0 ? (i % 2 ? 1 : -1) : Math.sign(off);
-        driftX = Math.cos(perp) * drift * sign;
-        driftY = Math.sin(perp) * drift * sign;
-      } else if (g.pellets > 1) {
-        const off = (i / (g.pellets - 1) - 0.5) * 2 * g.spread;
-        a = base + off + (Math.random() - 0.5) * g.spread * 0.35;
-        bx = p.x + Math.cos(a) * (p.size + g.barrel);
-        by = p.y + Math.sin(a) * (p.size + g.barrel);
-      } else {
-        a = base + (Math.random() - 0.5) * g.spread;
-        bx = p.x + Math.cos(a) * (p.size + g.barrel);
-        by = p.y + Math.sin(a) * (p.size + g.barrel);
-      }
-      // 投射榴弹炮：不发射平行弹药，而是向瞄准落点抛射（z 轴抛物线），落地爆炸
-      if (g.id === "mortar") {
-        const tgt = this.mortarTarget(g);
-        const dist = Math.hypot(tgt.x - bx, tgt.y - by);
-        const dur = 0.5 + Math.min(0.9, dist / 1400);
+    // burst fire: a semi-auto weapon with `burst` fires that many rounds per
+    // trigger pull (e.g. the plasma rifle's 3-round burst), fanned slightly.
+    const burstCount = g.burst ?? 1;
+    for (let bI = 0; bI < burstCount; bI++) {
+      const burstSpread =
+        burstCount > 1 ? (bI - (burstCount - 1) / 2) * (g.burstSpread ?? 0.06) : 0;
+      for (let i = 0; i < g.pellets; i++) {
+        let a: number;
+        let bx: number;
+        let by: number;
+        let driftX = 0;
+        let driftY = 0;
+        if (useParallel) {
+          // parallel side-by-side shots that drift apart as they travel
+          const off = i - (g.pellets - 1) / 2;
+          const lateral = off * gap;
+          bx = p.x + Math.cos(base) * (p.size + g.barrel) + Math.cos(perp) * lateral;
+          by = p.y + Math.sin(base) * (p.size + g.barrel) + Math.sin(perp) * lateral;
+          a = base;
+          const sign = off === 0 ? (i % 2 ? 1 : -1) : Math.sign(off);
+          driftX = Math.cos(perp) * drift * sign;
+          driftY = Math.sin(perp) * drift * sign;
+        } else if (g.pellets > 1) {
+          const off = (i / (g.pellets - 1) - 0.5) * 2 * g.spread;
+          a = base + off + (Math.random() - 0.5) * g.spread * 0.35 + burstSpread;
+          bx = p.x + Math.cos(a) * (p.size + g.barrel);
+          by = p.y + Math.sin(a) * (p.size + g.barrel);
+        } else {
+          a = base + (Math.random() - 0.5) * g.spread + burstSpread;
+          bx = p.x + Math.cos(a) * (p.size + g.barrel);
+          by = p.y + Math.sin(a) * (p.size + g.barrel);
+        }
+        // 投射榴弹炮：不发射平行弹药，而是向瞄准落点抛射（z 轴抛物线），落地爆炸
+        if (g.id === "mortar") {
+          const tgt = this.mortarTarget(g);
+          const dist = Math.hypot(tgt.x - bx, tgt.y - by);
+          const dur = 0.5 + Math.min(0.9, dist / 1400);
+          this.bullets.push({
+            x: bx, y: by, vx: 0, vy: 0,
+            life: dur + 0.2,
+            damage: dmg,
+            size: (g.bulletSize ?? 8) + 2,
+            color: g.color, glow: g.glow,
+            pierce: 0, knockback: g.knockback,
+            explosive: false,
+            explosionRadius: g.explosionRadius ?? 70,
+            kind: "mortar",
+            hit: new Set<number>(),
+            owner: this.player === this.foe ? "foe" : "self",
+          ownerId: this.activeId,
+            trail: false,
+            lobSx: bx, lobSy: by, lobTx: tgt.x, lobTy: tgt.y,
+            lobDur: dur, lobT: 0, lobPeak: 50 + dist * 0.18,
+            weapon: g.id,
+          });
+          continue;
+        }
+        const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
         this.bullets.push({
-          x: bx, y: by, vx: 0, vy: 0,
-          life: dur + 0.2,
+          x: bx,
+          y: by,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          driftX,
+          driftY,
+          life: g.life,
           damage: dmg,
-          size: (g.bulletSize ?? 8) + 2,
-          color: g.color, glow: g.glow,
-          pierce: 0, knockback: g.knockback,
-          explosive: false,
-          explosionRadius: g.explosionRadius ?? 70,
-          kind: "mortar",
-          hit: new Set<number>(),
+          size: g.bulletSize,
+          color: g.color,
+          glow: g.glow,
+          pierce: g.pierce,
+          knockback: g.knockback,
+          explosive: !!g.explosive,
+          explosionRadius: g.explosionRadius ?? 0,
+          kind: g.kind,
+          hit: new Set(),
           owner: this.player === this.foe ? "foe" : "self",
-        ownerId: this.activeId,
-          trail: false,
-          lobSx: bx, lobSy: by, lobTx: tgt.x, lobTy: tgt.y,
-          lobDur: dur, lobT: 0, lobPeak: 50 + dist * 0.18,
+          ownerId: this.activeId,
+          trail: g.kind === "tracer",
+          bounces: g.bounces,
+          // wall-piercing chance (plasma rifle): each bullet may pass through walls
+          ignoreWalls: g.wallPierceChance ? Math.random() < g.wallPierceChance : g.ignoreWalls,
           weapon: g.id,
         });
-        continue;
       }
-      const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
-      this.bullets.push({
-        x: bx,
-        y: by,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
-        driftX,
-        driftY,
-        life: g.life,
-        damage: dmg,
-        size: g.bulletSize,
-        color: g.color,
-        glow: g.glow,
-        pierce: g.pierce,
-        knockback: g.knockback,
-        explosive: !!g.explosive,
-        explosionRadius: g.explosionRadius ?? 0,
-        kind: g.kind,
-        hit: new Set(),
-        owner: this.player === this.foe ? "foe" : "self",
-        ownerId: this.activeId,
-        trail: g.kind === "tracer",
-        bounces: g.bounces,
-        ignoreWalls: g.ignoreWalls,
-        weapon: g.id,
-      });
+      if (g.magazine !== undefined) ws.ammo -= 1;
     }
-    if (g.magazine !== undefined) ws.ammo -= 1;
     sound.shoot(g.id);
     this.spawnParticles(
       p.x + Math.cos(base) * (p.size + g.barrel),
@@ -3176,21 +3184,21 @@ export class GameEngine {
         }
       }
 
-      // ---- deployed turrets / stations are solid & destructible ----
+      // ---- deployed turrets / stations / mines are solid & destructible ----
       if (!dead) {
         for (const d of this.deployables) {
-          if (
-            d.kind !== "turret_mg" &&
-            d.kind !== "turret_cannon" &&
-            d.kind !== "healing_station"
-          )
-            continue;
+          const isMine =
+            d.kind === "mine_explosive" ||
+            d.kind === "mine_poison" ||
+            d.kind === "mine_fire";
           const rr = d.size + b.size + 2;
           const ddx = d.x - b.x;
           const ddy = d.y - b.y;
           if (ddx * ddx + ddy * ddy <= rr * rr) {
-            // an owner never hurts their own structure (bullets pass through)
-            if ((d.ownerId ?? -1) === (b.ownerId ?? -1)) continue;
+            // an owner never hurts their own turret/station (bullets pass
+            // through); mines can always be shot — including your own, so you
+            // can clear a misplaced one.
+            if (!isMine && (d.ownerId ?? -1) === (b.ownerId ?? -1)) continue;
             if (b.explosive) {
               this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
               dead = true;
@@ -3238,6 +3246,21 @@ export class GameEngine {
             tickT: 0,
           });
           this.spawnParticles(gr.x, gr.y, "#fb923c", 20, 200, 0.5);
+        } else if (gr.kind === "poison") {
+          // release a lingering poison cloud (same as the poison mine)
+          this.effects.push({
+            type: "poisoncloud",
+            x: gr.x,
+            y: gr.y,
+            t: 0,
+            duration: 5,
+            radius: 92,
+            color: "#84cc16",
+            dps: 60,
+            slow: 0.5,
+            tickT: 0,
+          });
+          this.spawnParticles(gr.x, gr.y, "#84cc16", 20, 200, 0.5);
         } else {
           this.explode(gr.x, gr.y, 120, 180, "#fb923c");
         }
@@ -3251,7 +3274,8 @@ export class GameEngine {
   private gadgetRange(def: GadgetDef): number {
     if (def.range) return def.range;
     const k = def.kind;
-    if (k === "glue_grenade" || k === "fire_grenade") return GADGET_THROW_DIST;
+    if (k === "glue_grenade" || k === "fire_grenade" || k === "poison_grenade")
+      return GADGET_THROW_DIST;
     return GADGET_DEPLOY_DIST;
   }
 
@@ -3355,13 +3379,13 @@ export class GameEngine {
         });
         break;
       case "mine_explosive":
-        this.deployables.push({ ...base, life: 60, radius: 56, armed: 0.8 });
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 56, armed: 0.8 });
         break;
       case "mine_poison":
-        this.deployables.push({ ...base, life: 60, radius: 70, armed: 0.8 });
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 70, armed: 0.8 });
         break;
       case "mine_fire":
-        this.deployables.push({ ...base, life: 60, radius: 70, armed: 0.8 });
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 70, armed: 0.8 });
         break;
       case "glue_grenade": {
         // throw a grenade that lands and forms a glue wall
@@ -3388,6 +3412,20 @@ export class GameEngine {
           life: sim.fuse,
           fuse: sim.fuse,
           kind: "fire",
+        });
+        break;
+      }
+      case "poison_grenade": {
+        // throw a grenade that lands and releases a lingering poison cloud
+        const sim = this.simulateThrow(p.x, p.y, px, py);
+        this.grenades.push({
+          x: p.x,
+          y: p.y,
+          vx: sim.vx,
+          vy: sim.vy,
+          life: sim.fuse,
+          fuse: sim.fuse,
+          kind: "poison",
         });
         break;
       }
@@ -3562,55 +3600,58 @@ export class GameEngine {
       }
       // mines
       if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
+        // a mine destroyed by gunfire / explosions also goes off (triggered)
+        let triggered = d.hp <= 0;
         if (d.armed <= 0) {
-          let triggered = false;
           const tryTrigger = (cx: number, cy: number, cs: number) =>
             Math.hypot(cx - d.x, cy - d.y) < cs + 24;
+          let prox = false;
           if (this.isDM) {
             for (const c of this.combatants) {
               if (c.id === (d.ownerId ?? -1)) continue;
               const q = c.player;
               if (q.deadTimer && q.deadTimer > 0) continue;
-              if (tryTrigger(q.x, q.y, q.size)) { triggered = true; break; }
+              if (tryTrigger(q.x, q.y, q.size)) { prox = true; break; }
             }
           } else {
             for (const e of this.enemies) {
-              if (tryTrigger(e.x, e.y, e.size)) { triggered = true; break; }
+              if (tryTrigger(e.x, e.y, e.size)) { prox = true; break; }
             }
           }
-          if (triggered) {
-            if (d.kind === "mine_explosive") {
-              this.explode(d.x, d.y, d.radius, 160, d.color, undefined, d.ownerId);
-            } else if (d.kind === "mine_poison") {
-              this.effects.push({
-                type: "poisoncloud",
-                x: d.x,
-                y: d.y,
-                t: 0,
-                duration: 5,
-                radius: d.radius,
-                color: d.color,
-                dps: 60,
-                slow: 0.5,
-                tickT: 0,
-              });
-            } else {
-              this.effects.push({
-                type: "firefield",
-                x: d.x,
-                y: d.y,
-                t: 0,
-                duration: 5,
-                radius: d.radius,
-                color: d.color,
-                dps: 90,
-                tickT: 0,
-              });
-            }
-            d.life = 0;
-          }
+          if (prox) triggered = true;
         }
-        if (d.life > 0) next.push(d);
+        if (triggered) {
+          if (d.kind === "mine_explosive") {
+            this.explode(d.x, d.y, d.radius, 160, d.color, undefined, d.ownerId);
+          } else if (d.kind === "mine_poison") {
+            this.effects.push({
+              type: "poisoncloud",
+              x: d.x,
+              y: d.y,
+              t: 0,
+              duration: 5,
+              radius: d.radius,
+              color: d.color,
+              dps: 60,
+              slow: 0.5,
+              tickT: 0,
+            });
+          } else {
+            this.effects.push({
+              type: "firefield",
+              x: d.x,
+              y: d.y,
+              t: 0,
+              duration: 5,
+              radius: d.radius,
+              color: d.color,
+              dps: 90,
+              tickT: 0,
+            });
+          }
+          d.life = 0;
+        }
+        if (d.life > 0 && d.hp > 0) next.push(d);
         continue;
       }
       // healing station
@@ -3675,6 +3716,17 @@ export class GameEngine {
           continue;
         }
       }
+      // enemy fire can also destroy deployed turrets / stations / mines
+      let hitDep = false;
+      for (const d of this.deployables) {
+        const rr = d.size + b.size + 2;
+        if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr * rr) {
+          this.damageDeployable(d, b.damage, undefined);
+          hitDep = true;
+          break;
+        }
+      }
+      if (hitDep) continue;
       next.push(b);
     }
     this.enemyBullets = next;
@@ -5467,16 +5519,22 @@ export class GameEngine {
           }
         }
       }
-      // splash also damages deployed turrets / stations — but never the
-      // owner's own structure.
+      // splash also damages deployed turrets / stations / mines — but never the
+      // owner's own turret/station (mines can always be caught in a blast).
       for (const d of this.deployables) {
-        if (
-          d.kind !== "turret_mg" &&
-          d.kind !== "turret_cannon" &&
-          d.kind !== "healing_station"
-        )
-          continue;
-        if ((d.ownerId ?? -1) === (ownerId ?? -1)) continue;
+        const isMine =
+          d.kind === "mine_explosive" ||
+          d.kind === "mine_poison" ||
+          d.kind === "mine_fire";
+        if (!isMine) {
+          if (
+            d.kind !== "turret_mg" &&
+            d.kind !== "turret_cannon" &&
+            d.kind !== "healing_station"
+          )
+            continue;
+          if ((d.ownerId ?? -1) === (ownerId ?? -1)) continue;
+        }
         const d2 = Math.hypot(d.x - x, d.y - y);
         if (d2 < radius + d.size) {
           const fall = 1 - d2 / (radius + d.size);
@@ -6982,14 +7040,15 @@ export class GameEngine {
       ctx.translate(gr.x, gr.y);
       const fire = gr.kind === "fire";
       const glue = gr.kind === "glue";
-      ctx.fillStyle = fire ? "#7f1d1d" : glue ? "#0e7490" : "#1f2937";
-      ctx.strokeStyle = fire ? "#fb923c" : glue ? "#22d3ee" : "#fbbf24";
+      const poison = gr.kind === "poison";
+      ctx.fillStyle = fire ? "#7f1d1d" : glue ? "#0e7490" : poison ? "#3f6212" : "#1f2937";
+      ctx.strokeStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#fbbf24";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = fire ? "#fb923c" : glue ? "#22d3ee" : "#f97316";
+      ctx.fillStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#f97316";
       ctx.fillRect(-2, -9, 4, 4);
       if (fire) {
         // little flame tongue
@@ -6997,6 +7056,12 @@ export class GameEngine {
         ctx.beginPath();
         ctx.moveTo(-1.5, -9);
         ctx.quadraticCurveTo(0, -13, 1.5, -9);
+        ctx.fill();
+      } else if (poison) {
+        // little toxic puff
+        ctx.fillStyle = "#bef264";
+        ctx.beginPath();
+        ctx.arc(0, -11, 1.6, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();

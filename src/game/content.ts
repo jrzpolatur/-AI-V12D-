@@ -250,7 +250,7 @@ export const GADGETS: GadgetDef[] = [
     iconShape: "turret_mg",
     color: "#38bdf8",
     maxStack: 3,
-    hp: 160,
+    hp: 176,
   },
   {
     id: "turret_cannon",
@@ -261,7 +261,7 @@ export const GADGETS: GadgetDef[] = [
     iconShape: "turret_cannon",
     color: "#a78bfa",
     maxStack: 2,
-    hp: 200,
+    hp: 220,
   },
   {
     id: "mine_explosive",
@@ -311,6 +311,16 @@ export const GADGETS: GadgetDef[] = [
     cooldown: 22,
     iconShape: "fire_grenade",
     color: "#fb923c",
+    maxStack: 3,
+  },
+  {
+    id: "poison_grenade",
+    kind: "poison_grenade",
+    name: "毒气手雷",
+    desc: "投掷后炸开一团滞留毒云，减速并持续毒伤范围内敌人",
+    cooldown: 20,
+    iconShape: "poison_grenade",
+    color: "#84cc16",
     maxStack: 3,
   },
   {

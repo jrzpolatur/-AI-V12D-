@@ -221,7 +221,7 @@ var guns_default = [
     kind: "tracer",
     barrel: 22,
     beamRange: 780,
-    heatPerShot: 0.62,
+    heatPerShot: 0.73,
     coolRate: 0.5,
     rangeTier: "\u4E2D"
   },
@@ -613,6 +613,58 @@ var guns_default = [
     whip: true,
     slowOnHit: 2,
     rangeTier: "\u8FD1"
+  },
+  {
+    id: "plasma_rifle",
+    name: "\u7535\u6D46\u6B65\u67AA",
+    desc: "\u534A\u81EA\u52A8\u4E09\u8FDE\u53D1\u7B49\u79BB\u5B50\u6B65\u67AA\uFF1A\u5F39\u4F53\u7855\u5927\u547D\u4E2D\u7387\u9AD8\uFF0C\u7EA6 1/4 \u5B50\u5F39\u53EF\u8D2F\u7A7F\u5899\u4F53",
+    weaponClass: "ranged",
+    shape: "plasma_rifle",
+    iconShape: "plasma_rifle",
+    damage: 34,
+    fireRate: 4.5,
+    bulletSpeed: 980,
+    bulletSize: 8,
+    spread: 0.02,
+    pellets: 1,
+    pierce: 0,
+    life: 1.2,
+    knockback: 120,
+    color: "#c4b5fd",
+    glow: "#a78bfa",
+    kind: "tracer",
+    semiAuto: true,
+    burst: 3,
+    burstSpread: 0.06,
+    wallPierceChance: 0.25,
+    barrel: 24,
+    magazine: 27,
+    reloadTime: 2.2,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "lewis",
+    name: "\u5218\u6613\u65AF\u673A\u67AA",
+    desc: "\u7ECF\u5178\u6C14\u51B7\u8F7B\u673A\u67AA\uFF1A\u9AD8\u4F24\u5BB3\u3001\u4E2D\u5C04\u901F\u3001\u5F39\u9F13\u5BB9\u91CF\u5927\uFF0C\u6563\u5E03\u7565\u5BBD",
+    weaponClass: "ranged",
+    shape: "lewis",
+    iconShape: "lewis",
+    damage: 30,
+    fireRate: 9,
+    bulletSpeed: 900,
+    bulletSize: 6,
+    spread: 0.06,
+    pellets: 1,
+    pierce: 0,
+    life: 1.2,
+    knockback: 140,
+    color: "#fde68a",
+    glow: "#f59e0b",
+    kind: "tracer",
+    barrel: 26,
+    magazine: 60,
+    reloadTime: 3.2,
+    rangeTier: "\u4E2D"
   }
 ];
 
@@ -843,7 +895,7 @@ var GADGETS = [
     iconShape: "turret_mg",
     color: "#38bdf8",
     maxStack: 3,
-    hp: 160
+    hp: 176
   },
   {
     id: "turret_cannon",
@@ -854,7 +906,7 @@ var GADGETS = [
     iconShape: "turret_cannon",
     color: "#a78bfa",
     maxStack: 2,
-    hp: 200
+    hp: 220
   },
   {
     id: "mine_explosive",
@@ -904,6 +956,16 @@ var GADGETS = [
     cooldown: 22,
     iconShape: "fire_grenade",
     color: "#fb923c",
+    maxStack: 3
+  },
+  {
+    id: "poison_grenade",
+    kind: "poison_grenade",
+    name: "\u6BD2\u6C14\u624B\u96F7",
+    desc: "\u6295\u63B7\u540E\u70B8\u5F00\u4E00\u56E2\u6EDE\u7559\u6BD2\u4E91\uFF0C\u51CF\u901F\u5E76\u6301\u7EED\u6BD2\u4F24\u8303\u56F4\u5185\u654C\u4EBA",
+    cooldown: 20,
+    iconShape: "poison_grenade",
+    color: "#84cc16",
     maxStack: 3
   },
   {
@@ -1704,6 +1766,44 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
         ctx.arc(px, Math.sin(i * 2 + t * 2) * 4, rr, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.restore();
+      break;
+    }
+    // ---------------- LEWIS MACHINE GUN ----------------
+    case "lewis": {
+      body(-9, -4.5, 20, 9, STEEL_X, STEEL, 2.5);
+      body(9, -2, 14, 4, STEEL_L, STEEL_D, 1.5);
+      block(11, -4, 10, 2, STEEL_D, 1);
+      block(-4, -6.5, 9, 5, STEEL_D, 1.5);
+      block(-13, -2.4, 7, 4.8, STEEL_D, 1.5);
+      ctx.save();
+      ctx.translate(0, 3);
+      ctx.rotate(0.42);
+      block(-2, 0, 5, 10, STEEL_D, 2);
+      ctx.restore();
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 24, -1, 2.6, 2.4, 1);
+      ctx.fill();
+      break;
+    }
+    // ---------------- PLASMA RIFLE ----------------
+    case "plasma_rifle": {
+      body(-6, -4.5, 18, 9, STEEL_X, STEEL, 2.5);
+      body(10, -2.4, 12, 4.8, STEEL_L, STEEL_D, 1.5);
+      block(3, -7, 10, 3, "#6d28d9", 1.5);
+      block(5, -6.4, 6, 1, "#c4b5fd", 0.5);
+      block(-12, -2.4, 7, 4.8, STEEL_D, 1.5);
+      ctx.save();
+      ctx.translate(0, 3);
+      ctx.rotate(0.42);
+      block(-2, 0, 5, 9, STEEL_D, 2);
+      ctx.restore();
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.beginPath();
+      ctx.arc(23, 0, 3.4, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
       break;
     }
@@ -3846,93 +3946,98 @@ var GameEngine = class {
     const useParallel = (g.parallel ?? 1) > 1;
     const gap = g.parallelGap ?? 8;
     const drift = g.drift ?? 0;
-    for (let i = 0; i < g.pellets; i++) {
-      let a;
-      let bx;
-      let by;
-      let driftX = 0;
-      let driftY = 0;
-      if (useParallel) {
-        const off = i - (g.pellets - 1) / 2;
-        const lateral = off * gap;
-        bx = p.x + Math.cos(base) * (p.size + g.barrel) + Math.cos(perp) * lateral;
-        by = p.y + Math.sin(base) * (p.size + g.barrel) + Math.sin(perp) * lateral;
-        a = base;
-        const sign = off === 0 ? i % 2 ? 1 : -1 : Math.sign(off);
-        driftX = Math.cos(perp) * drift * sign;
-        driftY = Math.sin(perp) * drift * sign;
-      } else if (g.pellets > 1) {
-        const off = (i / (g.pellets - 1) - 0.5) * 2 * g.spread;
-        a = base + off + (Math.random() - 0.5) * g.spread * 0.35;
-        bx = p.x + Math.cos(a) * (p.size + g.barrel);
-        by = p.y + Math.sin(a) * (p.size + g.barrel);
-      } else {
-        a = base + (Math.random() - 0.5) * g.spread;
-        bx = p.x + Math.cos(a) * (p.size + g.barrel);
-        by = p.y + Math.sin(a) * (p.size + g.barrel);
-      }
-      if (g.id === "mortar") {
-        const tgt = this.mortarTarget(g);
-        const dist = Math.hypot(tgt.x - bx, tgt.y - by);
-        const dur = 0.5 + Math.min(0.9, dist / 1400);
+    const burstCount = g.burst ?? 1;
+    for (let bI = 0; bI < burstCount; bI++) {
+      const burstSpread = burstCount > 1 ? (bI - (burstCount - 1) / 2) * (g.burstSpread ?? 0.06) : 0;
+      for (let i = 0; i < g.pellets; i++) {
+        let a;
+        let bx;
+        let by;
+        let driftX = 0;
+        let driftY = 0;
+        if (useParallel) {
+          const off = i - (g.pellets - 1) / 2;
+          const lateral = off * gap;
+          bx = p.x + Math.cos(base) * (p.size + g.barrel) + Math.cos(perp) * lateral;
+          by = p.y + Math.sin(base) * (p.size + g.barrel) + Math.sin(perp) * lateral;
+          a = base;
+          const sign = off === 0 ? i % 2 ? 1 : -1 : Math.sign(off);
+          driftX = Math.cos(perp) * drift * sign;
+          driftY = Math.sin(perp) * drift * sign;
+        } else if (g.pellets > 1) {
+          const off = (i / (g.pellets - 1) - 0.5) * 2 * g.spread;
+          a = base + off + (Math.random() - 0.5) * g.spread * 0.35 + burstSpread;
+          bx = p.x + Math.cos(a) * (p.size + g.barrel);
+          by = p.y + Math.sin(a) * (p.size + g.barrel);
+        } else {
+          a = base + (Math.random() - 0.5) * g.spread + burstSpread;
+          bx = p.x + Math.cos(a) * (p.size + g.barrel);
+          by = p.y + Math.sin(a) * (p.size + g.barrel);
+        }
+        if (g.id === "mortar") {
+          const tgt = this.mortarTarget(g);
+          const dist = Math.hypot(tgt.x - bx, tgt.y - by);
+          const dur = 0.5 + Math.min(0.9, dist / 1400);
+          this.bullets.push({
+            x: bx,
+            y: by,
+            vx: 0,
+            vy: 0,
+            life: dur + 0.2,
+            damage: dmg,
+            size: (g.bulletSize ?? 8) + 2,
+            color: g.color,
+            glow: g.glow,
+            pierce: 0,
+            knockback: g.knockback,
+            explosive: false,
+            explosionRadius: g.explosionRadius ?? 70,
+            kind: "mortar",
+            hit: /* @__PURE__ */ new Set(),
+            owner: this.player === this.foe ? "foe" : "self",
+            ownerId: this.activeId,
+            trail: false,
+            lobSx: bx,
+            lobSy: by,
+            lobTx: tgt.x,
+            lobTy: tgt.y,
+            lobDur: dur,
+            lobT: 0,
+            lobPeak: 50 + dist * 0.18,
+            weapon: g.id
+          });
+          continue;
+        }
+        const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
         this.bullets.push({
           x: bx,
           y: by,
-          vx: 0,
-          vy: 0,
-          life: dur + 0.2,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          driftX,
+          driftY,
+          life: g.life,
           damage: dmg,
-          size: (g.bulletSize ?? 8) + 2,
+          size: g.bulletSize,
           color: g.color,
           glow: g.glow,
-          pierce: 0,
+          pierce: g.pierce,
           knockback: g.knockback,
-          explosive: false,
-          explosionRadius: g.explosionRadius ?? 70,
-          kind: "mortar",
+          explosive: !!g.explosive,
+          explosionRadius: g.explosionRadius ?? 0,
+          kind: g.kind,
           hit: /* @__PURE__ */ new Set(),
           owner: this.player === this.foe ? "foe" : "self",
           ownerId: this.activeId,
-          trail: false,
-          lobSx: bx,
-          lobSy: by,
-          lobTx: tgt.x,
-          lobTy: tgt.y,
-          lobDur: dur,
-          lobT: 0,
-          lobPeak: 50 + dist * 0.18,
+          trail: g.kind === "tracer",
+          bounces: g.bounces,
+          // wall-piercing chance (plasma rifle): each bullet may pass through walls
+          ignoreWalls: g.wallPierceChance ? Math.random() < g.wallPierceChance : g.ignoreWalls,
           weapon: g.id
         });
-        continue;
       }
-      const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
-      this.bullets.push({
-        x: bx,
-        y: by,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
-        driftX,
-        driftY,
-        life: g.life,
-        damage: dmg,
-        size: g.bulletSize,
-        color: g.color,
-        glow: g.glow,
-        pierce: g.pierce,
-        knockback: g.knockback,
-        explosive: !!g.explosive,
-        explosionRadius: g.explosionRadius ?? 0,
-        kind: g.kind,
-        hit: /* @__PURE__ */ new Set(),
-        owner: this.player === this.foe ? "foe" : "self",
-        ownerId: this.activeId,
-        trail: g.kind === "tracer",
-        bounces: g.bounces,
-        ignoreWalls: g.ignoreWalls,
-        weapon: g.id
-      });
+      if (g.magazine !== void 0) ws.ammo -= 1;
     }
-    if (g.magazine !== void 0) ws.ammo -= 1;
     sound.shoot(g.id);
     this.spawnParticles(
       p.x + Math.cos(base) * (p.size + g.barrel),
@@ -4752,13 +4857,12 @@ var GameEngine = class {
       }
       if (!dead) {
         for (const d of this.deployables) {
-          if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station")
-            continue;
+          const isMine = d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire";
           const rr = d.size + b.size + 2;
           const ddx = d.x - b.x;
           const ddy = d.y - b.y;
           if (ddx * ddx + ddy * ddy <= rr * rr) {
-            if ((d.ownerId ?? -1) === (b.ownerId ?? -1)) continue;
+            if (!isMine && (d.ownerId ?? -1) === (b.ownerId ?? -1)) continue;
             if (b.explosive) {
               this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
               dead = true;
@@ -4803,6 +4907,20 @@ var GameEngine = class {
             tickT: 0
           });
           this.spawnParticles(gr.x, gr.y, "#fb923c", 20, 200, 0.5);
+        } else if (gr.kind === "poison") {
+          this.effects.push({
+            type: "poisoncloud",
+            x: gr.x,
+            y: gr.y,
+            t: 0,
+            duration: 5,
+            radius: 92,
+            color: "#84cc16",
+            dps: 60,
+            slow: 0.5,
+            tickT: 0
+          });
+          this.spawnParticles(gr.x, gr.y, "#84cc16", 20, 200, 0.5);
         } else {
           this.explode(gr.x, gr.y, 120, 180, "#fb923c");
         }
@@ -4815,7 +4933,8 @@ var GameEngine = class {
   gadgetRange(def) {
     if (def.range) return def.range;
     const k = def.kind;
-    if (k === "glue_grenade" || k === "fire_grenade") return GADGET_THROW_DIST;
+    if (k === "glue_grenade" || k === "fire_grenade" || k === "poison_grenade")
+      return GADGET_THROW_DIST;
     return GADGET_DEPLOY_DIST;
   }
   /**
@@ -4905,13 +5024,13 @@ var GameEngine = class {
         });
         break;
       case "mine_explosive":
-        this.deployables.push({ ...base, life: 60, radius: 56, armed: 0.8 });
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 56, armed: 0.8 });
         break;
       case "mine_poison":
-        this.deployables.push({ ...base, life: 60, radius: 70, armed: 0.8 });
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 70, armed: 0.8 });
         break;
       case "mine_fire":
-        this.deployables.push({ ...base, life: 60, radius: 70, armed: 0.8 });
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 70, armed: 0.8 });
         break;
       case "glue_grenade": {
         const sim = this.simulateThrow(p.x, p.y, px, py);
@@ -4936,6 +5055,19 @@ var GameEngine = class {
           life: sim.fuse,
           fuse: sim.fuse,
           kind: "fire"
+        });
+        break;
+      }
+      case "poison_grenade": {
+        const sim = this.simulateThrow(p.x, p.y, px, py);
+        this.grenades.push({
+          x: p.x,
+          y: p.y,
+          vx: sim.vx,
+          vy: sim.vy,
+          life: sim.fuse,
+          fuse: sim.fuse,
+          kind: "poison"
         });
         break;
       }
@@ -5096,60 +5228,62 @@ var GameEngine = class {
         continue;
       }
       if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
+        let triggered = d.hp <= 0;
         if (d.armed <= 0) {
-          let triggered = false;
           const tryTrigger = (cx, cy, cs) => Math.hypot(cx - d.x, cy - d.y) < cs + 24;
+          let prox = false;
           if (this.isDM) {
             for (const c of this.combatants) {
               if (c.id === (d.ownerId ?? -1)) continue;
               const q = c.player;
               if (q.deadTimer && q.deadTimer > 0) continue;
               if (tryTrigger(q.x, q.y, q.size)) {
-                triggered = true;
+                prox = true;
                 break;
               }
             }
           } else {
             for (const e of this.enemies) {
               if (tryTrigger(e.x, e.y, e.size)) {
-                triggered = true;
+                prox = true;
                 break;
               }
             }
           }
-          if (triggered) {
-            if (d.kind === "mine_explosive") {
-              this.explode(d.x, d.y, d.radius, 160, d.color, void 0, d.ownerId);
-            } else if (d.kind === "mine_poison") {
-              this.effects.push({
-                type: "poisoncloud",
-                x: d.x,
-                y: d.y,
-                t: 0,
-                duration: 5,
-                radius: d.radius,
-                color: d.color,
-                dps: 60,
-                slow: 0.5,
-                tickT: 0
-              });
-            } else {
-              this.effects.push({
-                type: "firefield",
-                x: d.x,
-                y: d.y,
-                t: 0,
-                duration: 5,
-                radius: d.radius,
-                color: d.color,
-                dps: 90,
-                tickT: 0
-              });
-            }
-            d.life = 0;
-          }
+          if (prox) triggered = true;
         }
-        if (d.life > 0) next.push(d);
+        if (triggered) {
+          if (d.kind === "mine_explosive") {
+            this.explode(d.x, d.y, d.radius, 160, d.color, void 0, d.ownerId);
+          } else if (d.kind === "mine_poison") {
+            this.effects.push({
+              type: "poisoncloud",
+              x: d.x,
+              y: d.y,
+              t: 0,
+              duration: 5,
+              radius: d.radius,
+              color: d.color,
+              dps: 60,
+              slow: 0.5,
+              tickT: 0
+            });
+          } else {
+            this.effects.push({
+              type: "firefield",
+              x: d.x,
+              y: d.y,
+              t: 0,
+              duration: 5,
+              radius: d.radius,
+              color: d.color,
+              dps: 90,
+              tickT: 0
+            });
+          }
+          d.life = 0;
+        }
+        if (d.life > 0 && d.hp > 0) next.push(d);
         continue;
       }
       if (d.kind === "healing_station") {
@@ -5205,6 +5339,16 @@ var GameEngine = class {
           continue;
         }
       }
+      let hitDep = false;
+      for (const d of this.deployables) {
+        const rr2 = d.size + b.size + 2;
+        if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr2 * rr2) {
+          this.damageDeployable(d, b.damage, void 0);
+          hitDep = true;
+          break;
+        }
+      }
+      if (hitDep) continue;
       next.push(b);
     }
     this.enemyBullets = next;
@@ -6748,9 +6892,12 @@ var GameEngine = class {
         }
       }
       for (const d of this.deployables) {
-        if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station")
-          continue;
-        if ((d.ownerId ?? -1) === (ownerId ?? -1)) continue;
+        const isMine = d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire";
+        if (!isMine) {
+          if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station")
+            continue;
+          if ((d.ownerId ?? -1) === (ownerId ?? -1)) continue;
+        }
         const d2 = Math.hypot(d.x - x, d.y - y);
         if (d2 < radius + d.size) {
           const fall = 1 - d2 / (radius + d.size);
@@ -8081,20 +8228,26 @@ var GameEngine = class {
       ctx.translate(gr.x, gr.y);
       const fire = gr.kind === "fire";
       const glue = gr.kind === "glue";
-      ctx.fillStyle = fire ? "#7f1d1d" : glue ? "#0e7490" : "#1f2937";
-      ctx.strokeStyle = fire ? "#fb923c" : glue ? "#22d3ee" : "#fbbf24";
+      const poison = gr.kind === "poison";
+      ctx.fillStyle = fire ? "#7f1d1d" : glue ? "#0e7490" : poison ? "#3f6212" : "#1f2937";
+      ctx.strokeStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#fbbf24";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = fire ? "#fb923c" : glue ? "#22d3ee" : "#f97316";
+      ctx.fillStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#f97316";
       ctx.fillRect(-2, -9, 4, 4);
       if (fire) {
         ctx.fillStyle = "#fde68a";
         ctx.beginPath();
         ctx.moveTo(-1.5, -9);
         ctx.quadraticCurveTo(0, -13, 1.5, -9);
+        ctx.fill();
+      } else if (poison) {
+        ctx.fillStyle = "#bef264";
+        ctx.beginPath();
+        ctx.arc(0, -11, 1.6, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
