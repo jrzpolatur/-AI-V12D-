@@ -82,6 +82,8 @@ const rooms = new Map();
 const queue = []; // players waiting for a quick match
 let pidCounter = 1;
 
+const RECONNECT_GRACE_MS = 15000;
+
 function genRoom() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code;
@@ -93,16 +95,10 @@ function genRoom() {
 }
 
 function send(ws, obj) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
+  if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
 }
 function peerInfo(peer) {
   return { t: "peer", pid: peer.pid, name: peer.name, host: peer.host };
-}
-function notifyPeers(room, exceptPid) {
-  for (const peer of room.peers.values()) {
-    if (peer.pid === exceptPid) continue;
-    send(peer.ws, { t: "peerLeft" });
-  }
 }
 
 wss.on("connection", (ws) => {
@@ -116,7 +112,7 @@ wss.on("connection", (ws) => {
     if (msg.t === "create") {
       const code = genRoom();
       const pid = pidCounter++;
-      const room = { peers: new Map() };
+      const room = { code, peers: new Map() };
       room.peers.set(pid, { pid, ws, name: String(msg.name || "Host").slice(0, 16), host: true });
       rooms.set(code, room);
       ws.pid = pid; ws.room = code;
@@ -135,20 +131,19 @@ wss.on("connection", (ws) => {
           if (other.pid !== p.pid) send(p.ws, peerInfo(other));
       for (const p of room.peers.values()) send(p.ws, { t: "start" });
     } else if (msg.t === "find") {
-      // Quick match: pair with the first player already waiting in the queue.
       const name = String(msg.name || "玩家").slice(0, 16);
       const qi = queue.findIndex((q) => q.ws === ws);
       if (qi >= 0) queue.splice(qi, 1);
       if (queue.length > 0) {
         const other = queue.shift();
         const code = genRoom();
-        const room = { peers: new Map() };
+        const room = { code, peers: new Map() };
         const pidA = other.pid;
         const pidB = pidCounter++;
         room.peers.set(pidA, { pid: pidA, ws: other.ws, name: other.name, host: true });
         room.peers.set(pidB, { pid: pidB, ws, name, host: false });
         rooms.set(code, room);
-        other.ws.pid = pidA; other.ws.room = code;
+        other.ws.room = code;
         ws.pid = pidB; ws.room = code;
         send(other.ws, { t: "created", room: code, pid: pidA });
         send(ws, { t: "joined", room: code, pid: pidB });
@@ -166,7 +161,30 @@ wss.on("connection", (ws) => {
       const room = ws.room && rooms.get(ws.room);
       if (!room) return;
       for (const peer of room.peers.values())
-        if (peer.pid !== ws.pid) send(peer.ws, { t: "msg", data: msg.data });
+        if (peer.pid !== ws.pid && !peer.disconnected) send(peer.ws, { t: "msg", data: msg.data });
+    } else if (msg.t === "rejoin") {
+      const code = String(msg.room || "").toUpperCase();
+      const room = rooms.get(code);
+      if (!room) return send(ws, { t: "error", msg: "房间已失效，请重新匹配" });
+      const pid = Number(msg.pid);
+      const peer = room.peers.get(pid);
+      if (!peer) return send(ws, { t: "error", msg: "房间已失效，请重新匹配" });
+
+      if (room.graceTimers?.has(pid)) {
+        clearTimeout(room.graceTimers.get(pid));
+        room.graceTimers.delete(pid);
+      }
+
+      peer.ws = ws;
+      peer.disconnected = false;
+      peer.name = String(msg.name || peer.name || "玩家").slice(0, 16);
+      ws.room = code;
+      ws.pid = pid;
+
+      const other = pid === 1 ? room.peers.get(2) : room.peers.get(1);
+      send(ws, { t: "peer", pid: other?.pid ?? 0, name: other?.name ?? "", host: other?.host ?? false });
+      send(ws, { t: "start", youPid: pid });
+      if (other && !other.disconnected) send(other.ws, { t: "peerBack" });
     }
   });
 
@@ -174,11 +192,21 @@ wss.on("connection", (ws) => {
     const qi = queue.findIndex((q) => q.ws === ws);
     if (qi >= 0) queue.splice(qi, 1);
     const room = ws.room && rooms.get(ws.room);
-    if (room) {
-      notifyPeers(room, ws.pid);
+    if (!room) return;
+    const peer = ws.pid != null ? room.peers.get(ws.pid) : null;
+    if (!peer) return;
+
+    peer.disconnected = true;
+    const other = ws.pid === 1 ? room.peers.get(2) : room.peers.get(1);
+    if (other && !other.disconnected) send(other.ws, { t: "peerGone" });
+
+    if (!room.graceTimers) room.graceTimers = new Map();
+    room.graceTimers.set(ws.pid, setTimeout(() => {
       room.peers.delete(ws.pid);
-      if (room.peers.size === 0) rooms.delete(ws.room);
-    }
+      if (other && !other.disconnected) send(other.ws, { t: "peerLeft" });
+      room.graceTimers.delete(ws.pid);
+      if (room.peers.size === 0) rooms.delete(room.code || ws.room);
+    }, RECONNECT_GRACE_MS));
   });
 });
 

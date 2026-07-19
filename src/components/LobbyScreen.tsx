@@ -77,7 +77,7 @@ export default function LobbyScreen({
           联机对战
         </h1>
         <p className="mb-6 text-center text-sm text-slate-400">
-          1v1 竞技 + 合作守基地 · 点一下自动匹配对手
+          1v1 竞技 (死亡竞赛) · 点一下自动匹配对手
         </p>
 
         <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5">

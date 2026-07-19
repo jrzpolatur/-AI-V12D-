@@ -647,6 +647,8 @@ export class GameEngine {
   private foeGadgets: GadgetDef[] = [];
   /** the opponent's per-gadget cooldown timers (separate from the host's own) */
   private foeGadgetCd = new Map<string, number>();
+  private foeWeaponStates = new Map<string, WeaponState>();
+  private wallsDirty = true;
   /** the host's own avatar; never swapped while simulating the foe */
   private localPlayer: Player = null as unknown as Player;
   // one-shot action intents captured on the guest, sent with the next input
@@ -997,6 +999,8 @@ export class GameEngine {
         overheated: false,
       });
     }
+    this.foeWeaponStates = new Map();
+    this.wallsDirty = true;
     this.score = 0;
     this.kills = 0;
     this.gold = 0;
@@ -1076,7 +1080,7 @@ export class GameEngine {
     // ---- deathmatch: build 4 combatants (you + 3 AI bots) ----
     if (this.gameMode === "deathmatch") {
       this.isDM = true;
-      this.dmKillLimit = 15;
+      this.dmKillLimit = this.mode === "local" ? 15 : 8;
       // neutralise bases so they're never targeted / drawn
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
@@ -1089,30 +1093,35 @@ export class GameEngine {
         { x: this.worldW * 0.85, y: this.worldH * 0.2 },
         { x: this.worldW * 0.5, y: this.worldH * 0.16 },
       ];
-      // combatant 0 = the local human (reuses the existing globals)
-      const human: Combatant = {
-        id: 0, isBot: false, name: "你", color: "#38bdf8",
-        player: this.player,
-        character: this.character, outfit: this.outfit, skill: this.skill,
-        guns: this.guns, gunIndex: this.gunIndex,
-        weaponStates: this.weaponStates, gadgets: this.gadgets,
-        selectedGadget: this.selectedGadget,
-        skillCd: this.skillCd, dashCharges: this.dashCharges,
-        dashRecharge: this.dashRecharge, gadgetCd: this.gadgetCd,
-        lastGadget: this.lastGadget, kills: 0, score: 0,
-        wander: 0, strafeDir: 1, strafeTimer: 0,
-      };
-      this.combatants = [human];
-      this.player.cid = 0;
-      const botColors = ["#f472b6", "#a3e635", "#fbbf24"];
-      const botNames = ["阿尔法", "贝塔", "伽马"];
-      const picks = this.rollBotLoadouts(3);
-      for (let i = 0; i < 3; i++) {
-        const sp = this.dmSpawns[i + 1];
-        this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+      if (this.mode === "local") {
+        // combatant 0 = the local human (reuses the existing globals)
+        const human: Combatant = {
+          id: 0, isBot: false, name: "你", color: "#38bdf8",
+          player: this.player,
+          character: this.character, outfit: this.outfit, skill: this.skill,
+          guns: this.guns, gunIndex: this.gunIndex,
+          weaponStates: this.weaponStates, gadgets: this.gadgets,
+          selectedGadget: this.selectedGadget,
+          skillCd: this.skillCd, dashCharges: this.dashCharges,
+          dashRecharge: this.dashRecharge, gadgetCd: this.gadgetCd,
+          lastGadget: this.lastGadget, kills: 0, score: 0,
+          wander: 0, strafeDir: 1, strafeTimer: 0,
+        };
+        this.combatants = [human];
+        this.player.cid = 0;
+        const botColors = ["#f472b6", "#a3e635", "#fbbf24"];
+        const botNames = ["阿尔法", "贝塔", "伽马"];
+        const picks = this.rollBotLoadouts(3);
+        for (let i = 0; i < 3; i++) {
+          const sp = this.dmSpawns[i + 1];
+          this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+        }
+        this.banner = { text: "死亡竞赛 · 先杀 15 人获胜！", t: 2.4 };
+      } else {
+        this.combatants = [];
+        this.banner = { text: "死亡竞赛 · 先杀 8 人获胜！", t: 2.4 };
       }
       this.activeId = 0;
-      this.banner = { text: "死亡竞赛 · 先杀 15 人获胜！", t: 2.4 };
     } else {
       this.isDM = false;
       this.combatants = [];
@@ -1135,6 +1144,65 @@ export class GameEngine {
       this.player.lastGadget = 0;
       this.foe = this.makeFoe();
       this.net.sendGame({ t: "hello", name: this.character.name, loadout: this.loadout });
+
+      if (this.gameMode === "deathmatch") {
+        this.player.cid = this.selfPid;
+        this.foe.cid = this.peerPid;
+
+        const hostSpawn = this.dmSpawns[0];
+        const guestSpawn = this.dmSpawns[1];
+        if (this.selfPid === 1) {
+          this.player.x = hostSpawn.x;
+          this.player.y = hostSpawn.y;
+          this.foe.x = guestSpawn.x;
+          this.foe.y = guestSpawn.y;
+        } else {
+          this.player.x = guestSpawn.x;
+          this.player.y = guestSpawn.y;
+          this.foe.x = hostSpawn.x;
+          this.foe.y = hostSpawn.y;
+        }
+
+        const c1: Combatant = {
+          id: 1, isBot: false, name: this.mode === "host" ? "你" : (this.peerName || "对手"), color: "#38bdf8",
+          player: this.mode === "host" ? this.player : this.foe,
+          character: this.mode === "host" ? this.character : this.foeChar!,
+          outfit: this.mode === "host" ? this.outfit : this.foeOutfit!,
+          skill: this.mode === "host" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          guns: this.mode === "host" ? this.guns : this.foeGuns,
+          gunIndex: this.mode === "host" ? this.gunIndex : (this.foe.gunIndex ?? 0),
+          weaponStates: this.mode === "host" ? this.weaponStates : new Map(),
+          gadgets: this.mode === "host" ? this.gadgets : this.foeGadgets,
+          selectedGadget: this.mode === "host" ? this.selectedGadget : -1,
+          skillCd: this.mode === "host" ? this.skillCd : 0,
+          dashCharges: this.mode === "host" ? this.dashCharges : MAX_DASH_CHARGES,
+          dashRecharge: this.mode === "host" ? this.dashRecharge : 0,
+          gadgetCd: this.mode === "host" ? this.gadgetCd : new Map(),
+          lastGadget: this.mode === "host" ? this.lastGadget : 0,
+          kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0
+        };
+
+        const c2: Combatant = {
+          id: 2, isBot: false, name: this.mode === "guest" ? "你" : (this.peerName || "对手"), color: "#f472b6",
+          player: this.mode === "guest" ? this.player : this.foe,
+          character: this.mode === "guest" ? this.character : this.foeChar!,
+          outfit: this.mode === "guest" ? this.outfit : this.foeOutfit!,
+          skill: this.mode === "guest" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          guns: this.mode === "guest" ? this.guns : this.foeGuns,
+          gunIndex: this.mode === "guest" ? this.gunIndex : (this.foe.gunIndex ?? 0),
+          weaponStates: this.mode === "guest" ? this.weaponStates : new Map(),
+          gadgets: this.mode === "guest" ? this.gadgets : this.foeGadgets,
+          selectedGadget: this.mode === "guest" ? this.selectedGadget : -1,
+          skillCd: this.mode === "guest" ? this.skillCd : 0,
+          dashCharges: this.mode === "guest" ? this.dashCharges : MAX_DASH_CHARGES,
+          dashRecharge: this.mode === "guest" ? this.dashRecharge : 0,
+          gadgetCd: this.mode === "guest" ? this.gadgetCd : new Map(),
+          lastGadget: this.mode === "guest" ? this.lastGadget : 0,
+          kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0
+        };
+
+        this.combatants = [c1, c2];
+      }
     }
   }
 
@@ -1292,10 +1360,10 @@ export class GameEngine {
   }
 
   /** Make sure every gun in the list has a WeaponState entry (host simulates foe guns too). */
-  private ensureWeaponStates(guns: GunDef[]) {
+  private ensureWeaponStates(guns: GunDef[], targetMap: Map<string, WeaponState> = this.weaponStates) {
     for (const g of guns) {
-      if (!this.weaponStates.has(g.id)) {
-        this.weaponStates.set(g.id, {
+      if (!targetMap.has(g.id)) {
+        targetMap.set(g.id, {
           ammo: g.magazine ?? 0,
           reload: 0,
           heat: 0,
@@ -1317,7 +1385,7 @@ export class GameEngine {
             .map((id) => GUNS.find((g) => g.id === id) ?? GUNS[0])
             .slice(0, 2)
         : [GUNS.find((g) => g.id === pl.gunId) ?? GUNS[0]];
-    this.ensureWeaponStates(this.foeGuns);
+    this.ensureWeaponStates(this.foeGuns, this.foeWeaponStates);
     // adopt the opponent's own gadget picks (in their loadout order) so the
     // host resolves the foe's gadget slot index correctly when deploying
     const chosen = (pl.gadgetIds ?? [])
@@ -1334,6 +1402,20 @@ export class GameEngine {
       if (this.foe.hp > this.foe.maxHp) this.foe.hp = this.foe.maxHp;
       this.foe.speed = c.speed * (1 + o.speedBonus);
       this.foe.size = c.size;
+    }
+    
+    // sync deathmatch peer combatant
+    if (this.gameMode === "deathmatch" && this.combatants.length > 0) {
+      const peerC = this.combatants.find((c) => c.id === this.peerPid);
+      if (peerC) {
+        peerC.name = this.peerName || "对手";
+        peerC.character = this.foeChar!;
+        peerC.outfit = this.foeOutfit!;
+        peerC.skill = getSkill(pl.skillId ?? "dash");
+        peerC.guns = this.foeGuns;
+        peerC.weaponStates = this.foeWeaponStates;
+        peerC.gadgets = this.foeGadgets;
+      }
     }
   }
 
@@ -1839,16 +1921,46 @@ export class GameEngine {
     // which keeps the client light and in lock-step with the server's view.
     if (this.authoritative) {
       this.applySnapshot();
-      // smooth the local avatar toward the latest snapshot so the camera/aim isn't choppy
-      if (!this.gxInit) {
-        this.gx = this.player.x;
-        this.gy = this.player.y;
-        this.gxInit = true;
+      
+      // Client-side prediction for local player movement in authoritative client
+      let dx = 0;
+      let dy = 0;
+      if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) dy -= 1;
+      if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
+      if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
+      if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+      dx += this.virtualMove.x;
+      dy += this.virtualMove.y;
+      const vlen = Math.hypot(dx, dy) || 1;
+      dx /= vlen;
+      dy /= vlen;
+
+      const p = this.player;
+      if (!p.deadTimer || p.deadTimer <= 0) {
+        if (p.dashTime > 0) {
+          p.dashTime -= dt;
+          p.x += p.dashVx * dt;
+          p.y += p.dashVy * dt;
+        } else {
+          const slow = (p.bowDrawing ? (this.gun.drawSlowMult ?? 1) : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
+          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+        }
+        const m = p.size;
+        p.x = Math.max(m, Math.min(this.worldW - m, p.x));
+        p.y = Math.max(m, Math.min(this.worldH - m, p.y));
+        this.collideWalls(p, p.size);
+        this.collideBase(p, p.size);
+        this.collideBase(p, p.size, this.enemyBase);
       }
-      this.gx += (this.player.x - this.gx) * 0.4;
-      this.gy += (this.player.y - this.gy) * 0.4;
-      this.player.x = this.gx;
-      this.player.y = this.gy;
+
+      this.gx = this.player.x;
+      this.gy = this.player.y;
+      this.gxInit = true;
+
       // local respawn countdown (server is authoritative on hp; we only display it)
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
@@ -1864,9 +1976,6 @@ export class GameEngine {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
-      // NOTE: emit(false) — NOT emit(true). The main loop already throttles HUD
-      // pushes to ~16Hz; an immediate emit here would force a React re-render
-      // every frame (60x/sec) and tank the frame rate in online matches.
       this.emit(false);
       return;
     }
@@ -1877,7 +1986,7 @@ export class GameEngine {
     if (this.paused) {
       if (this.mode === "host" && this.net) {
         this.snapAccum += dt;
-        if (this.snapAccum >= 1 / 30) {
+        if (this.snapAccum >= 1 / 20) {
           this.snapAccum = 0;
           this.sendSnapshot();
         }
@@ -1890,16 +1999,46 @@ export class GameEngine {
     // ---- guest: no local simulation, just mirror the host snapshot ----
     if (this.mode === "guest") {
       this.applySnapshot();
-      // smooth the local avatar toward the latest snapshot so the camera/aim isn't choppy
-      if (!this.gxInit) {
-        this.gx = this.player.x;
-        this.gy = this.player.y;
-        this.gxInit = true;
+      
+      // Client-side prediction for local player movement
+      let dx = 0;
+      let dy = 0;
+      if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) dy -= 1;
+      if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
+      if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
+      if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+      dx += this.virtualMove.x;
+      dy += this.virtualMove.y;
+      const vlen = Math.hypot(dx, dy) || 1;
+      dx /= vlen;
+      dy /= vlen;
+
+      const p = this.player;
+      if (!p.deadTimer || p.deadTimer <= 0) {
+        if (p.dashTime > 0) {
+          p.dashTime -= dt;
+          p.x += p.dashVx * dt;
+          p.y += p.dashVy * dt;
+        } else {
+          const slow = (p.bowDrawing ? (this.gun.drawSlowMult ?? 1) : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
+          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+        }
+        const m = p.size;
+        p.x = Math.max(m, Math.min(this.worldW - m, p.x));
+        p.y = Math.max(m, Math.min(this.worldH - m, p.y));
+        this.collideWalls(p, p.size);
+        this.collideBase(p, p.size);
+        this.collideBase(p, p.size, this.enemyBase);
       }
-      this.gx += (this.player.x - this.gx) * 0.4;
-      this.gy += (this.player.y - this.gy) * 0.4;
-      this.player.x = this.gx;
-      this.player.y = this.gy;
+
+      this.gx = this.player.x;
+      this.gy = this.player.y;
+      this.gxInit = true;
+
       // mobile aim assist (guest + touch only): point the avatar at the nearest
       // threat so the on-screen fire button hits without a separate aim input.
       // The chosen world point is sent to the host as the aim (mx/my).
@@ -1948,7 +2087,7 @@ export class GameEngine {
     // ---- deathmatch: simulate the human + 3 AI bots through the
     // same per-player combat code (context-switching in `simulateBot`) ----
     if (this.isDM) {
-      this.activeId = 0;
+      this.activeId = this.mode === "local" ? 0 : this.selfPid;
       this.updatePlayer(dt);
       for (const c of this.combatants) if (c.isBot) this.simulateBot(c, dt);
     } else {
@@ -1965,7 +2104,7 @@ export class GameEngine {
       }
       this.simulateRemote(dt);
       this.snapAccum += dt;
-      if (this.snapAccum >= 1 / 30) {
+      if (this.snapAccum >= 1 / 20) {
         this.snapAccum = 0;
         this.sendSnapshot();
       }
@@ -4387,7 +4526,7 @@ export class GameEngine {
   private tickRespawns(dt: number) {
     if (this.isDM) {
       for (const c of this.combatants) {
-        const sp = this.dmSpawns[c.id] ?? { x: this.worldW / 2, y: this.worldH / 2 };
+        const sp = this.dmSpawns[this.mode === "local" ? c.id : c.id - 1] ?? { x: this.worldW / 2, y: this.worldH / 2 };
         this.reviveIfReady(c.player, sp.x, sp.y, dt, c.guns, c.weaponStates);
       }
       return;
@@ -4472,7 +4611,9 @@ export class GameEngine {
       sDash = this.dashCharges,
       sDashR = this.dashRecharge,
       sLastG = this.lastGadget,
-      sSemi = this.semiAutoLatch;
+      sSemi = this.semiAutoLatch,
+      sActive = this.activeId,
+      sWs = this.weaponStates;
     // save the host's own joystick vector so it can be restored after simulating
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
@@ -4493,6 +4634,8 @@ export class GameEngine {
     // adopt the GUEST's own gadget list so slot indices resolve to THEIR gadget
     this.gadgets = this.foeGadgets.length ? this.foeGadgets : this.gadgets;
     this.gadgetCd = this.foeGadgetCd;
+    this.activeId = this.peerPid;
+    this.weaponStates = this.foeWeaponStates;
     // decay the foe's gadget cooldowns
     for (const [k, v] of this.gadgetCd) {
       if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
@@ -4511,6 +4654,7 @@ export class GameEngine {
     foe.lastGadget = this.lastGadget;
     // persist the foe's (possibly updated) gadget cooldowns
     this.foeGadgetCd = this.gadgetCd;
+    this.foeWeaponStates = this.weaponStates;
     // restore local context
     this.player = sp;
     this.guns = sGuns;
@@ -4525,6 +4669,8 @@ export class GameEngine {
     this.dashRecharge = sDashR;
     this.lastGadget = sLastG;
     this.semiAutoLatch = sSemi;
+    this.activeId = sActive;
+    this.weaponStates = sWs;
     // restore the host's own joystick vector
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
@@ -4842,6 +4988,25 @@ export class GameEngine {
 
   /** Build the full world snapshot (used by the host relay AND the authoritative server). */
   buildSnapshot(): Snapshot {
+    const snapWalls = this.wallsDirty
+      ? this.walls
+          .filter((w) => !w.invisible)
+          .map((w) => ({
+            x: w.x,
+            y: w.y,
+            w: w.w,
+            h: w.h,
+            hp: w.destructible ? Math.max(0, Math.round(w.hp)) : -1,
+            maxHp: w.destructible ? w.maxHp : -1,
+            destructible: w.destructible,
+            glue: !!w.glue,
+            building: !!w.building,
+            seed: w.seed,
+          }))
+      : undefined;
+
+    this.wallsDirty = false;
+
     return {
       time: this.time,
       scene: this.sceneIndex,
@@ -4873,22 +5038,7 @@ export class GameEngine {
         kind: b.kind,
         owner: b.owner ?? "self",
       })),
-      // terrain — mirror the exact cover state to the guest so walls (incl.
-      // destruction) render correctly. Skip invisible boundary "air walls".
-      walls: this.walls
-        .filter((w) => !w.invisible)
-        .map((w) => ({
-          x: w.x,
-          y: w.y,
-          w: w.w,
-          h: w.h,
-          hp: w.destructible ? Math.max(0, Math.round(w.hp)) : -1,
-          maxHp: w.destructible ? w.maxHp : -1,
-          destructible: w.destructible,
-          glue: !!w.glue,
-          building: !!w.building,
-          seed: w.seed,
-        })),
+      walls: snapWalls,
       effects: this.effects.map((e) => {
         let id = this.fxIds.get(e);
         if (id === undefined) {
@@ -4945,6 +5095,11 @@ export class GameEngine {
       gold: this.gold,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
+      dmKills: this.isDM ? [
+        this.combatants.find(c => c.id === 1)?.kills ?? 0,
+        this.combatants.find(c => c.id === 2)?.kills ?? 0
+      ] : undefined,
+      dmTarget: this.isDM ? this.dmKillLimit : undefined,
     };
   }
 
@@ -5018,7 +5173,9 @@ export class GameEngine {
       sDash = this.dashCharges,
       sDashR = this.dashRecharge,
       sLastG = this.lastGadget,
-      sSemi = this.semiAutoLatch;
+      sSemi = this.semiAutoLatch,
+      sActive = this.activeId,
+      sWs = this.weaponStates;
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
     // load this peer's state into the engine's single simulation context
@@ -5036,6 +5193,8 @@ export class GameEngine {
     this.lastGadget = player.lastGadget ?? 0;
     this.gadgets = gadgets.length ? gadgets : this.gadgets;
     this.gadgetCd = gadgetCd;
+    this.activeId = player === this.player ? this.selfPid : this.peerPid;
+    this.weaponStates = player === this.player ? sWs : this.foeWeaponStates;
     // decay this peer's gadget cooldowns
     for (const [k, v] of this.gadgetCd) {
       if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
@@ -5052,6 +5211,9 @@ export class GameEngine {
     player.dashCharges = this.dashCharges;
     player.dashRecharge = this.dashRecharge;
     player.lastGadget = this.lastGadget;
+    if (player === this.foe) {
+      this.foeWeaponStates = this.weaponStates;
+    }
     // restore the engine's main (player-A) context
     this.player = sp;
     this.guns = sGuns;
@@ -5066,6 +5228,8 @@ export class GameEngine {
     this.dashRecharge = sDashR;
     this.lastGadget = sLastG;
     this.semiAutoLatch = sSemi;
+    this.activeId = sActive;
+    this.weaponStates = sWs;
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
   }
@@ -5149,6 +5313,59 @@ export class GameEngine {
     this.peerInput.clear();
     this.peerLatch.clear();
     this.foe = this.makeFoe();
+
+    if (this.gameMode === "deathmatch") {
+      this.player.cid = this.selfPid;
+      this.foe.cid = this.peerPid;
+
+      this.dmSpawns = [
+        { x: this.worldW * 0.5, y: this.worldH - 200 },
+        { x: this.worldW * 0.15, y: this.worldH * 0.2 },
+        { x: this.worldW * 0.85, y: this.worldH * 0.2 },
+        { x: this.worldW * 0.5, y: this.worldH * 0.16 },
+      ];
+
+      const hostSpawn = this.dmSpawns[0];
+      const guestSpawn = this.dmSpawns[1];
+      this.player.x = hostSpawn.x;
+      this.player.y = hostSpawn.y;
+      this.foe.x = guestSpawn.x;
+      this.foe.y = guestSpawn.y;
+
+      const c1: Combatant = {
+        id: 1, isBot: false, name: "玩家1", color: "#38bdf8",
+        player: this.player,
+        character: this.character, outfit: this.outfit, skill: this.skill,
+        guns: this.guns, gunIndex: this.gunIndex,
+        weaponStates: this.weaponStates, gadgets: this.gadgets,
+        selectedGadget: this.selectedGadget,
+        skillCd: this.skillCd, dashCharges: this.dashCharges,
+        dashRecharge: this.dashRecharge, gadgetCd: this.gadgetCd,
+        lastGadget: this.lastGadget, kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0
+      };
+
+      const c2: Combatant = {
+        id: 2, isBot: false, name: "玩家2", color: "#f472b6",
+        player: this.foe,
+        character: this.foeChar!,
+        outfit: this.foeOutfit!,
+        skill: getSkill(loadoutB.skillId ?? "dash"),
+        guns: this.foeGuns,
+        gunIndex: 0,
+        weaponStates: new Map(),
+        gadgets: this.foeGadgets,
+        selectedGadget: -1,
+        skillCd: 0,
+        dashCharges: MAX_DASH_CHARGES,
+        dashRecharge: 0,
+        gadgetCd: new Map(),
+        lastGadget: 0,
+        kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0
+      };
+
+      this.combatants = [c1, c2];
+    }
+
     this.peerLoadout = loadoutB;
     this.applyPeerLoadout();
     this.foe.gunIndex = 0;
@@ -5191,8 +5408,20 @@ export class GameEngine {
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
     const foe = s.players.find((p) => p.id !== this.selfPid) ?? s.players[1];
     if (me) {
-      this.player.x = me.x;
-      this.player.y = me.y;
+      if (this.mode === "guest" || this.authoritative) {
+        // Client-side prediction position reconciliation
+        const distSq = (this.player.x - me.x) ** 2 + (this.player.y - me.y) ** 2;
+        if (distSq > 120 * 120) {
+          this.player.x = me.x;
+          this.player.y = me.y;
+        } else {
+          this.player.x += (me.x - this.player.x) * 0.25;
+          this.player.y += (me.y - this.player.y) * 0.25;
+        }
+      } else {
+        this.player.x = me.x;
+        this.player.y = me.y;
+      }
       this.player.angle = me.angle;
       this.player.hp = me.hp;
       this.player.maxHp = me.maxHp;
@@ -5236,6 +5465,7 @@ export class GameEngine {
     // on the guest side too (the guest runs no world simulation of its own).
     this.netEffects = s.effects ? s.effects.map((e) => ({ ...e })) : [];
     // mirror thrown grenades + deployed gadgets so the guest can render them
+    // mirror thrown grenades + deployed gadgets so the guest can render them
     this.netGrenades = s.grenades ? s.grenades.map((g) => ({ ...g }) as Grenade) : [];
     this.netDeployables = s.deployables
       ? s.deployables.map((d) => ({ ...d, targets: [] }) as unknown as Deployable)
@@ -5263,20 +5493,29 @@ export class GameEngine {
         seed: sw.seed,
       }));
     }
+    if (s.dmKills && this.isDM && this.combatants.length > 0) {
+      const hostC = this.combatants.find(c => c.id === 1);
+      const guestC = this.combatants.find(c => c.id === 2);
+      if (hostC) hostC.kills = s.dmKills[0];
+      if (guestC) guestC.kills = s.dmKills[1];
+    }
     if (s.gameOver && !this.gameOver) {
       // The host's gameOverReason is from the host's POV; derive the guest's
-      // outcome from the base HPs so it is always correct:
-      //   - my (top) base destroyed -> I lose
-      //   - host (bottom) base destroyed -> I win
-      //   - otherwise (host player down) -> I win
-      // Derive the outcome from the base HPs relative to THIS client's role.
-      // The snapshot's hostBaseHp/guestBaseHp are always in the creator's
-      // (pid 1) perspective, so a pid 1 client must read them oppositely to a
-      // pid 2 client. The old code assumed the guest perspective and therefore
-      // showed the host/client the wrong win/lose text.
+      // outcome from the base HPs relative to THIS client's role.
       const iAmJoiner = this.selfPid === 2;
       let reason: string;
-      if (iAmJoiner) {
+      if (this.isDM && s.dmKills) {
+        const hostKills = s.dmKills[0];
+        const guestKills = s.dmKills[1];
+        const target = s.dmTarget ?? 8;
+        if (iAmJoiner) {
+          if (guestKills >= target) reason = "胜利！你击败了对手";
+          else reason = "失败，对手击败了你";
+        } else {
+          if (hostKills >= target) reason = "胜利！你击败了对手";
+          else reason = "失败，对手击败了你";
+        }
+      } else if (iAmJoiner) {
         if (s.guestBaseHp <= 0) reason = "失败，基地失守";
         else if (s.hostBaseHp <= 0) reason = "胜利！敌方基地已摧毁";
         else reason = "胜利！对手已被击败";
@@ -5463,6 +5702,7 @@ export class GameEngine {
   private damageWall(w: Wall, dmg: number) {
     if (!w.destructible) return;
     w.hp -= dmg;
+    this.wallsDirty = true;
     this.spawnParticles(
       w.x + w.w / 2,
       w.y + w.h / 2,
@@ -5479,6 +5719,7 @@ export class GameEngine {
 
   private breakWall(w: Wall, i: number) {
     this.walls.splice(i, 1);
+    this.wallsDirty = true;
     const cx = w.x + w.w / 2;
     const cy = w.y + w.h / 2;
     this.spawnParticles(cx, cy, w.glue ? "#22d3ee" : "#d6b27a", 18, 220, 0.6);
@@ -6090,7 +6331,7 @@ export class GameEngine {
     const hud: HudState = {
       hp: Math.max(0, Math.round(p.hp)),
       maxHp: p.maxHp,
-      score: this.isDM ? this.combatants[0]?.score ?? 0 : this.score,
+      score: this.isDM ? (this.mode === "local" ? this.combatants[0]?.score ?? 0 : this.combatants.find(c => c.id === this.selfPid)?.score ?? 0) : this.score,
       wave: this.wave,
       enemiesLeft:
         this.mode === "guest" ? this.enemiesLeft : this.enemies.length + this.spawnQueue,
@@ -6136,7 +6377,7 @@ export class GameEngine {
       connecting: this.mode !== "local" && !this.peerReady,
       reconnecting: this.reconnecting,
       banner: this.banner ? this.banner.text : null,
-      kills: this.isDM ? this.combatants[0]?.kills ?? 0 : this.kills,
+      kills: this.isDM ? (this.mode === "local" ? this.combatants[0]?.kills ?? 0 : this.combatants.find(c => c.id === this.selfPid)?.kills ?? 0) : this.kills,
       gold: this.gold,
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
@@ -6158,7 +6399,7 @@ export class GameEngine {
               name: c.name,
               kills: c.kills,
               color: c.color,
-              you: c.id === 0,
+              you: this.mode === "local" ? c.id === 0 : c.id === this.selfPid,
               dead: !!(c.player.deadTimer && c.player.deadTimer > 0),
             }))
         : undefined,

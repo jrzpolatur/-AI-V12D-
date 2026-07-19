@@ -2678,6 +2678,8 @@ var GameEngine = class {
   foeGadgets = [];
   /** the opponent's per-gadget cooldown timers (separate from the host's own) */
   foeGadgetCd = /* @__PURE__ */ new Map();
+  foeWeaponStates = /* @__PURE__ */ new Map();
+  wallsDirty = true;
   /** the host's own avatar; never swapped while simulating the foe */
   localPlayer = null;
   // one-shot action intents captured on the guest, sent with the next input
@@ -2973,6 +2975,8 @@ var GameEngine = class {
         overheated: false
       });
     }
+    this.foeWeaponStates = /* @__PURE__ */ new Map();
+    this.wallsDirty = true;
     this.score = 0;
     this.kills = 0;
     this.gold = 0;
@@ -3044,7 +3048,7 @@ var GameEngine = class {
     this.applyRuntime();
     if (this.gameMode === "deathmatch") {
       this.isDM = true;
-      this.dmKillLimit = 15;
+      this.dmKillLimit = this.mode === "local" ? 15 : 8;
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
@@ -3055,42 +3059,47 @@ var GameEngine = class {
         { x: this.worldW * 0.85, y: this.worldH * 0.2 },
         { x: this.worldW * 0.5, y: this.worldH * 0.16 }
       ];
-      const human = {
-        id: 0,
-        isBot: false,
-        name: "\u4F60",
-        color: "#38bdf8",
-        player: this.player,
-        character: this.character,
-        outfit: this.outfit,
-        skill: this.skill,
-        guns: this.guns,
-        gunIndex: this.gunIndex,
-        weaponStates: this.weaponStates,
-        gadgets: this.gadgets,
-        selectedGadget: this.selectedGadget,
-        skillCd: this.skillCd,
-        dashCharges: this.dashCharges,
-        dashRecharge: this.dashRecharge,
-        gadgetCd: this.gadgetCd,
-        lastGadget: this.lastGadget,
-        kills: 0,
-        score: 0,
-        wander: 0,
-        strafeDir: 1,
-        strafeTimer: 0
-      };
-      this.combatants = [human];
-      this.player.cid = 0;
-      const botColors = ["#f472b6", "#a3e635", "#fbbf24"];
-      const botNames = ["\u963F\u5C14\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C"];
-      const picks = this.rollBotLoadouts(3);
-      for (let i = 0; i < 3; i++) {
-        const sp = this.dmSpawns[i + 1];
-        this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+      if (this.mode === "local") {
+        const human = {
+          id: 0,
+          isBot: false,
+          name: "\u4F60",
+          color: "#38bdf8",
+          player: this.player,
+          character: this.character,
+          outfit: this.outfit,
+          skill: this.skill,
+          guns: this.guns,
+          gunIndex: this.gunIndex,
+          weaponStates: this.weaponStates,
+          gadgets: this.gadgets,
+          selectedGadget: this.selectedGadget,
+          skillCd: this.skillCd,
+          dashCharges: this.dashCharges,
+          dashRecharge: this.dashRecharge,
+          gadgetCd: this.gadgetCd,
+          lastGadget: this.lastGadget,
+          kills: 0,
+          score: 0,
+          wander: 0,
+          strafeDir: 1,
+          strafeTimer: 0
+        };
+        this.combatants = [human];
+        this.player.cid = 0;
+        const botColors = ["#f472b6", "#a3e635", "#fbbf24"];
+        const botNames = ["\u963F\u5C14\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C"];
+        const picks = this.rollBotLoadouts(3);
+        for (let i = 0; i < 3; i++) {
+          const sp = this.dmSpawns[i + 1];
+          this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+        }
+        this.banner = { text: "\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 15 \u4EBA\u83B7\u80DC\uFF01", t: 2.4 };
+      } else {
+        this.combatants = [];
+        this.banner = { text: "\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 8 \u4EBA\u83B7\u80DC\uFF01", t: 2.4 };
       }
       this.activeId = 0;
-      this.banner = { text: "\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 15 \u4EBA\u83B7\u80DC\uFF01", t: 2.4 };
     } else {
       this.isDM = false;
       this.combatants = [];
@@ -3107,6 +3116,74 @@ var GameEngine = class {
       this.player.lastGadget = 0;
       this.foe = this.makeFoe();
       this.net.sendGame({ t: "hello", name: this.character.name, loadout: this.loadout });
+      if (this.gameMode === "deathmatch") {
+        this.player.cid = this.selfPid;
+        this.foe.cid = this.peerPid;
+        const hostSpawn = this.dmSpawns[0];
+        const guestSpawn = this.dmSpawns[1];
+        if (this.selfPid === 1) {
+          this.player.x = hostSpawn.x;
+          this.player.y = hostSpawn.y;
+          this.foe.x = guestSpawn.x;
+          this.foe.y = guestSpawn.y;
+        } else {
+          this.player.x = guestSpawn.x;
+          this.player.y = guestSpawn.y;
+          this.foe.x = hostSpawn.x;
+          this.foe.y = hostSpawn.y;
+        }
+        const c1 = {
+          id: 1,
+          isBot: false,
+          name: this.mode === "host" ? "\u4F60" : this.peerName || "\u5BF9\u624B",
+          color: "#38bdf8",
+          player: this.mode === "host" ? this.player : this.foe,
+          character: this.mode === "host" ? this.character : this.foeChar,
+          outfit: this.mode === "host" ? this.outfit : this.foeOutfit,
+          skill: this.mode === "host" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          guns: this.mode === "host" ? this.guns : this.foeGuns,
+          gunIndex: this.mode === "host" ? this.gunIndex : this.foe.gunIndex ?? 0,
+          weaponStates: this.mode === "host" ? this.weaponStates : /* @__PURE__ */ new Map(),
+          gadgets: this.mode === "host" ? this.gadgets : this.foeGadgets,
+          selectedGadget: this.mode === "host" ? this.selectedGadget : -1,
+          skillCd: this.mode === "host" ? this.skillCd : 0,
+          dashCharges: this.mode === "host" ? this.dashCharges : MAX_DASH_CHARGES,
+          dashRecharge: this.mode === "host" ? this.dashRecharge : 0,
+          gadgetCd: this.mode === "host" ? this.gadgetCd : /* @__PURE__ */ new Map(),
+          lastGadget: this.mode === "host" ? this.lastGadget : 0,
+          kills: 0,
+          score: 0,
+          wander: 0,
+          strafeDir: 1,
+          strafeTimer: 0
+        };
+        const c2 = {
+          id: 2,
+          isBot: false,
+          name: this.mode === "guest" ? "\u4F60" : this.peerName || "\u5BF9\u624B",
+          color: "#f472b6",
+          player: this.mode === "guest" ? this.player : this.foe,
+          character: this.mode === "guest" ? this.character : this.foeChar,
+          outfit: this.mode === "guest" ? this.outfit : this.foeOutfit,
+          skill: this.mode === "guest" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          guns: this.mode === "guest" ? this.guns : this.foeGuns,
+          gunIndex: this.mode === "guest" ? this.gunIndex : this.foe.gunIndex ?? 0,
+          weaponStates: this.mode === "guest" ? this.weaponStates : /* @__PURE__ */ new Map(),
+          gadgets: this.mode === "guest" ? this.gadgets : this.foeGadgets,
+          selectedGadget: this.mode === "guest" ? this.selectedGadget : -1,
+          skillCd: this.mode === "guest" ? this.skillCd : 0,
+          dashCharges: this.mode === "guest" ? this.dashCharges : MAX_DASH_CHARGES,
+          dashRecharge: this.mode === "guest" ? this.dashRecharge : 0,
+          gadgetCd: this.mode === "guest" ? this.gadgetCd : /* @__PURE__ */ new Map(),
+          lastGadget: this.mode === "guest" ? this.lastGadget : 0,
+          kills: 0,
+          score: 0,
+          wander: 0,
+          strafeDir: 1,
+          strafeTimer: 0
+        };
+        this.combatants = [c1, c2];
+      }
     }
   }
   makeFoe() {
@@ -3280,10 +3357,10 @@ var GameEngine = class {
     };
   }
   /** Make sure every gun in the list has a WeaponState entry (host simulates foe guns too). */
-  ensureWeaponStates(guns) {
+  ensureWeaponStates(guns, targetMap = this.weaponStates) {
     for (const g of guns) {
-      if (!this.weaponStates.has(g.id)) {
-        this.weaponStates.set(g.id, {
+      if (!targetMap.has(g.id)) {
+        targetMap.set(g.id, {
           ammo: g.magazine ?? 0,
           reload: 0,
           heat: 0,
@@ -3298,7 +3375,7 @@ var GameEngine = class {
     this.foeChar = getCharacter(pl.characterId);
     this.foeOutfit = getOutfit(pl.outfitId);
     this.foeGuns = pl.gunIds && pl.gunIds.length > 0 ? pl.gunIds.map((id) => GUNS.find((g) => g.id === id) ?? GUNS[0]).slice(0, 2) : [GUNS.find((g) => g.id === pl.gunId) ?? GUNS[0]];
-    this.ensureWeaponStates(this.foeGuns);
+    this.ensureWeaponStates(this.foeGuns, this.foeWeaponStates);
     const chosen = (pl.gadgetIds ?? []).map((id) => GADGETS.find((g) => g.id === id)).filter((g) => !!g);
     this.foeGadgets = chosen.length > 0 ? chosen : GADGETS.slice(0, 3);
     if (this.foe) {
@@ -3308,6 +3385,18 @@ var GameEngine = class {
       if (this.foe.hp > this.foe.maxHp) this.foe.hp = this.foe.maxHp;
       this.foe.speed = c.speed * (1 + o.speedBonus);
       this.foe.size = c.size;
+    }
+    if (this.gameMode === "deathmatch" && this.combatants.length > 0) {
+      const peerC = this.combatants.find((c) => c.id === this.peerPid);
+      if (peerC) {
+        peerC.name = this.peerName || "\u5BF9\u624B";
+        peerC.character = this.foeChar;
+        peerC.outfit = this.foeOutfit;
+        peerC.skill = getSkill(pl.skillId ?? "dash");
+        peerC.guns = this.foeGuns;
+        peerC.weaponStates = this.foeWeaponStates;
+        peerC.gadgets = this.foeGadgets;
+      }
     }
   }
   /** Sync world / base tunables from RUNTIME into the live engine. */
@@ -3695,15 +3784,41 @@ var GameEngine = class {
     if (this.mode !== "local" && this.net) this.pumpNet();
     if (this.authoritative) {
       this.applySnapshot();
-      if (!this.gxInit) {
-        this.gx = this.player.x;
-        this.gy = this.player.y;
-        this.gxInit = true;
+      let dx = 0;
+      let dy = 0;
+      if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) dy -= 1;
+      if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
+      if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
+      if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+      dx += this.virtualMove.x;
+      dy += this.virtualMove.y;
+      const vlen = Math.hypot(dx, dy) || 1;
+      dx /= vlen;
+      dy /= vlen;
+      const p = this.player;
+      if (!p.deadTimer || p.deadTimer <= 0) {
+        if (p.dashTime > 0) {
+          p.dashTime -= dt;
+          p.x += p.dashVx * dt;
+          p.y += p.dashVy * dt;
+        } else {
+          const slow = (p.bowDrawing ? this.gun.drawSlowMult ?? 1 : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
+          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+        }
+        const m = p.size;
+        p.x = Math.max(m, Math.min(this.worldW - m, p.x));
+        p.y = Math.max(m, Math.min(this.worldH - m, p.y));
+        this.collideWalls(p, p.size);
+        this.collideBase(p, p.size);
+        this.collideBase(p, p.size, this.enemyBase);
       }
-      this.gx += (this.player.x - this.gx) * 0.4;
-      this.gy += (this.player.y - this.gy) * 0.4;
-      this.player.x = this.gx;
-      this.player.y = this.gy;
+      this.gx = this.player.x;
+      this.gy = this.player.y;
+      this.gxInit = true;
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
@@ -3724,7 +3839,7 @@ var GameEngine = class {
     if (this.paused) {
       if (this.mode === "host" && this.net) {
         this.snapAccum += dt;
-        if (this.snapAccum >= 1 / 30) {
+        if (this.snapAccum >= 1 / 20) {
           this.snapAccum = 0;
           this.sendSnapshot();
         }
@@ -3735,15 +3850,41 @@ var GameEngine = class {
     }
     if (this.mode === "guest") {
       this.applySnapshot();
-      if (!this.gxInit) {
-        this.gx = this.player.x;
-        this.gy = this.player.y;
-        this.gxInit = true;
+      let dx = 0;
+      let dy = 0;
+      if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) dy -= 1;
+      if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
+      if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
+      if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+      dx += this.virtualMove.x;
+      dy += this.virtualMove.y;
+      const vlen = Math.hypot(dx, dy) || 1;
+      dx /= vlen;
+      dy /= vlen;
+      const p = this.player;
+      if (!p.deadTimer || p.deadTimer <= 0) {
+        if (p.dashTime > 0) {
+          p.dashTime -= dt;
+          p.x += p.dashVx * dt;
+          p.y += p.dashVy * dt;
+        } else {
+          const slow = (p.bowDrawing ? this.gun.drawSlowMult ?? 1 : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
+          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+        }
+        const m = p.size;
+        p.x = Math.max(m, Math.min(this.worldW - m, p.x));
+        p.y = Math.max(m, Math.min(this.worldH - m, p.y));
+        this.collideWalls(p, p.size);
+        this.collideBase(p, p.size);
+        this.collideBase(p, p.size, this.enemyBase);
       }
-      this.gx += (this.player.x - this.gx) * 0.4;
-      this.gy += (this.player.y - this.gy) * 0.4;
-      this.player.x = this.gx;
-      this.player.y = this.gy;
+      this.gx = this.player.x;
+      this.gy = this.player.y;
+      this.gxInit = true;
       if (this.touchMode) {
         const tgt = this.findAimTarget(this.player);
         if (tgt) {
@@ -3782,7 +3923,7 @@ var GameEngine = class {
       return;
     }
     if (this.isDM) {
-      this.activeId = 0;
+      this.activeId = this.mode === "local" ? 0 : this.selfPid;
       this.updatePlayer(dt);
       for (const c of this.combatants) if (c.isBot) this.simulateBot(c, dt);
     } else {
@@ -3796,7 +3937,7 @@ var GameEngine = class {
       }
       this.simulateRemote(dt);
       this.snapAccum += dt;
-      if (this.snapAccum >= 1 / 30) {
+      if (this.snapAccum >= 1 / 20) {
         this.snapAccum = 0;
         this.sendSnapshot();
       }
@@ -5937,7 +6078,7 @@ var GameEngine = class {
   tickRespawns(dt) {
     if (this.isDM) {
       for (const c of this.combatants) {
-        const sp = this.dmSpawns[c.id] ?? { x: this.worldW / 2, y: this.worldH / 2 };
+        const sp = this.dmSpawns[this.mode === "local" ? c.id : c.id - 1] ?? { x: this.worldW / 2, y: this.worldH / 2 };
         this.reviveIfReady(c.player, sp.x, sp.y, dt, c.guns, c.weaponStates);
       }
       return;
@@ -5997,7 +6138,7 @@ var GameEngine = class {
     this.simulatingOther = true;
     if (foe.deadTimer && foe.deadTimer > 0) return;
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse, sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets, sGadgetCd = this.gadgetCd;
-    const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch;
+    const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch, sActive = this.activeId, sWs = this.weaponStates;
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
     this.player = foe;
@@ -6014,6 +6155,8 @@ var GameEngine = class {
     this.lastGadget = foe.lastGadget ?? 0;
     this.gadgets = this.foeGadgets.length ? this.foeGadgets : this.gadgets;
     this.gadgetCd = this.foeGadgetCd;
+    this.activeId = this.peerPid;
+    this.weaponStates = this.foeWeaponStates;
     for (const [k, v] of this.gadgetCd) {
       if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
     }
@@ -6029,6 +6172,7 @@ var GameEngine = class {
     foe.dashRecharge = this.dashRecharge;
     foe.lastGadget = this.lastGadget;
     this.foeGadgetCd = this.gadgetCd;
+    this.foeWeaponStates = this.weaponStates;
     this.player = sp;
     this.guns = sGuns;
     this.gunIndex = sg;
@@ -6042,6 +6186,8 @@ var GameEngine = class {
     this.dashRecharge = sDashR;
     this.lastGadget = sLastG;
     this.semiAutoLatch = sSemi;
+    this.activeId = sActive;
+    this.weaponStates = sWs;
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
     this.simulatingOther = false;
@@ -6324,6 +6470,19 @@ var GameEngine = class {
   }
   /** Build the full world snapshot (used by the host relay AND the authoritative server). */
   buildSnapshot() {
+    const snapWalls = this.wallsDirty ? this.walls.filter((w) => !w.invisible).map((w) => ({
+      x: w.x,
+      y: w.y,
+      w: w.w,
+      h: w.h,
+      hp: w.destructible ? Math.max(0, Math.round(w.hp)) : -1,
+      maxHp: w.destructible ? w.maxHp : -1,
+      destructible: w.destructible,
+      glue: !!w.glue,
+      building: !!w.building,
+      seed: w.seed
+    })) : void 0;
+    this.wallsDirty = false;
     return {
       time: this.time,
       scene: this.sceneIndex,
@@ -6355,20 +6514,7 @@ var GameEngine = class {
         kind: b.kind,
         owner: b.owner ?? "self"
       })),
-      // terrain — mirror the exact cover state to the guest so walls (incl.
-      // destruction) render correctly. Skip invisible boundary "air walls".
-      walls: this.walls.filter((w) => !w.invisible).map((w) => ({
-        x: w.x,
-        y: w.y,
-        w: w.w,
-        h: w.h,
-        hp: w.destructible ? Math.max(0, Math.round(w.hp)) : -1,
-        maxHp: w.destructible ? w.maxHp : -1,
-        destructible: w.destructible,
-        glue: !!w.glue,
-        building: !!w.building,
-        seed: w.seed
-      })),
+      walls: snapWalls,
       effects: this.effects.map((e) => {
         let id = this.fxIds.get(e);
         if (id === void 0) {
@@ -6424,7 +6570,12 @@ var GameEngine = class {
       kills: this.kills,
       gold: this.gold,
       gameOver: this.gameOver,
-      gameOverReason: this.gameOverReason
+      gameOverReason: this.gameOverReason,
+      dmKills: this.isDM ? [
+        this.combatants.find((c) => c.id === 1)?.kills ?? 0,
+        this.combatants.find((c) => c.id === 2)?.kills ?? 0
+      ] : void 0,
+      dmTarget: this.isDM ? this.dmKillLimit : void 0
     };
   }
   /** Host relay path: send the snapshot to the guest over the existing Net. */
@@ -6475,7 +6626,7 @@ var GameEngine = class {
     if (!player || !inp) return;
     if (player.deadTimer && player.deadTimer > 0) return;
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse, sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets, sGadgetCd = this.gadgetCd;
-    const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch;
+    const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch, sActive = this.activeId, sWs = this.weaponStates;
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
     this.player = player;
@@ -6492,6 +6643,8 @@ var GameEngine = class {
     this.lastGadget = player.lastGadget ?? 0;
     this.gadgets = gadgets.length ? gadgets : this.gadgets;
     this.gadgetCd = gadgetCd;
+    this.activeId = player === this.player ? this.selfPid : this.peerPid;
+    this.weaponStates = player === this.player ? sWs : this.foeWeaponStates;
     for (const [k, v] of this.gadgetCd) {
       if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
     }
@@ -6506,6 +6659,9 @@ var GameEngine = class {
     player.dashCharges = this.dashCharges;
     player.dashRecharge = this.dashRecharge;
     player.lastGadget = this.lastGadget;
+    if (player === this.foe) {
+      this.foeWeaponStates = this.weaponStates;
+    }
     this.player = sp;
     this.guns = sGuns;
     this.gunIndex = sg;
@@ -6519,6 +6675,8 @@ var GameEngine = class {
     this.dashRecharge = sDashR;
     this.lastGadget = sLastG;
     this.semiAutoLatch = sSemi;
+    this.activeId = sActive;
+    this.weaponStates = sWs;
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
   }
@@ -6591,6 +6749,73 @@ var GameEngine = class {
     this.peerInput.clear();
     this.peerLatch.clear();
     this.foe = this.makeFoe();
+    if (this.gameMode === "deathmatch") {
+      this.player.cid = this.selfPid;
+      this.foe.cid = this.peerPid;
+      this.dmSpawns = [
+        { x: this.worldW * 0.5, y: this.worldH - 200 },
+        { x: this.worldW * 0.15, y: this.worldH * 0.2 },
+        { x: this.worldW * 0.85, y: this.worldH * 0.2 },
+        { x: this.worldW * 0.5, y: this.worldH * 0.16 }
+      ];
+      const hostSpawn = this.dmSpawns[0];
+      const guestSpawn = this.dmSpawns[1];
+      this.player.x = hostSpawn.x;
+      this.player.y = hostSpawn.y;
+      this.foe.x = guestSpawn.x;
+      this.foe.y = guestSpawn.y;
+      const c1 = {
+        id: 1,
+        isBot: false,
+        name: "\u73A9\u5BB61",
+        color: "#38bdf8",
+        player: this.player,
+        character: this.character,
+        outfit: this.outfit,
+        skill: this.skill,
+        guns: this.guns,
+        gunIndex: this.gunIndex,
+        weaponStates: this.weaponStates,
+        gadgets: this.gadgets,
+        selectedGadget: this.selectedGadget,
+        skillCd: this.skillCd,
+        dashCharges: this.dashCharges,
+        dashRecharge: this.dashRecharge,
+        gadgetCd: this.gadgetCd,
+        lastGadget: this.lastGadget,
+        kills: 0,
+        score: 0,
+        wander: 0,
+        strafeDir: 1,
+        strafeTimer: 0
+      };
+      const c2 = {
+        id: 2,
+        isBot: false,
+        name: "\u73A9\u5BB62",
+        color: "#f472b6",
+        player: this.foe,
+        character: this.foeChar,
+        outfit: this.foeOutfit,
+        skill: getSkill(loadoutB.skillId ?? "dash"),
+        guns: this.foeGuns,
+        gunIndex: 0,
+        weaponStates: /* @__PURE__ */ new Map(),
+        gadgets: this.foeGadgets,
+        selectedGadget: -1,
+        skillCd: 0,
+        dashCharges: MAX_DASH_CHARGES,
+        dashRecharge: 0,
+        gadgetCd: /* @__PURE__ */ new Map(),
+        lastGadget: 0,
+        kills: 0,
+        score: 0,
+        wander: 0,
+        strafeDir: 1,
+        strafeTimer: 0
+      };
+      this.combatants = [c1, c2];
+    }
     this.peerLoadout = loadoutB;
     this.applyPeerLoadout();
     this.foe.gunIndex = 0;
@@ -6629,8 +6854,19 @@ var GameEngine = class {
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
     const foe = s.players.find((p) => p.id !== this.selfPid) ?? s.players[1];
     if (me) {
-      this.player.x = me.x;
-      this.player.y = me.y;
+      if (this.mode === "guest" || this.authoritative) {
+        const distSq = (this.player.x - me.x) ** 2 + (this.player.y - me.y) ** 2;
+        if (distSq > 120 * 120) {
+          this.player.x = me.x;
+          this.player.y = me.y;
+        } else {
+          this.player.x += (me.x - this.player.x) * 0.25;
+          this.player.y += (me.y - this.player.y) * 0.25;
+        }
+      } else {
+        this.player.x = me.x;
+        this.player.y = me.y;
+      }
       this.player.angle = me.angle;
       this.player.hp = me.hp;
       this.player.maxHp = me.maxHp;
@@ -6688,10 +6924,27 @@ var GameEngine = class {
         seed: sw.seed
       }));
     }
+    if (s.dmKills && this.isDM && this.combatants.length > 0) {
+      const hostC = this.combatants.find((c) => c.id === 1);
+      const guestC = this.combatants.find((c) => c.id === 2);
+      if (hostC) hostC.kills = s.dmKills[0];
+      if (guestC) guestC.kills = s.dmKills[1];
+    }
     if (s.gameOver && !this.gameOver) {
       const iAmJoiner = this.selfPid === 2;
       let reason;
-      if (iAmJoiner) {
+      if (this.isDM && s.dmKills) {
+        const hostKills = s.dmKills[0];
+        const guestKills = s.dmKills[1];
+        const target = s.dmTarget ?? 8;
+        if (iAmJoiner) {
+          if (guestKills >= target) reason = "\u80DC\u5229\uFF01\u4F60\u51FB\u8D25\u4E86\u5BF9\u624B";
+          else reason = "\u5931\u8D25\uFF0C\u5BF9\u624B\u51FB\u8D25\u4E86\u4F60";
+        } else {
+          if (hostKills >= target) reason = "\u80DC\u5229\uFF01\u4F60\u51FB\u8D25\u4E86\u5BF9\u624B";
+          else reason = "\u5931\u8D25\uFF0C\u5BF9\u624B\u51FB\u8D25\u4E86\u4F60";
+        }
+      } else if (iAmJoiner) {
         if (s.guestBaseHp <= 0) reason = "\u5931\u8D25\uFF0C\u57FA\u5730\u5931\u5B88";
         else if (s.hostBaseHp <= 0) reason = "\u80DC\u5229\uFF01\u654C\u65B9\u57FA\u5730\u5DF2\u6467\u6BC1";
         else reason = "\u80DC\u5229\uFF01\u5BF9\u624B\u5DF2\u88AB\u51FB\u8D25";
@@ -6845,6 +7098,7 @@ var GameEngine = class {
   damageWall(w, dmg) {
     if (!w.destructible) return;
     w.hp -= dmg;
+    this.wallsDirty = true;
     this.spawnParticles(
       w.x + w.w / 2,
       w.y + w.h / 2,
@@ -6860,6 +7114,7 @@ var GameEngine = class {
   }
   breakWall(w, i) {
     this.walls.splice(i, 1);
+    this.wallsDirty = true;
     const cx = w.x + w.w / 2;
     const cy = w.y + w.h / 2;
     this.spawnParticles(cx, cy, w.glue ? "#22d3ee" : "#d6b27a", 18, 220, 0.6);
@@ -7391,7 +7646,7 @@ var GameEngine = class {
     const hud = {
       hp: Math.max(0, Math.round(p.hp)),
       maxHp: p.maxHp,
-      score: this.isDM ? this.combatants[0]?.score ?? 0 : this.score,
+      score: this.isDM ? this.mode === "local" ? this.combatants[0]?.score ?? 0 : this.combatants.find((c) => c.id === this.selfPid)?.score ?? 0 : this.score,
       wave: this.wave,
       enemiesLeft: this.mode === "guest" ? this.enemiesLeft : this.enemies.length + this.spawnQueue,
       gunId: g.id,
@@ -7435,7 +7690,7 @@ var GameEngine = class {
       connecting: this.mode !== "local" && !this.peerReady,
       reconnecting: this.reconnecting,
       banner: this.banner ? this.banner.text : null,
-      kills: this.isDM ? this.combatants[0]?.kills ?? 0 : this.kills,
+      kills: this.isDM ? this.mode === "local" ? this.combatants[0]?.kills ?? 0 : this.combatants.find((c) => c.id === this.selfPid)?.kills ?? 0 : this.kills,
       gold: this.gold,
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
@@ -7450,7 +7705,7 @@ var GameEngine = class {
         name: c.name,
         kills: c.kills,
         color: c.color,
-        you: c.id === 0,
+        you: this.mode === "local" ? c.id === 0 : c.id === this.selfPid,
         dead: !!(c.player.deadTimer && c.player.deadTimer > 0)
       })) : void 0,
       dmTarget: this.isDM ? this.dmKillLimit : void 0

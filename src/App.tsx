@@ -71,6 +71,7 @@ export default function App() {
   if (screen === "loadout") {
     return (
       <LoadoutScreen
+        isMultiplayer={mode !== "local"}
         onConfirm={(l) => {
           setLoadout(l);
           setScreen("game");

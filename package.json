@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "play": "vite build && node scripts/fix-file-protocol.mjs && node scripts/open.mjs",
     "server": "node server/relay.mjs",
-    "start": "node server/authoritative.mjs",
+    "start": "node server/prod.mjs",
     "build:engine": "esbuild src/game/engine.ts --bundle --format=esm --platform=node --outfile=server/engine.bundle.mjs",
     "editor": "node scripts/editor-server.mjs",
     "extract:guns": "node scripts/extract-guns.mjs",

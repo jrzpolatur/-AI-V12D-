@@ -144,7 +144,7 @@ export interface Snapshot {
   enemies: SnapEnemy[];
   bullets: SnapBullet[]; // all bullets (player + ai)
   /** terrain cover walls (indestructible pillars + destructible cover) */
-  walls: SnapWall[];
+  walls?: SnapWall[];
   /** host-simulated visual effects mirrored to the guest (explosions, sweeps, ...) */
   effects: SnapEffect[];
   /** thrown grenades mirrored to the guest so they render mid-flight */
@@ -164,6 +164,8 @@ export interface Snapshot {
   gold: number;
   gameOver: boolean;
   gameOverReason: string;
+  dmKills?: [number, number];
+  dmTarget?: number;
 }
 
 /** Compact effect payload so guest / authoritative clients can mirror the

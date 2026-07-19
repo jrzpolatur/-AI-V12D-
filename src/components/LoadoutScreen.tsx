@@ -352,9 +352,11 @@ function PickCard({
 export default function LoadoutScreen({
   onConfirm,
   onBack,
+  isMultiplayer = false,
 }: {
   onConfirm: (loadout: Loadout) => void;
   onBack?: () => void;
+  isMultiplayer?: boolean;
 }) {
   const [characterId, setCharacterId] = useState(
     () => localStorage.getItem("dm_loadout.characterId") || "raider"
@@ -449,7 +451,7 @@ export default function LoadoutScreen({
     gunIds,
     skillId,
     gadgetIds,
-    gameMode,
+    gameMode: isMultiplayer ? "deathmatch" : gameMode,
   };
   const character = CHARACTERS.find((c) => c.id === characterId)!;
   const outfit = OUTFITS.find((o) => o.id === outfitId)!;
@@ -659,26 +661,28 @@ export default function LoadoutScreen({
           </div>
         </div>
 
-            <Section label="游戏模式（单机）">
-              <PickCard
-                active={gameMode === "biohazard"}
-                accent="#a3e635"
-                onClick={() => setGameMode("biohazard")}
-              >
-                <span className="text-xl">☣</span>
-                <span className="text-xs font-semibold">生化危机</span>
-                <span className="text-[10px] text-slate-400">尸潮生存 · 新武器</span>
-              </PickCard>
-              <PickCard
-                active={gameMode === "deathmatch"}
-                accent="#f472b6"
-                onClick={() => setGameMode("deathmatch")}
-              >
-                <span className="text-xl">🤖</span>
-                <span className="text-xs font-semibold">人机对战</span>
-                <span className="text-[10px] text-slate-400">离线 PvP · 先杀 15 人胜</span>
-              </PickCard>
-            </Section>
+            {!isMultiplayer && (
+              <Section label="游戏模式（单机）">
+                <PickCard
+                  active={gameMode === "biohazard"}
+                  accent="#a3e635"
+                  onClick={() => setGameMode("biohazard")}
+                >
+                  <span className="text-xl">☣</span>
+                  <span className="text-xs font-semibold">生化危机</span>
+                  <span className="text-[10px] text-slate-400">尸潮生存 · 新武器</span>
+                </PickCard>
+                <PickCard
+                  active={gameMode === "deathmatch"}
+                  accent="#f472b6"
+                  onClick={() => setGameMode("deathmatch")}
+                >
+                  <span className="text-xl">🤖</span>
+                  <span className="text-xs font-semibold">人机对战</span>
+                  <span className="text-[10px] text-slate-400">离线 PvP · 先杀 15 人胜</span>
+                </PickCard>
+              </Section>
+            )}
 
         {/* Controls + start */}
         <div className="mt-6 flex flex-col items-center gap-4">
