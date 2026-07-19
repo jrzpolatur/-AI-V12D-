@@ -356,16 +356,53 @@ export default function LoadoutScreen({
   onConfirm: (loadout: Loadout) => void;
   onBack?: () => void;
 }) {
-  const [characterId, setCharacterId] = useState("raider");
-  const [outfitId, setOutfitId] = useState("tactical");
-  const [gunIds, setGunIds] = useState<string[]>(["mac11", "sniper"]);
-  const [skillId, setSkillId] = useState("dash");
-  const [gadgetIds, setGadgetIds] = useState<string[]>([
-    "turret_mg",
-    "turret_cannon",
-    "mine_explosive",
-  ]);
-  const [gameMode, setGameMode] = useState<"defense" | "biohazard" | "deathmatch">("defense");
+  const [characterId, setCharacterId] = useState(
+    () => localStorage.getItem("dm_loadout.characterId") || "raider"
+  );
+  const [outfitId, setOutfitId] = useState(
+    () => localStorage.getItem("dm_loadout.outfitId") || "tactical"
+  );
+  const [gunIds, setGunIds] = useState<string[]>(() => {
+    const raw = localStorage.getItem("dm_loadout.gunIds");
+    if (raw) {
+      try {
+        const v = JSON.parse(raw);
+        if (Array.isArray(v) && v.length) return v as string[];
+      } catch {
+        /* ignore corrupt value */
+      }
+    }
+    return ["mac11", "sniper"];
+  });
+  const [skillId, setSkillId] = useState(
+    () => localStorage.getItem("dm_loadout.skillId") || "dash"
+  );
+  const [gadgetIds, setGadgetIds] = useState<string[]>(() => {
+    const raw = localStorage.getItem("dm_loadout.gadgetIds");
+    if (raw) {
+      try {
+        const v = JSON.parse(raw);
+        if (Array.isArray(v) && v.length) return v as string[];
+      } catch {
+        /* ignore corrupt value */
+      }
+    }
+    return ["turret_mg", "turret_cannon", "mine_explosive"];
+  });
+  const [gameMode, setGameMode] = useState<"defense" | "biohazard" | "deathmatch">(
+    () => (localStorage.getItem("dm_loadout.gameMode") as "defense" | "biohazard" | "deathmatch") || "defense"
+  );
+
+  // remember the last picked loadout so quitting & re-entering doesn't force a
+  // full re-selection every time.
+  useEffect(() => {
+    localStorage.setItem("dm_loadout.characterId", characterId);
+    localStorage.setItem("dm_loadout.outfitId", outfitId);
+    localStorage.setItem("dm_loadout.gunIds", JSON.stringify(gunIds));
+    localStorage.setItem("dm_loadout.skillId", skillId);
+    localStorage.setItem("dm_loadout.gadgetIds", JSON.stringify(gadgetIds));
+    localStorage.setItem("dm_loadout.gameMode", gameMode);
+  }, [characterId, outfitId, gunIds, skillId, gadgetIds, gameMode]);
 
   const gunId = gunIds[0] ?? "mac11";
   const toggleGun = (id: string) => {

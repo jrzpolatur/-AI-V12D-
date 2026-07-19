@@ -1169,31 +1169,55 @@ export class GameEngine {
   }
 
   /** Roll `n` randomised bot loadouts (ranged / bow weapons only, no
-   *  semi-auto so the per-combatant fire-latch stays correct). */
+   *  semi-auto so the per-combatant fire-latch stays correct). Bots get
+   *  DISTINCT characters / skills and a far+near gun pairing so they play
+   *  differently and actually exercise the in-match weapon switching. */
   private rollBotLoadouts(n: number): Loadout[] {
     const out: Loadout[] = [];
     const skillIds = SKILLS.filter((s) => s.id !== "timewarp").map((s) => s.id);
     const gunPool = GUNS.filter(
       (g) => (g.weaponClass === "ranged" || g.weaponClass === "bow") && !g.semiAuto
     );
+    // split by effective range so each bot carries one long-range + one
+    // short-range tool (bulletSpeed * lifetime ≈ max travel distance)
+    const eff = (g: GunDef) => (g.bulletSpeed ?? 700) * (g.life ?? 1);
+    const farGuns = gunPool.filter((g) => eff(g) >= 620);
+    const nearGuns = gunPool.filter((g) => eff(g) < 620);
     const gadPool = GADGETS.slice();
+    const shuffle = <T,>(a: T[]): T[] => {
+      const r = a.slice();
+      for (let i = r.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [r[i], r[j]] = [r[j], r[i]];
+      }
+      return r;
+    };
+    const chars = shuffle(CHARACTERS.map((c) => c.id));
+    const skills = shuffle(skillIds);
     for (let i = 0; i < n; i++) {
-      const c = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+      const cId =
+        chars[i] ?? CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)].id;
       const o = OUTFITS[Math.floor(Math.random() * OUTFITS.length)];
-      const g1 = gunPool[Math.floor(Math.random() * gunPool.length)];
-      let g2 = gunPool[Math.floor(Math.random() * gunPool.length)];
-      if (g2.id === g1.id) g2 = gunPool[(gunPool.indexOf(g2) + 1) % gunPool.length];
-      const sk = skillIds[Math.floor(Math.random() * skillIds.length)];
+      // one long-range, one short-range (fallback to any if a bucket is empty)
+      const far = farGuns.length
+        ? farGuns[Math.floor(Math.random() * farGuns.length)]
+        : gunPool[Math.floor(Math.random() * gunPool.length)];
+      const nearPool = nearGuns.length ? nearGuns : gunPool;
+      let near = nearPool[Math.floor(Math.random() * nearPool.length)];
+      if (near.id === far.id) near = nearPool[(nearPool.indexOf(near) + 1) % nearPool.length];
+      const sk = skills[i] ?? skillIds[Math.floor(Math.random() * skillIds.length)];
+      // 2–3 gadgets, varied per bot, biased to include a pressure tool
       const gs: string[] = [];
       const pool = gadPool.slice();
-      for (let k = 0; k < 3 && pool.length; k++) {
+      const want = 2 + (i % 2);
+      for (let k = 0; k < want && pool.length; k++) {
         gs.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
       }
       out.push({
-        characterId: c.id,
+        characterId: cId,
         outfitId: o.id,
-        gunId: g1.id,
-        gunIds: [g1.id, g2.id],
+        gunId: far.id,
+        gunIds: [far.id, near.id],
         skillId: sk,
         gadgetIds: gs,
         gameMode: "deathmatch",
@@ -4373,6 +4397,23 @@ export class GameEngine {
     if (intent.reload) this.reloadCurrent();
     if (intent.gadget >= 0)
       this.deployGadget(intent.gadget, intent.gadgetX ?? this.mouse.x, intent.gadgetY ?? this.mouse.y);
+    // age the bot's OWN cooldowns so it can actually re-use skills / gadgets /
+    // dashes. (The human's cooldowns are aged in `update()`; the bot context is
+    // only live inside this function, so it must age them here or they'd stay
+    // stuck at their post-use value forever.)
+    if (this.skillCd > 0) this.skillCd -= dt;
+    for (const [k, v] of this.gadgetCd) {
+      if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
+    }
+    if (this.dashCharges < MAX_DASH_CHARGES) {
+      this.dashRecharge += dt;
+      if (this.dashRecharge >= DASH_RECHARGE) {
+        this.dashRecharge = 0;
+        this.dashCharges = Math.min(MAX_DASH_CHARGES, this.dashCharges + 1);
+      }
+    } else {
+      this.dashRecharge = 0;
+    }
     // write bot state back
     c.gunIndex = this.gunIndex;
     c.skillCd = this.skillCd;
