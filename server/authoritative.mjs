@@ -83,8 +83,16 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
-  // Announcement / message-board API + admin page (handled before static).
   if (handleAnnouncementAuth(req, res)) return;
+
+  const url = (req.url || "").split("?")[0];
+  if (url === "/api/online") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ count: wss ? wss.clients.size : 0 }));
+    return;
+  }
+
   serveStatic(req, res);
 });
 

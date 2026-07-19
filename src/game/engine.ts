@@ -5312,8 +5312,8 @@ export class GameEngine {
     this.lastGadget = player.lastGadget ?? 0;
     this.gadgets = gadgets.length ? gadgets : this.gadgets;
     this.gadgetCd = gadgetCd;
-    this.activeId = player === this.player ? this.selfPid : this.peerPid;
-    this.weaponStates = player === this.player ? sWs : this.foeWeaponStates;
+    this.activeId = player === sp ? this.selfPid : this.peerPid;
+    this.weaponStates = player === sp ? sWs : this.foeWeaponStates;
     // decay this peer's gadget cooldowns
     for (const [k, v] of this.gadgetCd) {
       if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));

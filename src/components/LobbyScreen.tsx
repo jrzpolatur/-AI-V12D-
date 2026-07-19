@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Net, type NetStatus } from "../net/Net";
+import { useOnlineCount } from "../hooks/useOnlineCount";
 
 export default function LobbyScreen({
   onReady,
@@ -21,6 +22,7 @@ export default function LobbyScreen({
   const [status, setStatus] = useState<NetStatus>("idle");
   const [info, setInfo] = useState<string>("");
   const [peerName, setPeerName] = useState("");
+  const onlineCount = useOnlineCount();
 
   const netRef = useRef<Net | null>(null);
   const advanced = useRef(false);
@@ -79,6 +81,12 @@ export default function LobbyScreen({
         <p className="mb-6 text-center text-sm text-slate-400">
           1v1 竞技 (死亡竞赛) · 点一下自动匹配对手
         </p>
+
+        {onlineCount !== null && (
+          <div className="mb-4 text-center text-xs font-medium text-cyan-400/80">
+            当前服务器在线: {onlineCount}
+          </div>
+        )}
 
         <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           <label className="block text-xs text-slate-400">你的昵称</label>

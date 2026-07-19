@@ -5,6 +5,7 @@ import LobbyScreen from "./components/LobbyScreen";
 import { Net } from "./net/Net";
 import type { NetMode } from "./net/protocol";
 import type { Loadout } from "./game/engine";
+import { useOnlineCount } from "./hooks/useOnlineCount";
 import homeBg from "./assets/home-bg.png";
 
 type Screen = "menu" | "loadout" | "lobby" | "game";
@@ -21,6 +22,8 @@ export default function App() {
     skillId: "dash",
     gadgetIds: ["turret_mg", "turret_cannon", "mine_explosive"],
   });
+
+  const onlineCount = useOnlineCount();
 
   // 主界面公告 / 消息：从同一服务器拉取（连接服务器的玩家都能看到）。
   const [announce, setAnnounce] = useState("");
@@ -111,6 +114,11 @@ export default function App() {
               联机对战
             </button>
           </div>
+          {onlineCount !== null && (
+            <div className="mt-4 text-center text-sm font-medium text-cyan-200/80">
+              当前在线人数: {onlineCount}
+            </div>
+          )}
         </div>
 
         {/* 公告 / 消息（连接服务器后自动显示） */}

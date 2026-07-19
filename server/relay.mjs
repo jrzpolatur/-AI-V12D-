@@ -29,6 +29,15 @@ const PORT = Number(process.env.PORT) || 8080;
 // (The relay itself only forwards opaque game messages over WebSocket.)
 const server = http.createServer((req, res) => {
   if (handleAnnouncement(req, res)) return;
+  
+  const url = (req.url || "").split("?")[0];
+  if (url === "/api/online") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ count: wss ? wss.clients.size : 0 }));
+    return;
+  }
+
   res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
   res.end("not found");
 });
