@@ -485,7 +485,7 @@ export default function LoadoutScreen({
       <div className="mx-auto max-w-6xl px-5 py-8">
         <header className="mb-6 text-center">
           <h1 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">
-            NEON STRIKE
+            FIRING STICKERS
           </h1>
           <p className="mt-1 text-sm text-slate-400">
             2D 俯视角射击 · 生化生存与人机对战 · 自由搭配人物、服饰、枪械、技能与道具

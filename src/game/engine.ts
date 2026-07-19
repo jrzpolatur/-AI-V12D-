@@ -475,6 +475,7 @@ interface BeamHit {
   enemy: Enemy | null;
   wall: Wall | null;
   combatant?: Player | null;
+  deployable?: Deployable | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -2546,6 +2547,10 @@ export class GameEngine {
         this.damagePlayerEntity(hit.combatant, g.damage * this.character.damageMult * dt, undefined, 0, 0, this.activeId);
         if (Math.random() < 0.7)
           this.spawnParticles(hit.combatant.x, hit.combatant.y, g.glow, 2, 120, 0.22);
+      } else if (hit.deployable) {
+        this.damageDeployable(hit.deployable, g.damage * this.character.damageMult * dt, this.activeId);
+        if (Math.random() < 0.7)
+          this.spawnParticles(hit.deployable.x, hit.deployable.y, g.glow, 2, 120, 0.22);
       }
       if (this.beamSndCd <= 0) {
         sound.shoot("pulse");
@@ -2569,6 +2574,7 @@ export class GameEngine {
     let hitEnemy: Enemy | null = null;
     let hitWall: Wall | null = null;
     let hitCombatant: Player | null = null;
+    let hitDeployable: Deployable | null = null;
     for (const e of this.enemies) {
       const t = this.rayCircle(ox, oy, dx, dy, e.x, e.y, e.size);
       if (t >= 0 && t < best) {
@@ -2601,11 +2607,30 @@ export class GameEngine {
         hitWall = w;
       }
     }
+    // deployed turrets / stations / mines are solid & destructible — the beam
+    // stops at them. An owner never hits their own turret/station (the beam
+    // passes through), but mines can always be shot (incl. your own).
+    for (const d of this.deployables) {
+      const isMine =
+        d.kind === "mine_explosive" ||
+        d.kind === "mine_poison" ||
+        d.kind === "mine_fire";
+      if (!isMine && (d.ownerId ?? -1) === this.activeId) continue;
+      const t = this.rayCircle(ox, oy, dx, dy, d.x, d.y, d.size);
+      if (t >= 0 && t < best) {
+        best = t;
+        hitEnemy = null;
+        hitCombatant = null;
+        hitWall = null;
+        hitDeployable = d;
+      }
+    }
     return {
       point: { x: ox + dx * best, y: oy + dy * best },
       enemy: hitEnemy,
       combatant: hitCombatant,
       wall: hitWall,
+      deployable: hitDeployable,
     };
   }
 

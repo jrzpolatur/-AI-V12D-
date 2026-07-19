@@ -4,3 +4,4 @@ dist
 .playwright-cli
 npm-debug.log*
 .DS_Store
+server/announcements.json

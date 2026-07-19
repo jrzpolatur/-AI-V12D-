@@ -19,10 +19,21 @@
 //   S->C { t:"peerLeft" }                  your opponent disconnected
 //   S->C { t:"error",   msg }              something went wrong
 
+import http from "http";
 import { WebSocketServer } from "ws";
+import { handleAnnouncement } from "./common.mjs";
 
 const PORT = Number(process.env.PORT) || 8080;
-const wss = new WebSocketServer({ port: PORT });
+
+// HTTP server: serves the announcement / message-board API + admin page.
+// (The relay itself only forwards opaque game messages over WebSocket.)
+const server = http.createServer((req, res) => {
+  if (handleAnnouncement(req, res)) return;
+  res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+  res.end("not found");
+});
+
+const wss = new WebSocketServer({ server });
 
 /** roomCode -> { peers: Map<pid, {ws, name, host}> } */
 const rooms = new Map();
@@ -151,4 +162,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-console.log(`[relay] listening on ws://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`[relay] http + ws listening on http://localhost:${PORT}`);
+});

@@ -18,6 +18,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
+import { handleAnnouncement as handleAnnouncementAuth } from "./common.mjs";
 import { GameEngine } from "./engine.bundle.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +40,8 @@ const RECONNECT_GRACE_MS = 15000;
 
 // ---------------------------------------------------------------- static files
 const server = http.createServer((req, res) => {
+  // Announcement / message-board API + admin page (handled before SPA fallback).
+  if (handleAnnouncementAuth(req, res)) return;
   fs.readFile(path.join(DIST, "index.html"), (err, data) => {
     if (err) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });

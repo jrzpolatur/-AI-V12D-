@@ -18,6 +18,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
+import { handleAnnouncement } from "./common.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(__dirname, "../dist");
@@ -25,6 +26,8 @@ const PORT = Number(process.env.PORT) || 8080;
 
 // ---- Static file serving (only dist/index.html is needed, single-file build) ----
 const server = http.createServer((req, res) => {
+  // Announcement / message-board API + admin page (handled before SPA fallback).
+  if (handleAnnouncement(req, res)) return;
   // Any path serves the single-file build (SPA-style fallback).
   const file = path.join(DIST, "index.html");
   fs.readFile(file, (err, data) => {
