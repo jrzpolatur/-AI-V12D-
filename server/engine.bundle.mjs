@@ -4085,7 +4085,6 @@ var GameEngine = class {
       const d = Math.hypot(opp.x - p.x, opp.y - p.y);
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
-        const a = Math.atan2(opp.y - p.y, opp.x - p.x);
         this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, 0, 0, this.activeId);
       }
     }

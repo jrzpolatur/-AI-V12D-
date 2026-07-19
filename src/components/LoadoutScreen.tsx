@@ -430,6 +430,18 @@ export default function LoadoutScreen({
     });
   };
 
+  /** Wipe the saved loadout and fall back to the factory defaults. The
+   *  effect below then persists these defaults back to localStorage, so the
+   *  player starts fresh next time they open the screen. */
+  const resetToDefaults = () => {
+    setCharacterId("raider");
+    setOutfitId("tactical");
+    setGunIds(["mac11", "sniper"]);
+    setSkillId("dash");
+    setGadgetIds(["turret_mg", "turret_cannon", "mine_explosive"]);
+    setGameMode("biohazard");
+  };
+
   const loadout: Loadout = {
     characterId,
     outfitId,
@@ -477,6 +489,9 @@ export default function LoadoutScreen({
           </h1>
           <p className="mt-1 text-sm text-slate-400">
             2D 俯视角射击 · 生化生存与人机对战 · 自由搭配人物、服饰、枪械、技能与道具
+          </p>
+          <p className="mt-1 text-[11px] text-emerald-400/80">
+            📌 你的配置会自动保存，退出后再进来也会保留上次的选择
           </p>
         </header>
 
@@ -686,6 +701,12 @@ export default function LoadoutScreen({
                 ← 返回
               </button>
             )}
+            <button
+              onClick={resetToDefaults}
+              className="rounded-full border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-slate-400 hover:border-white/25 hover:bg-white/[0.06]"
+            >
+              恢复默认
+            </button>
             <button
               onClick={() => {
                 sound.ensure();

@@ -157,6 +157,8 @@ export interface GunDef {
   // ---- aim indicator (投射榴弹炮) ----
   /** if true, draw a deployable-style targeting marker while this gun is active */
   aimIndicator?: boolean;
+  /** max lob / throw range in px (mortar, etc.); falls back to bulletSpeed*life when absent */
+  range?: number;
 
   // ---- bow system (recurve bow) ----
   /** max charge time in seconds */

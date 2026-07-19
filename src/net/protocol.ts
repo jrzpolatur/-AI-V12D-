@@ -127,6 +127,10 @@ export interface SnapWall {
   maxHp: number;
   destructible: boolean;
   glue: boolean;
+  /** true when this wall is a building (tower slab) rather than plain cover */
+  building?: boolean;
+  /** deterministic seed used for building decoration */
+  seed?: number;
 }
 
 /** Full world snapshot sent by the host to the guest. */
