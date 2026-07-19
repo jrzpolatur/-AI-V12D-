@@ -7,9 +7,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "pistol",
     iconShape: "pistol",
-    damage: 44,
+    damage: 55,
     fireRate: 7,
-    bulletSpeed: 760,
+    bulletSpeed: 1102,
     bulletSize: 5,
     spread: 0.03,
     pellets: 1,
@@ -34,7 +34,7 @@ var guns_default = [
     iconShape: "mac11",
     damage: 18,
     fireRate: 16,
-    bulletSpeed: 840,
+    bulletSpeed: 1218,
     bulletSize: 4,
     spread: 0.13,
     pellets: 1,
@@ -45,7 +45,7 @@ var guns_default = [
     glow: "#22d3ee",
     kind: "bullet",
     barrel: 18,
-    magazine: 30,
+    magazine: 40,
     reloadTime: 1.6,
     rangeTier: "\u8FD1"
   },
@@ -58,7 +58,7 @@ var guns_default = [
     iconShape: "mp5",
     damage: 26,
     fireRate: 11,
-    bulletSpeed: 920,
+    bulletSpeed: 1334,
     bulletSize: 4.5,
     spread: 0.08,
     pellets: 1,
@@ -88,6 +88,7 @@ var guns_default = [
     pellets: 1,
     pierce: 0,
     life: 2.2,
+    range: 600,
     knockback: 240,
     color: "#fdba74",
     glow: "#fb923c",
@@ -110,7 +111,7 @@ var guns_default = [
     iconShape: "sniper",
     damage: 270,
     fireRate: 0.9,
-    bulletSpeed: 1750,
+    bulletSpeed: 2538,
     bulletSize: 6,
     spread: 0,
     pellets: 1,
@@ -134,7 +135,7 @@ var guns_default = [
     iconShape: "rocket",
     damage: 225,
     fireRate: 0.72,
-    bulletSpeed: 480,
+    bulletSpeed: 696,
     bulletSize: 9,
     spread: 0.02,
     pellets: 1,
@@ -158,9 +159,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "akm",
     iconShape: "akm",
-    damage: 44,
+    damage: 37,
     fireRate: 10,
-    bulletSpeed: 940,
+    bulletSpeed: 1363,
     bulletSize: 5,
     spread: 0.05,
     pellets: 1,
@@ -171,7 +172,7 @@ var guns_default = [
     glow: "#f59e0b",
     kind: "tracer",
     barrel: 26,
-    magazine: 30,
+    magazine: 36,
     reloadTime: 2.2,
     rangeTier: "\u4E2D"
   },
@@ -182,9 +183,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "fcar",
     iconShape: "fcar",
-    damage: 58,
+    damage: 46,
     fireRate: 9,
-    bulletSpeed: 1e3,
+    bulletSpeed: 1450,
     bulletSize: 6,
     spread: 0.045,
     pellets: 1,
@@ -309,7 +310,7 @@ var guns_default = [
     iconShape: "sa1216",
     damage: 22,
     fireRate: 5.5,
-    bulletSpeed: 820,
+    bulletSpeed: 1189,
     bulletSize: 4.5,
     spread: 0.18,
     pellets: 8,
@@ -385,7 +386,7 @@ var guns_default = [
     iconShape: "drone",
     damage: 56,
     fireRate: 1.6,
-    bulletSpeed: 380,
+    bulletSpeed: 551,
     bulletSize: 9,
     spread: 0.1,
     pellets: 1,
@@ -411,7 +412,7 @@ var guns_default = [
     iconShape: "recurve_bow",
     damage: 44,
     fireRate: 1.5,
-    bulletSpeed: 600,
+    bulletSpeed: 870,
     bulletSize: 5,
     spread: 0.01,
     pellets: 1,
@@ -466,8 +467,8 @@ var guns_default = [
     shape: "shak50",
     iconShape: "shak50",
     damage: 42,
-    fireRate: 3.4,
-    bulletSpeed: 900,
+    fireRate: 7,
+    bulletSpeed: 1305,
     bulletSize: 6,
     spread: 0,
     pellets: 2,
@@ -494,7 +495,7 @@ var guns_default = [
     iconShape: "pistol",
     damage: 118,
     fireRate: 3.2,
-    bulletSpeed: 1e3,
+    bulletSpeed: 1450,
     bulletSize: 5.5,
     spread: 0.012,
     pellets: 1,
@@ -519,7 +520,7 @@ var guns_default = [
     iconShape: "sniper",
     damage: 320,
     fireRate: 0.85,
-    bulletSpeed: 1900,
+    bulletSpeed: 2755,
     bulletSize: 7,
     spread: 0,
     pellets: 1,
@@ -543,7 +544,7 @@ var guns_default = [
     iconShape: "gatling",
     damage: 24,
     fireRate: 19,
-    bulletSpeed: 1050,
+    bulletSpeed: 1523,
     bulletSize: 4.5,
     spread: 0.11,
     pellets: 1,
@@ -1060,7 +1061,9 @@ var MONSTERS = [
 ];
 var getCharacter = (id) => CHARACTERS.find((c) => c.id === id) ?? CHARACTERS[0];
 var getOutfit = (id) => OUTFITS.find((o) => o.id === id) ?? OUTFITS[0];
+var getGun = (id) => GUNS.find((g) => g.id === id) ?? GUNS[0];
 var getSkill = (id) => SKILLS.find((s) => s.id === id) ?? SKILLS[0];
+var getGadget = (id) => GADGETS.find((g) => g.id === id) ?? GADGETS[0];
 var SCENES = [
   {
     id: "neon",
@@ -2372,8 +2375,8 @@ var sound = new SoundManager();
 
 // src/game/runtimeConfig.ts
 var RUNTIME_DEFAULTS = {
-  worldW: 1600,
-  worldH: 1e3,
+  worldW: 2400,
+  worldH: 1200,
   baseHp: 2e3,
   enemyBaseHp: 2e3,
   breathingDelay: 5,
@@ -2398,8 +2401,14 @@ var RUNTIME_DEFAULTS = {
   playerSpeedMult: 1,
   playerBaseHp: 250,
   // unified max HP for every player (character/outfit HP bonuses disabled)
-  enemyHp: 250
+  enemyHp: 250,
   // unified enemy base HP ×2.5 to match 250 player HP (per-wave hpScale & elite mult still apply)
+  botCount: 3,
+  // bots in a human-vs-bots deathmatch
+  killTarget: 15,
+  // first to this many kills wins
+  dmDuration: 300
+  // 5-minute time limit
 };
 var RUNTIME = { ...RUNTIME_DEFAULTS };
 
@@ -2553,6 +2562,35 @@ var GameEngine = class {
   foeGadgets = [];
   /** the opponent's per-gadget cooldown timers (separate from the host's own) */
   foeGadgetCd = /* @__PURE__ */ new Map();
+  // ---- deathmatch (human vs bots) state ----
+  /** true when the current match is a human-vs-bots deathmatch (offline PvP) */
+  get isDM() {
+    return this.gameMode === "deathmatch";
+  }
+  /** bot avatars (combatants 1..N). The human is always this.player (cid 0). */
+  bots = [];
+  botChar = [];
+  botOutfit = [];
+  botSkill = [];
+  botGuns = [];
+  botGadgets = [];
+  botGadgetCd = [];
+  botName = [];
+  botColor = [];
+  /** per-combatant score; index = cid (0 = human). First to killTarget wins. */
+  scores = [];
+  /** cached AI intent for each bot, refreshed by thinkBot */
+  botAi = [];
+  dmTarget = 10;
+  dmDuration = 300;
+  dmClock = 0;
+  /** stable list of all live combatants (human + bots).
+   *  Always leads with `localPlayer` (the human) — NOT `player`, because
+   *  `player` is temporarily swapped to a bot while `simulateBot` runs and
+   *  `emit`/targeting can be invoked from within that window. */
+  combatants() {
+    return [this.localPlayer, ...this.bots];
+  }
   /** the host's own avatar; never swapped while simulating the foe */
   localPlayer = null;
   // one-shot action intents captured on the guest, sent with the next input
@@ -2771,10 +2809,6 @@ var GameEngine = class {
     this.resize();
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
-    if (this.gameMode === "biohazard") {
-      this.worldW = this.W;
-      this.worldH = this.H;
-    }
     this.gx = 0;
     this.gy = 0;
     this.gxInit = false;
@@ -2808,7 +2842,7 @@ var GameEngine = class {
       flash: 0,
       t: 0
     };
-    if (this.gameMode === "biohazard") {
+    if (this.gameMode === "biohazard" || this.isDM) {
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
@@ -2839,7 +2873,7 @@ var GameEngine = class {
     this.beamHit = null;
     this.flameActive = false;
     this.banner = {
-      text: this.gameMode === "biohazard" ? "\u751F\u5316\u5371\u673A \xB7 \u6D3B\u4E0B\u53BB\uFF01" : "\u5B88\u62A4\u57FA\u5730\uFF01",
+      text: this.gameMode === "biohazard" ? "\u751F\u5316\u5371\u673A \xB7 \u6D3B\u4E0B\u53BB\uFF01" : this.isDM ? `\u4EBA\u673A\u5BF9\u6218 \xB7 \u5148\u51FB\u6740 ${this.dmTarget} \u4EBA\u83B7\u80DC\uFF01` : "\u5B88\u62A4\u57FA\u5730\uFF01",
       t: 2.2
     };
     this.enemyId = 1;
@@ -2861,6 +2895,7 @@ var GameEngine = class {
       angle: 0,
       hp: maxHp,
       maxHp,
+      cid: 0,
       size: c.size,
       speed,
       fireTimer: 0,
@@ -2905,6 +2940,8 @@ var GameEngine = class {
       this.foe = this.makeFoe();
       this.net.sendGame({ t: "hello", name: this.character.name, loadout: this.loadout });
     }
+    this.dmClock = 0;
+    this.setupBots();
   }
   makeFoe() {
     const c = getCharacter("raider");
@@ -2949,6 +2986,140 @@ var GameEngine = class {
       dashRecharge: 0,
       lastGadget: 0
     };
+  }
+  /** Build the offline bot squad for a human-vs-bots deathmatch. No-op for any
+   *  other mode. Each bot is a full Player avatar (own character / gun / skill /
+   *  gadgets) with a stable combatant id (cid). They are spread around the arena
+   *  and respawn on death like the human. */
+  setupBots() {
+    this.bots = [];
+    this.botChar = [];
+    this.botOutfit = [];
+    this.botSkill = [];
+    this.botGuns = [];
+    this.botGadgets = [];
+    this.botGadgetCd = [];
+    this.botName = [];
+    this.botColor = [];
+    this.scores = [];
+    this.botAi = [];
+    if (!this.isDM || this.mode !== "local") return;
+    const count = Math.max(1, RUNTIME.botCount | 0);
+    this.dmTarget = RUNTIME.killTarget | 0 || 15;
+    this.dmDuration = RUNTIME.dmDuration | 0 || 300;
+    this.scores = [0];
+    const chars = ["raider", "juggernaut", "phantom", "sentinel", "raider", "juggernaut"];
+    const gunsPool = [
+      "mac11",
+      "mp5",
+      "akm",
+      "sniper",
+      "shak50",
+      "gatling",
+      "fcar",
+      "sa1216"
+    ];
+    const skills = ["dash", "shield", "timewarp", "overdrive", "grenade"];
+    const gadgetsPool = [
+      "turret_mg",
+      "mine_explosive",
+      "mine_fire",
+      "healing_station",
+      "glue_grenade",
+      "fire_grenade"
+    ];
+    const names = ["\u963F\u5C14\u6CD5", "\u5E03\u96F7\u6CFD", "\u8770\u86C7", "\u5E7D\u7075", "\u94C1\u58C1", "\u730E\u624B"];
+    const colors = ["#f472b6", "#34d399", "#fbbf24", "#60a5fa", "#a78bfa", "#fb923c"];
+    const cx = this.worldW / 2;
+    const cy = this.worldH / 2;
+    const spawns = [
+      { x: cx, y: 220 },
+      { x: 360, y: 360 },
+      { x: this.worldW - 360, y: 360 },
+      { x: 300, y: cy },
+      { x: this.worldW - 300, y: cy },
+      { x: cx, y: this.worldH - 360 }
+    ];
+    const maxHp = RUNTIME.playerBaseHp > 0 ? RUNTIME.playerBaseHp : 250;
+    for (let i = 0; i < count; i++) {
+      const cid = i + 1;
+      const c = getCharacter(chars[i % chars.length]);
+      const o = getOutfit("tactical");
+      const g1 = getGun(gunsPool[(i * 3 + 1) % gunsPool.length]);
+      const g2 = getGun(gunsPool[(i * 5 + 4) % gunsPool.length]);
+      const guns = g1.id === g2.id ? [g1, getGun(gunsPool[(i + 2) % gunsPool.length])] : [g1, g2];
+      const skill = getSkill(skills[i % skills.length]);
+      const gi1 = i * 2 % gadgetsPool.length;
+      const gi2 = (gi1 + 3) % gadgetsPool.length;
+      const gadgets = [
+        getGadget(gadgetsPool[gi1]),
+        getGadget(gadgetsPool[gi2])
+      ].filter(Boolean);
+      this.ensureWeaponStates(guns);
+      const spawn = spawns[i % spawns.length];
+      const bot = {
+        x: spawn.x,
+        y: spawn.y,
+        vx: 0,
+        vy: 0,
+        angle: Math.atan2(cy - spawn.y, cx - spawn.x),
+        hp: maxHp,
+        maxHp,
+        size: c.size,
+        speed: c.speed * (1 + o.speedBonus),
+        fireTimer: 0,
+        iframes: 0,
+        flash: 0,
+        dashVx: 0,
+        dashVy: 0,
+        dashTime: 0,
+        shieldTime: 0,
+        overdriveTime: 0,
+        slamCd: 0,
+        t: 0,
+        swingTimer: 0,
+        swingDur: 0.22,
+        comboStep: 0,
+        comboTimer: 0,
+        lunge: 0,
+        bowCharge: 0,
+        bowDrawing: false,
+        shieldBlockTime: 0,
+        shieldHp: 0,
+        shieldCd: 0,
+        lastHitTime: 0,
+        cid,
+        gunIndex: 0,
+        skillCd: 0,
+        dashCharges: MAX_DASH_CHARGES,
+        dashRecharge: 0,
+        lastGadget: 0
+      };
+      this.bots.push(bot);
+      this.botChar.push(c);
+      this.botOutfit.push(o);
+      this.botSkill.push(skill);
+      this.botGuns.push(guns);
+      this.botGadgets.push(gadgets);
+      this.botGadgetCd.push(/* @__PURE__ */ new Map());
+      this.botName.push(names[i % names.length]);
+      this.botColor.push(colors[i % colors.length]);
+      this.scores.push(0);
+      this.botAi.push({
+        keys: /* @__PURE__ */ new Set(),
+        mx: cx,
+        my: cy,
+        firing: false,
+        skill: false,
+        gadget: -1,
+        reload: false,
+        switchW: false,
+        strafe: Math.random() < 0.5 ? 1 : -1,
+        strafeT: 0,
+        think: 0,
+        aimErr: (Math.random() - 0.5) * 0.18
+      });
+    }
   }
   /** Make sure every gun in the list has a WeaponState entry (host simulates foe guns too). */
   ensureWeaponStates(guns) {
@@ -3049,21 +3220,35 @@ var GameEngine = class {
       maxHp: 150,
       destructible: true
     });
-    pillar(cx - 200, cy - 150);
-    pillar(cx + 200, cy - 150);
-    pillar(cx - 200, cy + 150);
-    pillar(cx + 200, cy + 150);
-    pillar(cx, cy);
-    cover(cx, cy - 200, 160, 30);
-    cover(cx, cy + 200, 160, 30);
-    cover(cx - 250, cy, 30, 160);
-    cover(cx + 250, cy, 30, 160);
-    cover(cx - 150, cy - 100, 100, 28);
-    cover(cx + 150, cy + 100, 100, 28);
-    cover(cx - 350, cy - 200, 90, 26);
-    cover(cx + 350, cy + 200, 90, 26);
-    cover(cx - 400, cy + 150, 90, 26);
-    cover(cx + 400, cy - 150, 90, 26);
+    let buildingSeed = 1;
+    const building = (x, y, w, h, hp = 420) => walls.push({
+      x: x - w / 2,
+      y: y - h / 2,
+      w,
+      h,
+      hp,
+      maxHp: hp,
+      destructible: true,
+      building: true,
+      seed: buildingSeed++
+    });
+    switch (this.sceneIndex) {
+      case 1:
+        this.layoutDesert(building, cover, pillar, cx, cy);
+        break;
+      case 2:
+        this.layoutArctic(building, cover, pillar, cx, cy);
+        break;
+      case 3:
+        this.layoutRuin(building, cover, pillar, cx, cy);
+        break;
+      case 4:
+        this.layoutCyber(building, cover, pillar, cx, cy);
+        break;
+      default:
+        this.layoutNeon(building, cover, pillar, cx, cy);
+        break;
+    }
     const TH = 80;
     const air = (x, y, w, h) => walls.push({
       x,
@@ -3080,6 +3265,94 @@ var GameEngine = class {
     air(-TH, -TH, this.worldW + TH * 2, TH);
     air(-TH, this.worldH, this.worldW + TH * 2, TH);
     return walls;
+  }
+  // ---------------------------------------------------------------------------
+  // Per-map layout builders. `b` = building, `c` = cover wall, `p` = pillar.
+  // World is 2400×1200; bases sit at (cx, baseY=worldH-120) and (cx, 120) with
+  // radius 48, so mid-field anchors are kept a safe gap above/below them.
+  // ---------------------------------------------------------------------------
+  /** 霓虹都市 — four large corner towers, four mid-field anchors, central pillar ring. */
+  layoutNeon(b, _c, p, cx, cy) {
+    b(430, 320, 230, 180);
+    b(1970, 320, 230, 180);
+    b(430, 880, 230, 180);
+    b(1970, 880, 230, 180);
+    b(cx, 270, 220, 90);
+    b(cx, 930, 220, 90);
+    b(170, cy, 120, 200);
+    b(2230, cy, 120, 200);
+    p(cx - 200, cy - 150);
+    p(cx + 200, cy - 150);
+    p(cx - 200, cy + 150);
+    p(cx + 200, cy + 150);
+    p(cx, cy);
+  }
+  /** 沙漠废墟 — adobe compounds in the corners, a central alley of cover, scattered ruins. */
+  layoutDesert(b, c, p, cx, cy) {
+    b(400, 260, 180, 150);
+    b(2e3, 260, 180, 150);
+    b(400, 940, 180, 150);
+    b(2e3, 940, 180, 150);
+    b(150, cy, 120, 180);
+    b(2250, cy, 120, 180);
+    b(cx, 270, 200, 90);
+    b(cx, 930, 200, 90);
+    c(cx, cy - 170, 180, 28);
+    c(cx, cy + 170, 180, 28);
+    c(cx - 170, cy, 28, 180);
+    c(cx + 170, cy, 28, 180);
+    p(cx, cy);
+  }
+  /** 冰原基地 — frozen bunkers in the corners + sides, a long central ice cross. */
+  layoutArctic(b, c, p, cx, cy) {
+    b(450, 300, 190, 150);
+    b(1950, 300, 190, 150);
+    b(450, 900, 190, 150);
+    b(1950, 900, 190, 150);
+    b(760, cy, 130, 190);
+    b(1640, cy, 130, 190);
+    b(cx, 270, 200, 90);
+    b(cx, 930, 200, 90);
+    c(cx, cy - 150, 230, 26);
+    c(cx, cy + 150, 230, 26);
+    c(cx - 150, cy, 26, 230);
+    c(cx + 150, cy, 26, 230);
+    p(cx, cy);
+  }
+  /** 末日废墟 — broken city blocks clustered in the corners, scattered rubble pillars. */
+  layoutRuin(b, _c, p, cx, cy) {
+    b(380, 250, 170, 150);
+    b(640, 430, 150, 170);
+    b(2020, 250, 170, 150);
+    b(1760, 430, 150, 170);
+    b(380, 950, 170, 150);
+    b(640, 770, 150, 170);
+    b(2020, 950, 170, 150);
+    b(1760, 770, 150, 170);
+    b(cx, 260, 210, 80);
+    b(cx, 930, 210, 80);
+    b(150, cy, 120, 190);
+    b(2250, cy, 120, 190);
+    p(cx - 160, cy - 130);
+    p(cx + 160, cy - 130);
+    p(cx - 160, cy + 130);
+    p(cx + 160, cy + 130);
+    p(cx, cy);
+  }
+  /** 赛博都市 — tall vertical strips in the corners + mid, neon arches at center. */
+  layoutCyber(b, c, p, cx, cy) {
+    b(420, 360, 160, 320);
+    b(1980, 360, 160, 320);
+    b(420, 840, 160, 320);
+    b(1980, 840, 160, 320);
+    b(760, cy, 120, 240);
+    b(1640, cy, 120, 240);
+    b(cx, 280, 200, 100);
+    b(cx, 920, 200, 100);
+    c(cx, cy - 160, 170, 26);
+    c(cx, cy + 160, 170, 26);
+    p(cx - 220, cy);
+    p(cx + 220, cy);
   }
   attach() {
     if (!this.canvas) return;
@@ -3117,20 +3390,11 @@ var GameEngine = class {
     this.canvas.height = Math.floor(this.H * dpr);
     this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  /** Window resize handler: refresh the canvas size, then in the single-screen
-   *  biohazard arena re-sync the world bounds to the new viewport so the whole
-   *  playfield stays visible and the air walls stay at the screen edges. */
+  /** Window resize handler: refresh the canvas size. World bounds are fixed
+   *  (every mode uses the expanded RUNTIME world), so there is nothing to
+   *  re-sync here — the camera simply keeps following the player. */
   onResize() {
     this.resize();
-    if (this.gameMode === "biohazard") {
-      this.worldW = this.W;
-      this.worldH = this.H;
-      this.walls = this.buildWalls();
-      this.camX = 0;
-      this.camY = 0;
-      this.base.y = this.worldH - 120;
-      this.enemyBase.y = 120;
-    }
   }
   // ----------------------------------------------------------------- input
   onKeyDown(e) {
@@ -3348,6 +3612,7 @@ var GameEngine = class {
       return;
     }
     this.updatePlayer(dt);
+    if (this.isDM) this.tickDeathmatch(dt);
     this.simulateWorld(dt);
     if (this.mode === "host") {
       this.tickRespawns(dt);
@@ -3360,7 +3625,7 @@ var GameEngine = class {
         this.snapAccum = 0;
         this.sendSnapshot();
       }
-      if (this.gameMode !== "biohazard" && this.base.hp <= 0 && !this.gameOver)
+      if (this.gameMode !== "biohazard" && !this.isDM && this.base.hp <= 0 && !this.gameOver)
         this.endGame("\u57FA\u5730\u5931\u5B88\uFF0C\u4F60\u8F93\u4E86\uFF01");
     }
     if (this.dashCharges < MAX_DASH_CHARGES) {
@@ -3463,8 +3728,10 @@ var GameEngine = class {
     p.x = Math.max(m, Math.min(this.worldW - m, p.x));
     p.y = Math.max(m, Math.min(this.worldH - m, p.y));
     this.collideWalls(p, p.size);
-    this.collideBase(p, p.size);
-    this.collideBase(p, p.size, this.enemyBase);
+    if (!this.isDM) {
+      this.collideBase(p, p.size);
+      this.collideBase(p, p.size, this.enemyBase);
+    }
     p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
     if (this.touchMode) {
       const tgt = this.findAimTarget(p);
@@ -3546,6 +3813,40 @@ var GameEngine = class {
         bx = p.x + Math.cos(a) * (p.size + g.barrel);
         by = p.y + Math.sin(a) * (p.size + g.barrel);
       }
+      if (g.id === "mortar") {
+        const tgt = this.mortarTarget(g);
+        const dist = Math.hypot(tgt.x - bx, tgt.y - by);
+        const dur = 0.5 + Math.min(0.9, dist / 1400);
+        this.bullets.push({
+          x: bx,
+          y: by,
+          vx: 0,
+          vy: 0,
+          life: dur + 0.2,
+          damage: dmg,
+          size: (g.bulletSize ?? 8) + 2,
+          color: g.color,
+          glow: g.glow,
+          pierce: 0,
+          knockback: g.knockback,
+          explosive: false,
+          explosionRadius: g.explosionRadius ?? 70,
+          kind: "mortar",
+          hit: /* @__PURE__ */ new Set(),
+          owner: this.player === this.foe ? "foe" : "self",
+          ownerCid: this.player.cid ?? 0,
+          trail: false,
+          lobSx: bx,
+          lobSy: by,
+          lobTx: tgt.x,
+          lobTy: tgt.y,
+          lobDur: dur,
+          lobT: 0,
+          lobPeak: 50 + dist * 0.18,
+          weapon: g.id
+        });
+        continue;
+      }
       const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
       this.bullets.push({
         x: bx,
@@ -3566,6 +3867,7 @@ var GameEngine = class {
         kind: g.kind,
         hit: /* @__PURE__ */ new Set(),
         owner: this.player === this.foe ? "foe" : "self",
+        ownerCid: this.isDM ? this.player.cid ?? 0 : void 0,
         trail: g.kind === "tracer",
         bounces: g.bounces,
         ignoreWalls: g.ignoreWalls,
@@ -3588,9 +3890,45 @@ var GameEngine = class {
       this.shake = Math.min(14, this.shake + (g.id === "rocket" || g.id === "mgl32" ? 7 : 4));
     }
   }
+  /** Clamped mortar landing point. The landing is the aim point clamped to the
+   *  weapon's max lob range (g.range) around the firing player, then kept inside
+   *  the world. Shared by firing and the deployable-style aim indicator so the
+   *  shell always lands where the marker shows — never at the raw mouse when the
+   *  cursor is past the max-range ring. */
+  mortarTarget(g) {
+    const p = this.player;
+    const maxD = g.range ?? (g.bulletSpeed ?? 500) * (g.life ?? 2) * 0.9;
+    let dx = this.mouse.x - p.x;
+    let dy = this.mouse.y - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const beyond = d > maxD;
+    if (beyond) {
+      dx = dx / d * maxD;
+      dy = dy / d * maxD;
+    }
+    return {
+      x: Math.max(20, Math.min(this.worldW - 20, p.x + dx)),
+      y: Math.max(20, Math.min(this.worldH - 20, p.y + dy)),
+      maxD,
+      beyond
+    };
+  }
   // ------------------------------------------------------------- melee
-  /** The human opponent of whoever is currently `this.player` (the melee attacker). */
+  /** The melee target of whoever is currently `this.player` (the attacker). */
   meleeOpponent() {
+    if (this.isDM) {
+      let best = Infinity;
+      let target = null;
+      for (const c of this.combatants()) {
+        if (c === this.player || c.deadTimer && c.deadTimer > 0) continue;
+        const d = Math.hypot(c.x - this.player.x, c.y - this.player.y);
+        if (d < best) {
+          best = d;
+          target = c;
+        }
+      }
+      return target;
+    }
     if (!this.foe || !this.localPlayer) return null;
     if (this.player === this.foe) return this.localPlayer;
     return this.foe;
@@ -3664,7 +4002,7 @@ var GameEngine = class {
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
           const kx = Math.cos(ang) * g.knockback;
           const ky = Math.sin(ang) * g.knockback;
-          this.damagePlayerEntity(opp, dmg * dmgMult, void 0, kx, ky);
+          this.damagePlayerEntity(opp, dmg * dmgMult, void 0, kx, ky, this.player.cid);
           if (isSaber) {
             opp.electrifiedTime = 0.7;
             opp.electrifiedGlow = g.glow;
@@ -3677,6 +4015,7 @@ var GameEngine = class {
     }
     for (const w of this.walls) {
       if (!w.destructible) continue;
+      if (w.building && g.id !== "hammer") continue;
       const cx = Math.max(w.x, Math.min(p.x, w.x + w.w));
       const cy = Math.max(w.y, Math.min(p.y, w.y + w.h));
       const d = Math.hypot(cx - p.x, cy - p.y);
@@ -3721,7 +4060,7 @@ var GameEngine = class {
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
         const a = Math.atan2(opp.y - p.y, opp.x - p.x);
-        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, Math.cos(a) * 420, Math.sin(a) * 420);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, Math.cos(a) * 420, Math.sin(a) * 420, this.player.cid);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -3961,6 +4300,8 @@ var GameEngine = class {
       explosionRadius: 0,
       kind: g.kind,
       hit: /* @__PURE__ */ new Set(),
+      owner: this.player === this.foe ? "foe" : "self",
+      ownerCid: this.isDM ? this.player.cid ?? 0 : void 0,
       trail: true,
       weapon: g.id
     });
@@ -4116,6 +4457,19 @@ var GameEngine = class {
   updateBullets(dt) {
     const next = [];
     for (const b of this.bullets) {
+      if (b.lobTx !== void 0) {
+        b.lobT = (b.lobT ?? 0) + dt;
+        const prog = Math.min(1, b.lobT / (b.lobDur ?? 1));
+        b.x = (b.lobSx ?? b.x) + ((b.lobTx ?? b.x) - (b.lobSx ?? b.x)) * prog;
+        b.y = (b.lobSy ?? b.y) + ((b.lobTy ?? b.y) - (b.lobSy ?? b.y)) * prog;
+        b.z = (b.lobPeak ?? 0) * Math.sin(prog * Math.PI);
+        if (prog >= 1) {
+          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
+          continue;
+        }
+        next.push(b);
+        continue;
+      }
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.x += (b.driftX ?? 0) * dt;
@@ -4153,10 +4507,10 @@ var GameEngine = class {
             b.bounced = true;
             this.spawnParticles(b.x, b.y, b.glow, 4, 100, 0.2);
           } else if (b.explosive && b.bounced) {
-            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
             dead = true;
           } else {
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, void 0, void 0, 0);
             else this.spawnParticles(b.x, b.y, b.glow, 4, 120, 0.22);
             dead = true;
           }
@@ -4197,15 +4551,15 @@ var GameEngine = class {
           if (ddx * ddx + ddy * ddy <= rr * rr) {
             b.hit.add(e.id);
             if (b.explosive) {
-              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
               dead = true;
               break;
             }
             this.damageEnemy(
               e,
               b.damage,
-              Math.cos(Math.atan2(b.vy, b.vx)) * b.knockback,
-              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback,
+              0,
+              0,
               false,
               { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
             );
@@ -4217,37 +4571,70 @@ var GameEngine = class {
           }
         }
       }
-      if (!dead) {
-        if (b.owner === "foe") {
-          if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
-            this.damagePlayerEntity(this.player, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
-            dead = true;
+      if (this.isDM) {
+        if (!dead && b.ownerCid !== void 0) {
+          for (const c of this.combatants()) {
+            if (c.cid === b.ownerCid) continue;
+            if (c.deadTimer && c.deadTimer > 0) continue;
+            if (this.hitsPlayer(b, c)) {
+              const kx = 0;
+              const ky = 0;
+              this.damagePlayerEntity(c, b.damage, b, kx, ky, b.ownerCid);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.ownerCid, void 0, 0);
+              dead = true;
+              break;
+            }
+          }
+        }
+      } else {
+        if (!dead) {
+          if (b.owner === "foe") {
+            if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
+              this.damagePlayerEntity(this.player, b.damage, b);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
+              dead = true;
+            } else {
+              const bb = this.base;
+              const rr = bb.radius + b.size;
+              if ((bb.x - b.x) ** 2 + (bb.y - b.y) ** 2 <= rr * rr) {
+                this.damageBase(b.damage);
+                if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
+                dead = true;
+              }
+            }
           } else {
-            const bb = this.base;
-            const rr = bb.radius + b.size;
-            if ((bb.x - b.x) ** 2 + (bb.y - b.y) ** 2 <= rr * rr) {
-              this.damageBase(b.damage);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            const eb = this.enemyBase;
+            const rr = eb.radius + b.size;
+            if ((eb.x - b.x) ** 2 + (eb.y - b.y) ** 2 <= rr * rr) {
+              this.damageEnemyBase(b.damage);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
+              dead = true;
+            } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
+              this.damagePlayerEntity(this.foe, b.damage, b);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
               dead = true;
             }
           }
-        } else {
-          const eb = this.enemyBase;
-          const rr = eb.radius + b.size;
-          if ((eb.x - b.x) ** 2 + (eb.y - b.y) ** 2 <= rr * rr) {
-            this.damageEnemyBase(b.damage);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+        }
+      }
+      if (!dead) {
+        for (const d of this.deployables) {
+          if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station") continue;
+          if (d.hp <= 0) continue;
+          const sameOwner = this.isDM ? (b.ownerCid ?? -1) === (d.ownerCid ?? -2) : (b.owner ?? "") === (d.owner ?? "");
+          if (sameOwner) continue;
+          const rr = d.size + b.size;
+          if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr * rr) {
+            d.hp -= b.damage;
+            this.spawnParticles(b.x, b.y, d.color, 6, 120, 0.25);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
             dead = true;
-          } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
-            this.damagePlayerEntity(this.foe, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
-            dead = true;
+            break;
           }
         }
       }
       if (dead && b.explosive && b.life <= 0 && b.hit.size === 0 && !b.bounced) {
-        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, void 0, void 0, 0);
       }
       if (!dead) next.push(b);
     }
@@ -4351,7 +4738,11 @@ var GameEngine = class {
       radius: 0,
       color: def.color,
       size: 16,
-      targets: []
+      targets: [],
+      // multiplayer: remember who deployed this so it attacks the right side
+      owner: this.player === this.foe ? "foe" : "self",
+      // deathmatch: remember the combatant id so gadgets target the right side
+      ownerCid: this.isDM ? this.player.cid ?? 0 : void 0
     };
     switch (def.kind) {
       case "turret_mg":
@@ -4459,11 +4850,33 @@ var GameEngine = class {
         d.timer -= dt;
         let target = null;
         let bestD = d.radius;
-        for (const e of this.enemies) {
-          const dist = Math.hypot(e.x - d.x, e.y - d.y);
-          if (dist < bestD) {
-            bestD = dist;
-            target = e;
+        if (this.isDM) {
+          const ownerCid = d.ownerCid ?? 0;
+          for (const c of this.combatants()) {
+            if ((c.cid ?? 0) === ownerCid) continue;
+            if (c.deadTimer && c.deadTimer > 0) continue;
+            const dist = Math.hypot(c.x - d.x, c.y - d.y);
+            if (dist < bestD) {
+              bestD = dist;
+              target = c;
+            }
+          }
+        } else if (this.mode === "local") {
+          for (const e of this.enemies) {
+            const dist = Math.hypot(e.x - d.x, e.y - d.y);
+            if (dist < bestD) {
+              bestD = dist;
+              target = e;
+            }
+          }
+        } else {
+          const foe = d.owner === "foe" ? this.player : this.foe;
+          if (foe && !(foe.deadTimer && foe.deadTimer > 0)) {
+            const dist = Math.hypot(foe.x - d.x, foe.y - d.y);
+            if (dist < bestD) {
+              bestD = dist;
+              target = foe;
+            }
           }
         }
         if (target) {
@@ -4478,7 +4891,8 @@ var GameEngine = class {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 0.6,
-                damage: 28,
+                // 14% damage reduction (see task)
+                damage: 28 * 0.86,
                 size: 4,
                 color: "#bae6fd",
                 glow: d.color,
@@ -4487,7 +4901,10 @@ var GameEngine = class {
                 explosive: false,
                 explosionRadius: 0,
                 kind: "bullet",
-                hit: /* @__PURE__ */ new Set()
+                hit: /* @__PURE__ */ new Set(),
+                owner: d.owner,
+                ownerCid: d.ownerCid,
+                weapon: "turret_mg"
               });
               this.spawnParticles(d.x + Math.cos(d.angle) * 14, d.y + Math.sin(d.angle) * 14, d.color, 2, 80, 0.15);
             } else {
@@ -4499,7 +4916,8 @@ var GameEngine = class {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 1.2,
-                damage: 44,
+                // 14% damage reduction (see task)
+                damage: 44 * 0.86,
                 size: 7,
                 color: "#ddd6fe",
                 glow: d.color,
@@ -4508,13 +4926,30 @@ var GameEngine = class {
                 explosive: true,
                 explosionRadius: 56,
                 kind: "grenade",
-                hit: /* @__PURE__ */ new Set()
+                hit: /* @__PURE__ */ new Set(),
+                owner: d.owner,
+                ownerCid: d.ownerCid,
+                weapon: "turret_cannon"
               });
             }
           }
         }
         for (const e of this.enemies) {
           if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + d.size) {
+            d.hp -= 75 * dt;
+          }
+        }
+        if (this.isDM) {
+          const ownerCid = d.ownerCid ?? 0;
+          for (const c of this.combatants()) {
+            if ((c.cid ?? 0) === ownerCid) continue;
+            if (Math.hypot(c.x - d.x, c.y - d.y) < c.size + d.size) {
+              d.hp -= 75 * dt;
+            }
+          }
+        } else if (this.mode !== "local" && d.owner) {
+          const foe = d.owner === "foe" ? this.player : this.foe;
+          if (foe && Math.hypot(foe.x - d.x, foe.y - d.y) < foe.size + d.size) {
             d.hp -= 75 * dt;
           }
         }
@@ -4526,50 +4961,73 @@ var GameEngine = class {
       }
       if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
         if (d.armed <= 0) {
+          let triggered = false;
           for (const e of this.enemies) {
             if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + 24) {
-              if (d.kind === "mine_explosive") {
-                this.explode(d.x, d.y, d.radius, 160, d.color);
-              } else if (d.kind === "mine_poison") {
-                this.effects.push({
-                  type: "poisoncloud",
-                  x: d.x,
-                  y: d.y,
-                  t: 0,
-                  duration: 5,
-                  radius: d.radius,
-                  color: d.color,
-                  dps: 60,
-                  slow: 0.5,
-                  tickT: 0
-                });
-              } else {
-                this.effects.push({
-                  type: "firefield",
-                  x: d.x,
-                  y: d.y,
-                  t: 0,
-                  duration: 5,
-                  radius: d.radius,
-                  color: d.color,
-                  dps: 90,
-                  tickT: 0
-                });
-              }
-              d.life = 0;
+              triggered = true;
               break;
             }
+          }
+          if (!triggered && this.isDM) {
+            const ownerCid = d.ownerCid ?? 0;
+            for (const c of this.combatants()) {
+              if ((c.cid ?? 0) === ownerCid) continue;
+              if (Math.hypot(c.x - d.x, c.y - d.y) < c.size + 24) {
+                triggered = true;
+                break;
+              }
+            }
+          }
+          if (triggered) {
+            if (d.kind === "mine_explosive") {
+              this.explode(d.x, d.y, d.radius, 160, d.color, d.ownerCid);
+            } else if (d.kind === "mine_poison") {
+              this.effects.push({
+                type: "poisoncloud",
+                x: d.x,
+                y: d.y,
+                t: 0,
+                duration: 5,
+                radius: d.radius,
+                color: d.color,
+                dps: 60,
+                slow: 0.5,
+                tickT: 0
+              });
+            } else {
+              this.effects.push({
+                type: "firefield",
+                x: d.x,
+                y: d.y,
+                t: 0,
+                duration: 5,
+                radius: d.radius,
+                color: d.color,
+                dps: 90,
+                tickT: 0
+              });
+            }
+            d.life = 0;
           }
         }
         if (d.life > 0) next.push(d);
         continue;
       }
       if (d.kind === "healing_station") {
-        const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
-        if (dist < d.radius + this.player.size && this.player.hp < this.player.maxHp) {
-          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45 * dt);
-          if (Math.random() < 0.3)
-            this.spawnParticles(this.player.x, this.player.y, "#4ade80", 1, 50, 0.3);
+        if (this.isDM) {
+          const owner = this.combatants().find((c) => (c.cid ?? 0) === (d.ownerCid ?? 0));
+          if (owner && owner.hp < owner.maxHp) {
+            owner.hp = Math.min(owner.maxHp, owner.hp + 45 * dt);
+            if (Math.random() < 0.3)
+              this.spawnParticles(owner.x, owner.y, "#4ade80", 1, 50, 0.3);
+          }
+        } else {
+          const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
+          if (dist < d.radius + this.player.size && this.player.hp < this.player.maxHp) {
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45 * dt);
+            if (Math.random() < 0.3)
+              this.spawnParticles(this.player.x, this.player.y, "#4ade80", 1, 50, 0.3);
+          }
         }
         if (d.life > 0 && d.hp > 0) next.push(d);
         continue;
@@ -4617,6 +5075,19 @@ var GameEngine = class {
           continue;
         }
       }
+      let hitDep = false;
+      for (const d of this.deployables) {
+        if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station") continue;
+        if (d.hp <= 0) continue;
+        const rr2 = d.size + b.size;
+        if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr2 * rr2) {
+          d.hp -= b.damage;
+          this.spawnParticles(b.x, b.y, d.color, 6, 120, 0.25);
+          hitDep = true;
+          break;
+        }
+      }
+      if (hitDep) continue;
       next.push(b);
     }
     this.enemyBullets = next;
@@ -4816,6 +5287,19 @@ var GameEngine = class {
               this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true);
               e.burnT = Math.max(e.burnT, 1);
               e.burnDps = Math.max(e.burnDps, 20);
+            }
+          }
+        }
+        if (this.isDM) {
+          for (const c of this.combatants()) {
+            if (c.deadTimer && c.deadTimer > 0) continue;
+            if (Math.hypot(c.x - fx.x, c.y - fx.y) < fx.radius + c.size) {
+              if (fx.type === "poisoncloud") {
+                this.damagePlayerEntity(c, (fx.dps ?? 20) * 0.25 * 0.8, void 0, 0, 0, void 0, true);
+                c.slowT = Math.max(c.slowT ?? 0, 0.3);
+              } else {
+                this.damagePlayerEntity(c, (fx.dps ?? 20) * 0.25, void 0, 0, 0, void 0, true);
+              }
             }
           }
         }
@@ -5021,7 +5505,7 @@ var GameEngine = class {
   }
   damageBase(dmg) {
     if (this.base.hp <= 0) return;
-    if (this.gameMode === "biohazard") return;
+    if (this.gameMode === "biohazard" || this.isDM) return;
     this.base.hp -= dmg;
     this.base.flash = 1;
     this.shake = Math.min(12, this.shake + dmg * 0.25);
@@ -5042,6 +5526,7 @@ var GameEngine = class {
   }
   damageEnemyBase(dmg) {
     if (this.enemyBase.hp <= 0) return;
+    if (this.isDM) return;
     dmg *= RUNTIME.playerDamageMult;
     this.enemyBase.hp -= dmg;
     this.enemyBase.flash = 1;
@@ -5078,10 +5563,12 @@ var GameEngine = class {
     const rr = p.size + b.size;
     return (p.x - b.x) ** 2 + (p.y - b.y) ** 2 <= rr * rr;
   }
-  /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
-  damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0) {
+  /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer.
+   *  `attackerCid` (deathmatch only) credits the kill to that combatant.
+   *  `ignoreIframes` lets damage-over-time (fields) bypass i-frames. */
+  damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0, attackerCid, ignoreIframes = false) {
     if (p.deadTimer && p.deadTimer > 0) return;
-    if (p.iframes > 0 || p.shieldTime > 0) {
+    if (!ignoreIframes && (p.iframes > 0 || p.shieldTime > 0)) {
       if (p.shieldTime > 0) this.spawnParticles(p.x, p.y, "#60a5fa", 4, 90, 0.3);
       return;
     }
@@ -5118,7 +5605,20 @@ var GameEngine = class {
         this.beamActive = false;
         this.flameActive = false;
       }
-      if (p === this.foe) {
+      if (this.isDM) {
+        const killer = attackerCid;
+        if (killer !== void 0 && killer !== p.cid) {
+          this.scores[killer] = (this.scores[killer] ?? 0) + 1;
+          this.score = this.scores[0] ?? 0;
+          this.kills = this.scores[0] ?? 0;
+          this.banner = { text: `\u2694 ${this.nameOf(killer)} \u51FB\u6740 ${this.nameOf(p.cid ?? 0)}\uFF01`, t: 1.6 };
+          this.checkDeathmatchEnd();
+        } else if (p.cid === 0) {
+          this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${RESPAWN_TIME} \u79D2\u540E\u590D\u6D3B`, t: 1.6 };
+        } else {
+          this.banner = { text: `${this.nameOf(p.cid ?? 0)} \u9635\u4EA1\uFF0C\u590D\u6D3B\u4E2D\u2026`, t: 1.6 };
+        }
+      } else if (p === this.foe) {
         this.kills += 1;
         this.score += 250;
         this.banner = { text: `\u51FB\u6740 ${this.peerName || "\u5BF9\u624B"}\uFF01`, t: 1.6 };
@@ -5292,7 +5792,9 @@ var GameEngine = class {
         hp: w.destructible ? Math.max(0, Math.round(w.hp)) : -1,
         maxHp: w.destructible ? w.maxHp : -1,
         destructible: w.destructible,
-        glue: !!w.glue
+        glue: !!w.glue,
+        building: !!w.building,
+        seed: w.seed
       })),
       effects: this.effects.map((e) => {
         let id = this.fxIds.get(e);
@@ -5464,10 +5966,262 @@ var GameEngine = class {
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.tickRespawns(dt);
-    if (this.matchLive) this.updateWaves(dt);
+    if (this.matchLive && !this.isDM) this.updateWaves(dt);
     if (this.mode !== "local" && this.matchLive && !this.gameOver && this.time >= MATCH_DURATION) {
       this.endGame("\u65F6\u95F4\u5230\uFF01");
     }
+  }
+  // ============================== DEATHMATCH (human vs bots)
+  /** Advance the offline deathmatch: drive every bot, respawn the downed, and
+   *  end the match on a score/time limit. Called once per frame in local mode. */
+  tickDeathmatch(dt) {
+    if (this.gameOver) return;
+    this.dmClock += dt;
+    for (let i = 0; i < this.bots.length; i++) this.simulateBot(i, dt);
+    for (let i = 0; i < this.bots.length; i++) {
+      const b = this.bots[i];
+      if (b.deadTimer && b.deadTimer > 0) {
+        b.deadTimer -= dt;
+        if (b.deadTimer <= 0) {
+          b.deadTimer = 0;
+          b.hp = b.maxHp;
+          const sp = this.botSpawn(i);
+          b.x = sp.x;
+          b.y = sp.y;
+          b.vx = 0;
+          b.vy = 0;
+          b.iframes = 2;
+          b.dashVx = 0;
+          b.dashVy = 0;
+          b.dashTime = 0;
+          this.spawnParticles(b.x, b.y, this.botColor[i], 24, 200, 0.6);
+        }
+      }
+    }
+    if (!this.gameOver && this.dmClock >= this.dmDuration) {
+      let best = -1;
+      let bestCid = 0;
+      for (let c = 0; c < this.scores.length; c++) {
+        if (this.scores[c] > best) {
+          best = this.scores[c];
+          bestCid = c;
+        }
+      }
+      this.endGame(`\u65F6\u95F4\u5230\uFF01${this.nameOf(bestCid)} \u4EE5 ${best} \u5206\u83B7\u80DC`);
+    }
+  }
+  botSpawn(i) {
+    const cx = this.worldW / 2;
+    const cy = this.worldH / 2;
+    const spawns = [
+      { x: cx, y: 220 },
+      { x: 360, y: 360 },
+      { x: this.worldW - 360, y: 360 },
+      { x: 300, y: cy },
+      { x: this.worldW - 300, y: cy },
+      { x: cx, y: this.worldH - 360 }
+    ];
+    return spawns[i % spawns.length];
+  }
+  nameOf(cid) {
+    if (cid <= 0) return "\u4F60";
+    return this.botName[cid - 1] ?? `Bot${cid}`;
+  }
+  /** End the deathmatch if any combatant reached the kill target. */
+  checkDeathmatchEnd() {
+    if (this.gameOver) return;
+    for (let c = 0; c < this.scores.length; c++) {
+      if (this.scores[c] >= this.dmTarget) {
+        this.endGame(`${this.nameOf(c)} \u8FBE\u6210 ${this.dmTarget} \u6740\uFF0C\u83B7\u80DC\uFF01`);
+        return;
+      }
+    }
+  }
+  /** Simple wall raycast so bots don't fire through cover. */
+  hasLineOfSight(x0, y0, x1, y1) {
+    const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 24);
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps;
+      if (this.pointInWall(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 6)) return false;
+    }
+    return true;
+  }
+  /** Decide a bot's intent for this frame (movement keys, aim, fire, one-shots). */
+  thinkBot(i, dt) {
+    const bot = this.bots[i];
+    const ai = this.botAi[i];
+    const intent = {
+      keys: /* @__PURE__ */ new Set(),
+      mx: ai.mx,
+      my: ai.my,
+      firing: false,
+      skill: false,
+      gadget: -1,
+      reload: false,
+      switchW: false
+    };
+    if (!bot || bot.deadTimer && bot.deadTimer > 0) return intent;
+    let target = null;
+    let best = Infinity;
+    for (const c of this.combatants()) {
+      if (c === bot || c.deadTimer && c.deadTimer > 0) continue;
+      const d = Math.hypot(c.x - bot.x, c.y - bot.y);
+      if (d < best) {
+        best = d;
+        target = c;
+      }
+    }
+    if (!target) return intent;
+    const dx = target.x - bot.x;
+    const dy = target.y - bot.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    ai.think -= dt;
+    if (ai.think <= 0) {
+      ai.think = 0.12;
+      ai.strafeT -= 0.12;
+      if (ai.strafeT <= 0) {
+        ai.strafeT = 0.8 + Math.random() * 1.2;
+        ai.strafe = Math.random() < 0.5 ? 1 : -1;
+      }
+      ai.aimErr = (Math.random() - 0.5) * 0.18;
+      ai.gadget = -1;
+      const gs = this.botGadgets[i];
+      for (let k = 0; k < gs.length; k++) {
+        const cd = this.botGadgetCd[i].get(gs[k].id) ?? 0;
+        if (cd <= 0 && Math.random() < 0.25) {
+          ai.gadget = k;
+          break;
+        }
+      }
+      ai.skill = (bot.skillCd ?? 0) <= 0 && Math.random() < 0.06;
+    }
+    const pref = 320;
+    const minR = 170;
+    let mvx = 0;
+    let mvy = 0;
+    if (dist > pref * 1.25) {
+      mvx = nx;
+      mvy = ny;
+    } else if (dist < minR) {
+      mvx = -nx;
+      mvy = -ny;
+    } else {
+      mvx = -ny * ai.strafe;
+      mvy = nx * ai.strafe;
+    }
+    for (const w of this.walls) {
+      if (w.glue || w.invisible) continue;
+      const cxw = w.x + w.w / 2;
+      const cyw = w.y + w.h / 2;
+      const ddx = bot.x - cxw;
+      const ddy = bot.y - cyw;
+      const d = Math.hypot(ddx, ddy);
+      const reach = Math.max(w.w, w.h) / 2 + 120;
+      if (d < reach && d > 1e-3) {
+        const f = (reach - d) / reach;
+        mvx += ddx / d * f * 1.5;
+        mvy += ddy / d * f * 1.5;
+      }
+    }
+    const ml = Math.hypot(mvx, mvy) || 1;
+    mvx /= ml;
+    mvy /= ml;
+    if (mvy < -0.35) intent.keys.add("KeyW");
+    else if (mvy > 0.35) intent.keys.add("KeyS");
+    if (mvx < -0.35) intent.keys.add("KeyA");
+    else if (mvx > 0.35) intent.keys.add("KeyD");
+    const g = this.botGuns[i][bot.gunIndex ?? 0] ?? this.botGuns[i][0];
+    const bsp = g.bulletSpeed ?? 600;
+    const tLead = Math.min(0.4, dist / bsp);
+    const tx = target.x + (target.vx ?? 0) * tLead;
+    const ty = target.y + (target.vy ?? 0) * tLead;
+    const aimAng = Math.atan2(ty - bot.y, tx - bot.x) + ai.aimErr;
+    intent.mx = bot.x + Math.cos(aimAng) * 100;
+    intent.my = bot.y + Math.sin(aimAng) * 100;
+    const facing = Math.abs(this.angleDiff(aimAng, Math.atan2(dy, dx)));
+    const range = g.range ?? 9999;
+    if (dist < range && facing < 0.5 && this.hasLineOfSight(bot.x, bot.y, target.x, target.y)) {
+      intent.firing = true;
+    }
+    intent.skill = ai.skill;
+    intent.gadget = ai.gadget;
+    ai.mx = intent.mx;
+    ai.my = intent.my;
+    return intent;
+  }
+  /** Run one bot's simulation by swapping the engine's single-player context
+   *  (the same trick the authoritative server uses for peers). */
+  simulateBot(i, dt) {
+    const bot = this.bots[i];
+    if (!bot || bot.deadTimer && bot.deadTimer > 0) return;
+    const intent = this.thinkBot(i, dt);
+    const sp = this.player;
+    const sg = this.gunIndex;
+    const sk = this.keys;
+    const sm = this.mouse;
+    const sf = this.firing;
+    const sGuns = this.guns;
+    const sGadgets = this.gadgets;
+    const sGadgetCd = this.gadgetCd;
+    const sSkillCd = this.skillCd;
+    const sDash = this.dashCharges;
+    const sDashR = this.dashRecharge;
+    const sLastG = this.lastGadget;
+    const sSemi = this.semiAutoLatch;
+    const svmx = this.virtualMove.x;
+    const svmy = this.virtualMove.y;
+    const sChar = this.character;
+    const sOut = this.outfit;
+    const sSkillDef = this.skill;
+    this.player = bot;
+    this.guns = this.botGuns[i];
+    this.gunIndex = Math.min(bot.gunIndex ?? 0, this.guns.length - 1);
+    this.keys = intent.keys;
+    this.mouse = { x: intent.mx, y: intent.my };
+    this.virtualMove.x = 0;
+    this.virtualMove.y = 0;
+    this.firing = intent.firing;
+    this.skillCd = bot.skillCd ?? 0;
+    this.dashCharges = bot.dashCharges ?? MAX_DASH_CHARGES;
+    this.dashRecharge = bot.dashRecharge ?? 0;
+    this.lastGadget = bot.lastGadget ?? 0;
+    this.gadgets = this.botGadgets[i];
+    this.gadgetCd = this.botGadgetCd[i];
+    this.semiAutoLatch = false;
+    this.character = this.botChar[i] ?? this.character;
+    this.outfit = this.botOutfit[i] ?? this.outfit;
+    this.skill = this.botSkill[i];
+    for (const [k, v] of this.gadgetCd) if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
+    this.updatePlayer(dt);
+    if (intent.switchW) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+    if (intent.skill) this.activateSkill();
+    if (intent.reload) this.reloadCurrent();
+    if (intent.gadget >= 0) this.deployGadget(intent.gadget, this.mouse.x, this.mouse.y);
+    bot.gunIndex = this.gunIndex;
+    bot.skillCd = this.skillCd;
+    bot.dashCharges = this.dashCharges;
+    bot.dashRecharge = this.dashRecharge;
+    bot.lastGadget = this.lastGadget;
+    this.player = sp;
+    this.guns = sGuns;
+    this.gunIndex = sg;
+    this.keys = sk;
+    this.mouse = sm;
+    this.firing = sf;
+    this.gadgets = sGadgets;
+    this.gadgetCd = sGadgetCd;
+    this.skillCd = sSkillCd;
+    this.dashCharges = sDash;
+    this.dashRecharge = sDashR;
+    this.lastGadget = sLastG;
+    this.semiAutoLatch = sSemi;
+    this.virtualMove.x = svmx;
+    this.virtualMove.y = svmy;
+    this.character = sChar;
+    this.outfit = sOut;
+    this.skill = sSkillDef;
   }
   /**
    * Authoritative fixed-step update driven by the Node server. Both peers are
@@ -5549,6 +6303,7 @@ var GameEngine = class {
     const s = this.lastSnap;
     if (!s) return;
     this.sceneTheme = SCENES[s.scene] ?? SCENES[0];
+    this.sceneIndex = s.scene ?? 0;
     if (this.mode === "local") this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
     const foe = s.players.find((p) => p.id !== this.selfPid) ?? s.players[1];
@@ -5607,7 +6362,9 @@ var GameEngine = class {
         hp: sw.destructible ? sw.hp : Infinity,
         maxHp: sw.destructible ? sw.maxHp : Infinity,
         destructible: sw.destructible,
-        glue: sw.glue
+        glue: sw.glue,
+        building: sw.building,
+        seed: sw.seed
       }));
     }
     if (s.gameOver && !this.gameOver) {
@@ -5797,7 +6554,7 @@ var GameEngine = class {
     });
     this.shake = Math.min(14, this.shake + 5);
   }
-  explode(x, y, radius, damage, color, srcWpn) {
+  explode(x, y, radius, damage, color, srcCid, srcWpn, knock = 260) {
     this.effects.push({
       type: "explosion",
       x,
@@ -5829,11 +6586,30 @@ var GameEngine = class {
           this.damageEnemy(
             e,
             damage * (0.5 + fall * 0.5),
-            Math.cos(a) * 260 * fall,
-            Math.sin(a) * 260 * fall,
+            Math.cos(a) * knock * fall,
+            Math.sin(a) * knock * fall,
             false,
             { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) }
           );
+        }
+      }
+      if (this.isDM) {
+        for (const c of this.combatants()) {
+          if (c.deadTimer && c.deadTimer > 0) continue;
+          if (srcCid !== void 0 && c.cid === srcCid) continue;
+          const d = Math.hypot(c.x - x, c.y - y);
+          if (d < radius + c.size) {
+            const fall = 1 - d / (radius + c.size);
+            const a = Math.atan2(c.y - y, c.x - x);
+            this.damagePlayerEntity(
+              c,
+              damage * (0.5 + fall * 0.5),
+              void 0,
+              Math.cos(a) * knock * fall,
+              Math.sin(a) * knock * fall,
+              srcCid
+            );
+          }
         }
       }
     }
@@ -6040,22 +6816,30 @@ var GameEngine = class {
     const speed = def.speed * RUNTIME.enemySpeedMult;
     const dmg = Math.round(def.damage * dmgScale);
     const m = def.size + 6;
+    const halfW = this.W / 2;
+    const halfH = this.H / 2;
+    const left = this.player.x - halfW;
+    const right = this.player.x + halfW;
+    const top = this.player.y - halfH;
+    const bottom = this.player.y + halfH;
     const edge = Math.floor(Math.random() * 4);
     let x = 0;
     let y = 0;
     if (edge === 0) {
-      x = m;
-      y = Math.random() * this.worldH;
+      x = left + m;
+      y = top + m + Math.random() * Math.max(1, bottom - top - 2 * m);
     } else if (edge === 1) {
-      x = this.worldW - m;
-      y = Math.random() * this.worldH;
+      x = right - m;
+      y = top + m + Math.random() * Math.max(1, bottom - top - 2 * m);
     } else if (edge === 2) {
-      x = Math.random() * this.worldW;
-      y = m;
+      x = left + m + Math.random() * Math.max(1, right - left - 2 * m);
+      y = top + m;
     } else {
-      x = Math.random() * this.worldW;
-      y = this.worldH - m;
+      x = left + m + Math.random() * Math.max(1, right - left - 2 * m);
+      y = bottom - m;
     }
+    x = Math.max(m, Math.min(this.worldW - m, x));
+    y = Math.max(m, Math.min(this.worldH - m, y));
     const e = {
       id: this.enemyId++,
       type: "monster",
@@ -6240,6 +7024,10 @@ var GameEngine = class {
     if (!immediate && now - this.lastHudEmit < 50) return;
     this.lastHudEmit = now;
     void immediate;
+    if (this.isDM) {
+      this.score = this.scores[0] ?? 0;
+      this.kills = this.scores[0] ?? 0;
+    }
     const p = this.player;
     const s = this.skill;
     const g = this.gun;
@@ -6318,7 +7106,16 @@ var GameEngine = class {
       shieldCdPct: p.shieldCd > 0 ? 1 - p.shieldCd / (this.gun.shieldRechargeTime ?? 8) : 1,
       hitFlash: p.flash,
       isNet: this.mode !== "local",
-      matchTimeLeft: this.mode === "local" ? null : Math.max(0, MATCH_DURATION - (this.mode === "guest" ? this.lastSnapTime : this.time))
+      matchTimeLeft: this.mode === "local" ? null : Math.max(0, MATCH_DURATION - (this.mode === "guest" ? this.lastSnapTime : this.time)),
+      dmPlayers: this.isDM ? this.combatants().map((c) => ({
+        name: this.nameOf(c.cid ?? 0),
+        score: this.scores[c.cid ?? 0] ?? 0,
+        isSelf: (c.cid ?? 0) === 0,
+        color: (c.cid ?? 0) === 0 ? "#38bdf8" : this.botColor[(c.cid ?? 1) - 1] ?? "#ffffff",
+        alive: !(c.deadTimer && c.deadTimer > 0)
+      })) : void 0,
+      killTarget: this.isDM ? this.dmTarget : void 0,
+      dmTimeLeft: this.isDM ? Math.max(0, Math.ceil(this.dmDuration - this.dmClock)) : null
     };
     this.onHud(hud);
   }
@@ -6344,7 +7141,7 @@ var GameEngine = class {
     ctx.translate(-this.camX, -this.camY);
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    if (this.gameMode !== "biohazard") {
+    if (!this.isDM && this.gameMode !== "biohazard") {
       this.drawBase(ctx, this.enemyBase, false);
       this.drawBase(ctx, this.base, true);
     }
@@ -6377,6 +7174,27 @@ var GameEngine = class {
         this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
       }
     }
+    for (let i = 0; i < this.bots.length; i++) {
+      const b = this.bots[i];
+      if (b.deadTimer && b.deadTimer > 0) continue;
+      this.drawNetCharacter(
+        ctx,
+        b.x,
+        b.y,
+        b.angle,
+        this.botChar[i]?.id ?? "raider",
+        this.botOutfit[i]?.id ?? "tactical",
+        b.gunIndex ?? 0,
+        this.botGuns[i],
+        this.botName[i],
+        b.hp / b.maxHp,
+        this.time,
+        b.size
+      );
+      if (b.electrifiedTime && b.electrifiedTime > 0) {
+        this.drawElectricArcs(ctx, b.x, b.y, b.size, b.electrifiedGlow ?? "#38bdf8", this.time);
+      }
+    }
     this.drawAimPreview(ctx);
     if (this.gun.aimIndicator) this.drawLauncherIndicator(ctx);
     this.drawBullets(ctx);
@@ -6400,13 +7218,14 @@ var GameEngine = class {
       [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
       [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"]
     ];
-    for (const [bx, by, col] of blobs) {
-      const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
-      rg.addColorStop(0, rgba(col, 0.18));
-      rg.addColorStop(1, rgba(col, 0));
-      ctx.fillStyle = rg;
-      ctx.fillRect(0, 0, this.W, this.H);
-    }
+    if (!this.isDM)
+      for (const [bx, by, col] of blobs) {
+        const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
+        rg.addColorStop(0, rgba(col, 0.18));
+        rg.addColorStop(1, rgba(col, 0));
+        ctx.fillStyle = rg;
+        ctx.fillRect(0, 0, this.W, this.H);
+      }
     if (theme.style === "city") {
       ctx.save();
       ctx.translate(-this.camX, -this.camY);
@@ -6535,7 +7354,9 @@ var GameEngine = class {
     for (const w of this.walls) {
       if (w.invisible) continue;
       ctx.save();
-      if (w.glue) {
+      if (w.building) {
+        this.drawBuilding(ctx, w);
+      } else if (w.glue) {
         const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
         g.addColorStop(0, rgba("#22d3ee", 0.5));
         g.addColorStop(1, rgba("#0891b2", 0.4));
@@ -6632,6 +7453,186 @@ var GameEngine = class {
       }
       ctx.restore();
     }
+  }
+  /** Render a solid building: a tower-like rooftop slab with neon trim, a seeded
+   *  window grid and a central rooftop unit. Drawn at world coords (the caller
+   *  has already applied the camera transform). */
+  /** Render a solid building. The slab colour follows the map palette
+   *  (sceneTheme.wallColor → wallDark); the *structure* drawn on top depends on
+   *  the map (this.sceneIndex) so every map has its own building style. */
+  drawBuilding(ctx, w) {
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(w.x + w.w / 2, w.y + w.h + 6, w.w / 2, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    switch (this.sceneIndex) {
+      case 1:
+        this.bldDesert(ctx, w);
+        break;
+      case 2:
+        this.bldArctic(ctx, w);
+        break;
+      case 3:
+        this.bldRuin(ctx, w);
+        break;
+      case 4:
+        this.bldCyber(ctx, w);
+        break;
+      default:
+        this.bldNeon(ctx, w);
+        break;
+    }
+    const frac = Math.max(0, w.hp / w.maxHp);
+    if (frac < 1) {
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(w.x + 4, w.y + w.h + 3, w.w - 8, 3);
+      ctx.fillStyle = rgba("#fbbf24", 0.9);
+      ctx.fillRect(w.x + 4, w.y + w.h + 3, (w.w - 8) * frac, 3);
+    }
+  }
+  /** Base concrete slab (gradient wallColor→wallDark) shared by every style. */
+  bldSlab(ctx, w) {
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, this.sceneTheme.wallColor || "#5b6478");
+    g.addColorStop(1, this.sceneTheme.wallDark || "#2a3140");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(8,10,18,0.85)";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.stroke();
+  }
+  /** Seeded lit/dark window grid. `thr` raises the lit-window rarity; `cell`
+   *  sets the grid pitch; `alpha` the glow strength. */
+  bldWindows(ctx, w, seed, accent, cell, thr, alpha) {
+    const padX = 12;
+    const padY = 12;
+    const cols = Math.max(2, Math.floor((w.w - padX * 2) / cell));
+    const rows = Math.max(2, Math.floor((w.h - padY * 2) / cell));
+    const stepX = (w.w - padX * 2) / cols;
+    const stepY = (w.h - padY * 2) / rows;
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const hh = Math.abs(Math.sin((seed * 12.9898 + i * 78.233 + j * 37.719) * 43758.5453));
+        const lit = hh - Math.floor(hh) > thr;
+        const wx = w.x + padX + i * stepX;
+        const wy = w.y + padY + j * stepY;
+        ctx.fillStyle = lit ? rgba(accent, alpha) : "rgba(120,130,150,0.16)";
+        ctx.fillRect(wx, wy, stepX - 6, stepY - 6);
+      }
+    }
+  }
+  /** 霓虹都市 — glass tower: neon inner trim + dense lit windows + rooftop hatch. */
+  bldNeon(ctx, w) {
+    const accent = this.sceneTheme.accent;
+    this.bldSlab(ctx, w);
+    ctx.strokeStyle = rgba(accent, 0.55);
+    ctx.lineWidth = 2.5;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 9);
+    ctx.stroke();
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 22, 0.55, 0.5);
+    const hw = Math.min(w.w, w.h) * 0.32;
+    ctx.fillStyle = "rgba(0,0,0,0.32)";
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.fill();
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = 1;
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.stroke();
+  }
+  /** 沙漠废墟 — adobe block: pale roof parapet, sparse warm windows, door arch. */
+  bldDesert(ctx, w) {
+    this.bldSlab(ctx, w);
+    ctx.fillStyle = "rgba(255,240,210,0.22)";
+    roundRect(ctx, w.x + 2, w.y + 2, w.w - 4, Math.max(8, w.h * 0.1), 6);
+    ctx.fill();
+    this.bldWindows(ctx, w, w.seed ?? 1, "#f59e0b", 30, 0.82, 0.5);
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    roundRect(ctx, w.x + w.w / 2 - 12, w.y + w.h - 22, 24, 22, 4);
+    ctx.fill();
+  }
+  /** 冰原基地 — frozen bunker: snow cap, panel lines, icy windows, light rim. */
+  bldArctic(ctx, w) {
+    const accent = this.sceneTheme.accent;
+    this.bldSlab(ctx, w);
+    ctx.fillStyle = "rgba(236,246,255,0.9)";
+    roundRect(ctx, w.x + 2, w.y + 2, w.w - 4, Math.max(8, w.h * 0.14), 6);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    for (let k = 1; k <= 3; k++) {
+      const yy = w.y + k * w.h / 4;
+      ctx.beginPath();
+      ctx.moveTo(w.x, yy);
+      ctx.lineTo(w.x + w.w, yy - 10);
+      ctx.stroke();
+    }
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 24, 0.6, 0.5);
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 9);
+    ctx.stroke();
+  }
+  /** 末日废墟 — broken concrete: cracks, mostly-dark windows, rubble at the base. */
+  bldRuin(ctx, w) {
+    this.bldSlab(ctx, w);
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.lineWidth = 1.5;
+    const seed = w.seed ?? 1;
+    for (let n = 0; n < 3; n++) {
+      const hh = Math.abs(Math.sin((seed * 12.9898 + n * 53.7) * 43758.5453));
+      let x = w.x + (hh - Math.floor(hh)) * w.w;
+      let y = w.y;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      while (y < w.y + w.h) {
+        y += 14;
+        x += Math.sin(y * 0.7 + n * 3 + seed) * 7 | 0;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    this.bldWindows(ctx, w, seed, "#ef4444", 26, 0.86, 0.3);
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    for (let r = 0; r < 5; r++) {
+      const hh = Math.abs(Math.sin((seed * 7.13 + r * 19.1) * 43758.5453));
+      const rx = w.x + 6 + (hh - Math.floor(hh)) * (w.w - 12);
+      ctx.beginPath();
+      ctx.arc(rx, w.y + w.h - 3, 2 + r % 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  /** 赛博都市 — dark tower: neon grid overlay, bright vertical strips, hot windows. */
+  bldCyber(ctx, w) {
+    const accent = this.sceneTheme.accent;
+    this.bldSlab(ctx, w);
+    ctx.save();
+    roundRect(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, 9);
+    ctx.clip();
+    ctx.strokeStyle = rgba(accent, 0.12);
+    ctx.lineWidth = 1;
+    for (let gx = w.x; gx < w.x + w.w; gx += 24) {
+      ctx.beginPath();
+      ctx.moveTo(gx, w.y);
+      ctx.lineTo(gx, w.y + w.h);
+      ctx.stroke();
+    }
+    for (let gy = w.y; gy < w.y + w.h; gy += 24) {
+      ctx.beginPath();
+      ctx.moveTo(w.x, gy);
+      ctx.lineTo(w.x + w.w, gy);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = rgba(accent, 0.35);
+    ctx.fillRect(w.x + 6, w.y + 6, 4, w.h - 12);
+    ctx.fillRect(w.x + w.w - 10, w.y + 6, 4, w.h - 12);
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 20, 0.45, 0.6);
+    ctx.strokeStyle = rgba(accent, 0.5);
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 9);
+    ctx.stroke();
   }
   drawDeployables(ctx) {
     for (const d of this.deployables) {
@@ -7299,6 +8300,26 @@ var GameEngine = class {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const b of this.bullets) {
+      if (b.z && b.z > 1) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y, b.size * 1.5, b.size * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = "lighter";
+        const rg0 = ctx.createRadialGradient(b.x, b.y - b.z, 0, b.x, b.y - b.z, b.size * 3);
+        rg0.addColorStop(0, rgba(b.glow, 0.9));
+        rg0.addColorStop(1, rgba(b.glow, 0));
+        ctx.fillStyle = rg0;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y - b.z, b.size * 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y - b.z, b.size, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3.4);
       rg.addColorStop(0, rgba(b.glow, 0.85));
       rg.addColorStop(1, rgba(b.glow, 0));
@@ -7661,48 +8682,51 @@ var GameEngine = class {
     ctx.stroke();
     ctx.restore();
   }
-  /** Deployable-style targeting marker for the 投射榴弹炮: a dashed line, a
-   *  max-range ring and a coverage circle sized to the blast radius. */
+  /** Deployable-style targeting marker for the 投射榴弹炮. Mirrors drawPlaceMarker:
+   *  a dashed line from the player to the (clamped) landing point, a max-range
+   *  ring drawn around the player, and a coverage circle sized to the blast
+   *  radius. The landing marker is clamped to the ring, so when the cursor is
+   *  past max range the shell lands on the ring edge — never at the raw mouse. */
   drawLauncherIndicator(ctx) {
     if (this.gameOver || this.paused) return;
     const p = this.player;
     const g = this.gun;
     const radius = g.explosionRadius ?? 60;
-    let tx = this.mouse.x;
-    let ty = this.mouse.y;
-    const maxD = (g.bulletSpeed ?? 500) * (g.life ?? 2) * 0.9;
-    let dx = tx - p.x;
-    let dy = ty - p.y;
-    const d = Math.hypot(dx, dy) || 1;
-    if (d > maxD) {
-      dx = dx / d * maxD;
-      dy = dy / d * maxD;
-    }
-    tx = Math.max(20, Math.min(this.worldW - 20, p.x + dx));
-    ty = Math.max(20, Math.min(this.worldH - 20, p.y + dy));
+    const tgt = this.mortarTarget(g);
+    const tx = tgt.x;
+    const ty = tgt.y;
     const col = g.glow;
+    const cx = p.x - this.camX;
+    const cy = p.y - this.camY;
+    const sx = tx - this.camX;
+    const sy = ty - this.camY;
     ctx.save();
     ctx.setLineDash([5, 5]);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = rgba(col, 0.5);
+    ctx.strokeStyle = tgt.beyond ? rgba(col, 0.3) : rgba(col, 0.55);
     ctx.beginPath();
-    ctx.moveTo(p.x - this.camX, p.y - this.camY);
-    ctx.lineTo(tx - this.camX, ty - this.camY);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(sx, sy);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = rgba(col, 0.18);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, tgt.maxD, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = tgt.beyond ? 0.35 : 0.6;
     ctx.fillStyle = rgba(col, 0.22);
     ctx.beginPath();
-    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.arc(sx, sy, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle = rgba(col, 0.95);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.arc(sx, sy, 14, 0, Math.PI * 2);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(tx - this.camX, ty - this.camY, 6, 0, Math.PI * 2);
+    ctx.arc(sx, sy, 6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }

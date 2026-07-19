@@ -40,11 +40,18 @@ export interface RuntimeConfig {
   /** enemy base max HP override; 0 = use per-character scaling.
    *  Set 250 so enemies match the unified 250 player HP (×2.5 balance scaling). */
   enemyHp: number;
+  // deathmatch (human vs bots)
+  /** number of AI bots in a deathmatch (offline PvP) */
+  botCount: number;
+  /** kills needed to win the deathmatch */
+  killTarget: number;
+  /** deathmatch time limit in seconds (match ends on timeout if reached first) */
+  dmDuration: number;
 }
 
 export const RUNTIME_DEFAULTS: RuntimeConfig = {
-  worldW: 1600,
-  worldH: 1000,
+  worldW: 2400,
+  worldH: 1200,
   baseHp: 2000,
   enemyBaseHp: 2000,
   breathingDelay: 5,
@@ -67,6 +74,9 @@ export const RUNTIME_DEFAULTS: RuntimeConfig = {
   playerSpeedMult: 1,
   playerBaseHp: 250, // unified max HP for every player (character/outfit HP bonuses disabled)
   enemyHp: 250, // unified enemy base HP ×2.5 to match 250 player HP (per-wave hpScale & elite mult still apply)
+  botCount: 3, // bots in a human-vs-bots deathmatch
+  killTarget: 15, // first to this many kills wins
+  dmDuration: 300, // 5-minute time limit
 };
 
 export const RUNTIME: RuntimeConfig = { ...RUNTIME_DEFAULTS };

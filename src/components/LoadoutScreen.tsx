@@ -365,7 +365,7 @@ export default function LoadoutScreen({
     "turret_cannon",
     "mine_explosive",
   ]);
-  const [gameMode, setGameMode] = useState<"defense" | "biohazard">("defense");
+  const [gameMode, setGameMode] = useState<"defense" | "biohazard" | "deathmatch">("defense");
 
   const gunId = gunIds[0] ?? "mac11";
   const toggleGun = (id: string) => {
@@ -430,7 +430,7 @@ export default function LoadoutScreen({
   ];
 
   return (
-    <div className="min-h-screen w-full overflow-y-auto bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100">
+    <div className="no-scrollbar min-h-screen w-full overflow-y-auto bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100">
       <div className="mx-auto max-w-6xl px-5 py-8">
         <header className="mb-6 text-center">
           <h1 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">
@@ -623,6 +623,15 @@ export default function LoadoutScreen({
                 <span className="text-xl">☣</span>
                 <span className="text-xs font-semibold">生化危机</span>
                 <span className="text-[10px] text-slate-400">尸潮生存 · 新武器</span>
+              </PickCard>
+              <PickCard
+                active={gameMode === "deathmatch"}
+                accent="#f472b6"
+                onClick={() => setGameMode("deathmatch")}
+              >
+                <span className="text-xl">🤖</span>
+                <span className="text-xs font-semibold">人机对战</span>
+                <span className="text-[10px] text-slate-400">离线 PvP · 先杀 10 人胜</span>
               </PickCard>
             </Section>
 

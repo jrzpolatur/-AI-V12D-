@@ -134,7 +134,19 @@ export default function GameScreen({
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>(initialHud);
   const [muted, setMuted] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const isTouch = useMemo(() => isTouchDevice(), []);
+
+  // keep fullscreen button state in sync with the browser (e.g. Esc exits FS)
+  useEffect(() => {
+    const onFs = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen?.();
+  };
 
   // ---- screen shake on hit ----
   const [shake, setShake] = useState({ x: 0, y: 0 });
@@ -243,8 +255,35 @@ export default function GameScreen({
 
       {/* ============ TOP BAR ============ */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-start justify-between p-3 sm:p-4">
-        {/* Base HP (left) + Enemy base HP — hidden in biohazard */}
-        {hud.mode === "biohazard" ? (
+        {/* Base HP (left) + Enemy base HP — hidden in biohazard/deathmatch */}
+        {hud.mode === "deathmatch" ? (
+          <div className="flex flex-col items-start gap-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-fuchsia-200/90">
+              <span>🤖</span>
+              <span>人机对战</span>
+            </div>
+            <div className="mt-0.5 flex flex-col gap-0.5 rounded-lg bg-black/45 px-2 py-1 backdrop-blur">
+              {hud.dmPlayers?.map((p, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex items-center gap-1.5 text-[11px]",
+                    p.isSelf ? "font-bold text-white" : "text-slate-300",
+                    !p.alive && "opacity-40"
+                  )}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: p.color, boxShadow: `0 0 6px ${p.color}` }}
+                  />
+                  <span className="w-12 truncate">{p.name}</span>
+                  <span className="ml-auto tabular-nums">{p.score}</span>
+                  {!p.alive && <span className="text-[9px]">💀</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : hud.mode === "biohazard" ? (
           <div className="flex flex-col items-start gap-1">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-lime-200/90">
               <span>☣</span>
@@ -296,8 +335,24 @@ export default function GameScreen({
           </div>
         )}
 
-        {/* Center: wave + enemies (single-player) OR match timer (online) */}
-        {hud.isNet ? (
+        {/* Center: DM target+timer, OR online match timer, OR single-player wave */}
+        {hud.mode === "deathmatch" ? (
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
+              <span className="text-xs text-slate-400">目标</span>
+              <span className="text-lg font-bold text-fuchsia-300">
+                {hud.killTarget ?? 15} 杀
+              </span>
+              <span className="ml-2 text-xs text-slate-400">剩余</span>
+              <span className="text-lg font-bold text-amber-300">
+                {hud.dmTimeLeft != null ? `${hud.dmTimeLeft}s` : "--"}
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400">
+              你的得分 <span className="font-bold text-white">{hud.score}</span>
+            </div>
+          </div>
+        ) : hud.isNet ? (
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
               <span className="text-xs text-slate-400">剩余</span>
@@ -319,23 +374,32 @@ export default function GameScreen({
 
         {/* Right: score + gold + controls */}
         <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             <div className="rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
               <span className="text-xs text-slate-400">分数 </span>
               <span className="text-lg font-bold text-amber-300">
                 {hud.score.toLocaleString()}
               </span>
             </div>
-            <div className="flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 backdrop-blur">
-              <span className="text-sm">🪙</span>
-              <span className="text-sm font-bold text-yellow-400">{hud.gold}</span>
-            </div>
+            {hud.mode !== "deathmatch" && (
+              <div className="flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 backdrop-blur">
+                <span className="text-sm">🪙</span>
+                <span className="text-sm font-bold text-yellow-400">{hud.gold}</span>
+              </div>
+            )}
             <button
               onClick={toggleMute}
               className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
               title={muted ? "开启声音" : "静音"}
             >
               {muted ? "🔇" : "🔊"}
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
+              title={fullscreen ? "退出全屏" : "全屏"}
+            >
+              {fullscreen ? "🗗" : "⛶"}
             </button>
             <button
               onClick={onExit}
@@ -651,14 +715,46 @@ export default function GameScreen({
               {hud.gameOverReason}
             </h2>
             <p className="mb-5 text-sm text-slate-400">
-              {hud.gameOverReason.includes("基地") ? "防线失守…" : "你倒下了…"}
+              {hud.mode === "deathmatch"
+                ? hud.gameOverReason.includes("你")
+                  ? "🏆 你赢得了这场人机对战！"
+                  : "人机对战结束"
+                : hud.gameOverReason.includes("基地")
+                ? "防线失守…"
+                : "你倒下了…"}
             </p>
-            <div className="mb-5 grid grid-cols-4 gap-2">
-              <Stat label="分数" value={hud.score.toLocaleString()} />
-              <Stat label="波数" value={`${hud.wave}`} />
-              <Stat label="击杀" value={`${hud.kills}`} />
-              <Stat label="金币" value={`${hud.gold}`} />
-            </div>
+            {hud.mode === "deathmatch" ? (
+              <div className="mb-5 flex flex-col gap-1 rounded-xl bg-black/40 px-3 py-2">
+                {hud.dmPlayers
+                  ?.slice()
+                  .sort((a, b) => b.score - a.score)
+                  .map((p, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "flex items-center gap-2 text-sm",
+                        p.isSelf ? "font-bold text-white" : "text-slate-300"
+                      )}
+                    >
+                      <span className="w-4 text-slate-500">{i + 1}</span>
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: p.color, boxShadow: `0 0 6px ${p.color}` }}
+                      />
+                      <span className="w-20 truncate text-left">{p.name}</span>
+                      <span className="ml-auto tabular-nums">{p.score}</span>
+                      {!p.alive && <span className="text-[10px]">💀</span>}
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="mb-5 grid grid-cols-4 gap-2">
+                <Stat label="分数" value={hud.score.toLocaleString()} />
+                <Stat label="波数" value={`${hud.wave}`} />
+                <Stat label="击杀" value={`${hud.kills}`} />
+                <Stat label="金币" value={`${hud.gold}`} />
+              </div>
+            )}
             <div className="space-y-2">
               <button
                 onClick={() => engineRef.current?.restart()}

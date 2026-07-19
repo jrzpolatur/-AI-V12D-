@@ -1,4 +1,4 @@
-import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getSkill, SCENES, CHARACTERS, OUTFITS } from "./content";
+import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getGun, getGadget, getSkill, SCENES, CHARACTERS, OUTFITS } from "./content";
 import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef, OutfitDef } from "./types";
 import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK } from "./draw";
 import { sound } from "./sound";
@@ -43,8 +43,9 @@ export interface Loadout {
   skillId: string;
   /** carried gadgets (max 3). Empty -> first 3 GADGETS. */
   gadgetIds?: string[];
-  /** single-player sub-mode: defend the base (default) or biohazard survival */
-  gameMode?: "defense" | "biohazard";
+  /** single-player sub-mode: defend the base (default), biohazard survival,
+   *  or human-vs-bots deathmatch (offline PvP, no base, first to N kills) */
+  gameMode?: "defense" | "biohazard" | "deathmatch";
 }
 
 export interface ActiveEffect {
@@ -89,7 +90,7 @@ export interface HudState {
   /** gatling spin-up 0..1 (0 = cold, 1 = full fire rate) */
   warmup: number;
   /** single-player sub-mode */
-  mode: "defense" | "biohazard";
+  mode: "defense" | "biohazard" | "deathmatch";
   skillId: string;
   skillName: string;
   skillIcon: string;
@@ -130,6 +131,12 @@ export interface HudState {
   isNet: boolean;
   /** seconds remaining in an online match (null in single-player) */
   matchTimeLeft: number | null;
+  /** deathmatch scoreboard: every combatant's live score (human + bots) */
+  dmPlayers?: { name: string; score: number; isSelf: boolean; color: string; alive: boolean }[];
+  /** deathmatch: kills needed to win */
+  killTarget?: number;
+  /** deathmatch: seconds left in the match (null if not deathmatch) */
+  dmTimeLeft?: number | null;
 }
 
 interface Player {
@@ -186,6 +193,8 @@ interface Player {
   electrifiedGlow?: string;
   /** slow debuff (from a lightning whip hit); time remaining */
   slowT?: number;
+  /** deathmatch: stable combatant id (0 = human, 1..N = bots) */
+  cid?: number;
 }
 
 interface Bullet {
@@ -213,11 +222,25 @@ interface Bullet {
   bounced?: boolean;
   /** who fired this bullet (for PvP ownership) */
   owner?: "self" | "foe" | "enemy";
+  /** deathmatch: stable combatant id of the shooter (for N-way collision) */
+  ownerCid?: number;
   /** sideways drift velocity so parallel shots fan apart over flight (px/s) */
   driftX?: number;
   driftY?: number;
   /** weapon id that fired this bullet (for styled coin-burst kill FX) */
   weapon?: string;
+  /** mortar lob: when set, the bullet arcs (z-axis) from (lobSx,lobSy) to
+   *  (lobTx,lobTy) over lobDur seconds and explodes at the landing point,
+   *  instead of travelling in a straight line. */
+  lobSx?: number;
+  lobSy?: number;
+  lobTx?: number;
+  lobTy?: number;
+  lobDur?: number;
+  lobT?: number;
+  lobPeak?: number;
+  /** current height above ground for the z-axis arc (drawing only) */
+  z?: number;
 }
 
 interface Enemy {
@@ -374,6 +397,11 @@ interface Wall {
   slow?: number;
   /** invisible boundary "air walls" — collide but are never drawn */
   invisible?: boolean;
+  /** solid building (textured, tower-like cover). Only the 大锤 (hammer) may
+   *  damage buildings with a melee swing; other melee weapons pass through. */
+  building?: boolean;
+  /** deterministic per-building seed for the procedural rooftop texture */
+  seed?: number;
 }
 
 interface Base {
@@ -424,6 +452,10 @@ interface Deployable {
   size: number;
   /** for cannon turret bomb travel */
   targets: number[];
+  /** who deployed this gadget (for multiplayer PvP ownership / targeting) */
+  owner?: "self" | "foe";
+  /** deathmatch: stable combatant id of the deployer (for N-way targeting) */
+  ownerCid?: number;
 }
 
 const KEYS_MOVE = new Set([
@@ -544,7 +576,7 @@ export class GameEngine {
   private authoritative = false;
   private net: Net | null = null;
   /** single-player sub-mode */
-  private gameMode: "defense" | "biohazard" = "defense";
+  private gameMode: "defense" | "biohazard" | "deathmatch" = "defense";
   private selfPid = 0;
   private peerPid = 0;
   private peerName = "";
@@ -566,6 +598,49 @@ export class GameEngine {
   private foeGadgets: GadgetDef[] = [];
   /** the opponent's per-gadget cooldown timers (separate from the host's own) */
   private foeGadgetCd = new Map<string, number>();
+
+  // ---- deathmatch (human vs bots) state ----
+  /** true when the current match is a human-vs-bots deathmatch (offline PvP) */
+  private get isDM(): boolean {
+    return this.gameMode === "deathmatch";
+  }
+  /** bot avatars (combatants 1..N). The human is always this.player (cid 0). */
+  private bots: Player[] = [];
+  private botChar: (CharacterDef | null)[] = [];
+  private botOutfit: (OutfitDef | null)[] = [];
+  private botSkill: SkillDef[] = [];
+  private botGuns: GunDef[][] = [];
+  private botGadgets: GadgetDef[][] = [];
+  private botGadgetCd: Map<string, number>[] = [];
+  private botName: string[] = [];
+  private botColor: string[] = [];
+  /** per-combatant score; index = cid (0 = human). First to killTarget wins. */
+  private scores: number[] = [];
+  /** cached AI intent for each bot, refreshed by thinkBot */
+  private botAi: {
+    keys: Set<string>;
+    mx: number;
+    my: number;
+    firing: boolean;
+    skill: boolean;
+    gadget: number;
+    reload: boolean;
+    switchW: boolean;
+    strafe: number;
+    strafeT: number;
+    think: number;
+    aimErr: number;
+  }[] = [];
+  private dmTarget = 10;
+  private dmDuration = 300;
+  private dmClock = 0;
+  /** stable list of all live combatants (human + bots).
+   *  Always leads with `localPlayer` (the human) — NOT `player`, because
+   *  `player` is temporarily swapped to a bot while `simulateBot` runs and
+   *  `emit`/targeting can be invoked from within that window. */
+  private combatants(): Player[] {
+    return [this.localPlayer, ...this.bots];
+  }
   /** the host's own avatar; never swapped while simulating the foe */
   private localPlayer: Player = null as unknown as Player;
   // one-shot action intents captured on the guest, sent with the next input
@@ -831,12 +906,9 @@ export class GameEngine {
     this.resize();
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
-    // biohazard mode = single-screen arena (no scrolling). The "map boundary"
-    // is exactly the player's view, so monsters can never leave the screen.
-    if (this.gameMode === "biohazard") {
-      this.worldW = this.W;
-      this.worldH = this.H;
-    }
+    // Every mode now uses the (expanded) world bounds from RUNTIME so the
+    // camera can scroll and follow the player — including biohazard, which is
+    // no longer a fixed single-screen arena but a larger roaming survival map.
     this.gx = 0;
     this.gy = 0;
     this.gxInit = false;
@@ -871,9 +943,9 @@ export class GameEngine {
       flash: 0,
       t: 0,
     };
-    // biohazard has no bases to defend — neutralise them so they never
-    // trigger a loss and aren't targeted by monsters.
-    if (this.gameMode === "biohazard") {
+    // biohazard + deathmatch have no bases to defend — neutralise them so they
+    // never trigger a loss and aren't targeted by monsters/bots.
+    if (this.gameMode === "biohazard" || this.isDM) {
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
@@ -904,7 +976,12 @@ export class GameEngine {
     this.beamHit = null;
     this.flameActive = false;
     this.banner = {
-      text: this.gameMode === "biohazard" ? "生化危机 · 活下去！" : "守护基地！",
+      text:
+        this.gameMode === "biohazard"
+          ? "生化危机 · 活下去！"
+          : this.isDM
+          ? `人机对战 · 先击杀 ${this.dmTarget} 人获胜！`
+          : "守护基地！",
       t: 2.2,
     };
     this.enemyId = 1;
@@ -930,6 +1007,7 @@ export class GameEngine {
       angle: 0,
       hp: maxHp,
       maxHp,
+      cid: 0,
       size: c.size,
       speed,
       fireTimer: 0,
@@ -955,7 +1033,7 @@ export class GameEngine {
       lastHitTime: 0,
     };
     this.localPlayer = this.player;
-    // biohazard: drop the player into the centre of the single-screen arena
+    // biohazard: drop the player into the centre of the (now scrolling) arena
     if (this.gameMode === "biohazard") {
       this.player.x = this.worldW / 2;
       this.player.y = this.worldH / 2;
@@ -982,6 +1060,10 @@ export class GameEngine {
       this.foe = this.makeFoe();
       this.net.sendGame({ t: "hello", name: this.character.name, loadout: this.loadout });
     }
+
+    // ---- deathmatch: spin up the bot squad (offline, single-player only) ----
+    this.dmClock = 0;
+    this.setupBots();
   }
 
   private makeFoe(): Player {
@@ -1031,6 +1113,141 @@ export class GameEngine {
       dashRecharge: 0,
       lastGadget: 0,
     };
+  }
+
+  /** Build the offline bot squad for a human-vs-bots deathmatch. No-op for any
+   *  other mode. Each bot is a full Player avatar (own character / gun / skill /
+   *  gadgets) with a stable combatant id (cid). They are spread around the arena
+   *  and respawn on death like the human. */
+  private setupBots() {
+    // reset any previous run
+    this.bots = [];
+    this.botChar = [];
+    this.botOutfit = [];
+    this.botSkill = [];
+    this.botGuns = [];
+    this.botGadgets = [];
+    this.botGadgetCd = [];
+    this.botName = [];
+    this.botColor = [];
+    this.scores = [];
+    this.botAi = [];
+    if (!this.isDM || this.mode !== "local") return;
+
+    const count = Math.max(1, RUNTIME.botCount | 0);
+    this.dmTarget = RUNTIME.killTarget | 0 || 15;
+    this.dmDuration = RUNTIME.dmDuration | 0 || 300;
+    // human is cid 0; scores[0] mirrors this.score for the HUD
+    this.scores = [0];
+
+    const chars = ["raider", "juggernaut", "phantom", "sentinel", "raider", "juggernaut"];
+    const gunsPool = [
+      "mac11", "mp5", "akm", "sniper", "shak50", "gatling", "fcar", "sa1216",
+    ];
+    const skills = ["dash", "shield", "timewarp", "overdrive", "grenade"];
+    const gadgetsPool = [
+      "turret_mg", "mine_explosive", "mine_fire", "healing_station",
+      "glue_grenade", "fire_grenade",
+    ];
+    const names = ["阿尔法", "布雷泽", "蝰蛇", "幽灵", "铁壁", "猎手"];
+    const colors = ["#f472b6", "#34d399", "#fbbf24", "#60a5fa", "#a78bfa", "#fb923c"];
+
+    // spread spawn anchors (kept away from the human's bottom-centre start)
+    const cx = this.worldW / 2;
+    const cy = this.worldH / 2;
+    const spawns = [
+      { x: cx, y: 220 },
+      { x: 360, y: 360 },
+      { x: this.worldW - 360, y: 360 },
+      { x: 300, y: cy },
+      { x: this.worldW - 300, y: cy },
+      { x: cx, y: this.worldH - 360 },
+    ];
+
+    const maxHp =
+      RUNTIME.playerBaseHp > 0 ? RUNTIME.playerBaseHp : 250;
+
+    for (let i = 0; i < count; i++) {
+      const cid = i + 1;
+      const c = getCharacter(chars[i % chars.length]);
+      const o = getOutfit("tactical");
+      const g1 = getGun(gunsPool[(i * 3 + 1) % gunsPool.length]);
+      const g2 = getGun(gunsPool[(i * 5 + 4) % gunsPool.length]);
+      const guns = g1.id === g2.id ? [g1, getGun(gunsPool[(i + 2) % gunsPool.length])] : [g1, g2];
+      const skill = getSkill(skills[i % skills.length]);
+      // pick 2 distinct gadgets for this bot
+      const gi1 = (i * 2) % gadgetsPool.length;
+      const gi2 = (gi1 + 3) % gadgetsPool.length;
+      const gadgets = [
+        getGadget(gadgetsPool[gi1]),
+        getGadget(gadgetsPool[gi2]),
+      ].filter(Boolean) as GadgetDef[];
+      this.ensureWeaponStates(guns);
+
+      const spawn = spawns[i % spawns.length];
+      const bot: Player = {
+        x: spawn.x,
+        y: spawn.y,
+        vx: 0,
+        vy: 0,
+        angle: Math.atan2(cy - spawn.y, cx - spawn.x),
+        hp: maxHp,
+        maxHp,
+        size: c.size,
+        speed: c.speed * (1 + o.speedBonus),
+        fireTimer: 0,
+        iframes: 0,
+        flash: 0,
+        dashVx: 0,
+        dashVy: 0,
+        dashTime: 0,
+        shieldTime: 0,
+        overdriveTime: 0,
+        slamCd: 0,
+        t: 0,
+        swingTimer: 0,
+        swingDur: 0.22,
+        comboStep: 0,
+        comboTimer: 0,
+        lunge: 0,
+        bowCharge: 0,
+        bowDrawing: false,
+        shieldBlockTime: 0,
+        shieldHp: 0,
+        shieldCd: 0,
+        lastHitTime: 0,
+        cid,
+        gunIndex: 0,
+        skillCd: 0,
+        dashCharges: MAX_DASH_CHARGES,
+        dashRecharge: 0,
+        lastGadget: 0,
+      };
+      this.bots.push(bot);
+      this.botChar.push(c);
+      this.botOutfit.push(o);
+      this.botSkill.push(skill);
+      this.botGuns.push(guns);
+      this.botGadgets.push(gadgets);
+      this.botGadgetCd.push(new Map());
+      this.botName.push(names[i % names.length]);
+      this.botColor.push(colors[i % colors.length]);
+      this.scores.push(0);
+      this.botAi.push({
+        keys: new Set<string>(),
+        mx: cx,
+        my: cy,
+        firing: false,
+        skill: false,
+        gadget: -1,
+        reload: false,
+        switchW: false,
+        strafe: Math.random() < 0.5 ? 1 : -1,
+        strafeT: 0,
+        think: 0,
+        aimErr: (Math.random() - 0.5) * 0.18,
+      });
+    }
   }
 
   /** Make sure every gun in the list has a WeaponState entry (host simulates foe guns too). */
@@ -1156,25 +1373,46 @@ export class GameEngine {
         maxHp: 150,
         destructible: true,
       });
+    // Solid buildings — large, textured, tower-like cover. They block movement
+    // and bullets like cover walls, but are tougher and only the 大锤 (hammer)
+    // can damage them with a melee swing (see meleeLight). `seed` drives the
+    // deterministic texture so each building looks distinct; the *style* of the
+    // texture is chosen by the map (this.sceneIndex) in drawBuilding.
+    let buildingSeed = 1;
+    const building = (x: number, y: number, w: number, h: number, hp = 420) =>
+      walls.push({
+        x: x - w / 2,
+        y: y - h / 2,
+        w,
+        h,
+        hp,
+        maxHp: hp,
+        destructible: true,
+        building: true,
+        seed: buildingSeed++,
+      });
 
-    // central pillars
-    pillar(cx - 200, cy - 150);
-    pillar(cx + 200, cy - 150);
-    pillar(cx - 200, cy + 150);
-    pillar(cx + 200, cy + 150);
-    pillar(cx, cy);
-
-    // cover walls — mid-field
-    cover(cx, cy - 200, 160, 30);
-    cover(cx, cy + 200, 160, 30);
-    cover(cx - 250, cy, 30, 160);
-    cover(cx + 250, cy, 30, 160);
-    cover(cx - 150, cy - 100, 100, 28);
-    cover(cx + 150, cy + 100, 100, 28);
-    cover(cx - 350, cy - 200, 90, 26);
-    cover(cx + 350, cy + 200, 90, 26);
-    cover(cx - 400, cy + 150, 90, 26);
-    cover(cx + 400, cy - 150, 90, 26);
+    // Each map (scene) gets its own layout of cover + buildings, and its own
+    // building art style (see drawBuilding). All layouts keep wide lanes
+    // (≥ ~90 px between obstacles / to the bases) so players and monsters can
+    // always move through. The central plaza around (cx,cy) is left open.
+    switch (this.sceneIndex) {
+      case 1:
+        this.layoutDesert(building, cover, pillar, cx, cy);
+        break;
+      case 2:
+        this.layoutArctic(building, cover, pillar, cx, cy);
+        break;
+      case 3:
+        this.layoutRuin(building, cover, pillar, cx, cy);
+        break;
+      case 4:
+        this.layoutCyber(building, cover, pillar, cx, cy);
+        break;
+      default:
+        this.layoutNeon(building, cover, pillar, cx, cy);
+        break;
+    }
 
     // ---- invisible boundary "air walls" ----
     // These solid (non-glue) walls sit just outside the playfield. They block
@@ -1198,6 +1436,135 @@ export class GameEngine {
     air(-TH, this.worldH, this.worldW + TH * 2, TH); // bottom
 
     return walls;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-map layout builders. `b` = building, `c` = cover wall, `p` = pillar.
+  // World is 2400×1200; bases sit at (cx, baseY=worldH-120) and (cx, 120) with
+  // radius 48, so mid-field anchors are kept a safe gap above/below them.
+  // ---------------------------------------------------------------------------
+
+  /** 霓虹都市 — four large corner towers, four mid-field anchors, central pillar ring. */
+  private layoutNeon(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    _c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    b(430, 320, 230, 180);
+    b(1970, 320, 230, 180);
+    b(430, 880, 230, 180);
+    b(1970, 880, 230, 180);
+    b(cx, 270, 220, 90); // top-center (clear of enemy base)
+    b(cx, 930, 220, 90); // bottom-center (clear of base)
+    b(170, cy, 120, 200); // left-mid
+    b(2230, cy, 120, 200); // right-mid
+    p(cx - 200, cy - 150);
+    p(cx + 200, cy - 150);
+    p(cx - 200, cy + 150);
+    p(cx + 200, cy + 150);
+    p(cx, cy);
+  }
+
+  /** 沙漠废墟 — adobe compounds in the corners, a central alley of cover, scattered ruins. */
+  private layoutDesert(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    b(400, 260, 180, 150);
+    b(2000, 260, 180, 150);
+    b(400, 940, 180, 150);
+    b(2000, 940, 180, 150);
+    b(150, cy, 120, 180); // left-mid ruin
+    b(2250, cy, 120, 180); // right-mid ruin
+    b(cx, 270, 200, 90); // top-center
+    b(cx, 930, 200, 90); // bottom-center
+    // central adobe alley — a cross of low cover walls with an open middle
+    c(cx, cy - 170, 180, 28);
+    c(cx, cy + 170, 180, 28);
+    c(cx - 170, cy, 28, 180);
+    c(cx + 170, cy, 28, 180);
+    p(cx, cy);
+  }
+
+  /** 冰原基地 — frozen bunkers in the corners + sides, a long central ice cross. */
+  private layoutArctic(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    b(450, 300, 190, 150);
+    b(1950, 300, 190, 150);
+    b(450, 900, 190, 150);
+    b(1950, 900, 190, 150);
+    b(760, cy, 130, 190); // left-mid bunker
+    b(1640, cy, 130, 190); // right-mid bunker
+    b(cx, 270, 200, 90); // top-center
+    b(cx, 930, 200, 90); // bottom-center
+    c(cx, cy - 150, 230, 26);
+    c(cx, cy + 150, 230, 26);
+    c(cx - 150, cy, 26, 230);
+    c(cx + 150, cy, 26, 230);
+    p(cx, cy);
+  }
+
+  /** 末日废墟 — broken city blocks clustered in the corners, scattered rubble pillars. */
+  private layoutRuin(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    _c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    // TL cluster
+    b(380, 250, 170, 150);
+    b(640, 430, 150, 170);
+    // TR cluster (mirror)
+    b(2020, 250, 170, 150);
+    b(1760, 430, 150, 170);
+    // BL cluster (mirror)
+    b(380, 950, 170, 150);
+    b(640, 770, 150, 170);
+    // BR cluster (mirror)
+    b(2020, 950, 170, 150);
+    b(1760, 770, 150, 170);
+    b(cx, 260, 210, 80); // top-center
+    b(cx, 930, 210, 80); // bottom-center
+    b(150, cy, 120, 190); // left-mid
+    b(2250, cy, 120, 190); // right-mid
+    p(cx - 160, cy - 130);
+    p(cx + 160, cy - 130);
+    p(cx - 160, cy + 130);
+    p(cx + 160, cy + 130);
+    p(cx, cy);
+  }
+
+  /** 赛博都市 — tall vertical strips in the corners + mid, neon arches at center. */
+  private layoutCyber(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    b(420, 360, 160, 320); // TL tower
+    b(1980, 360, 160, 320); // TR tower
+    b(420, 840, 160, 320); // BL tower
+    b(1980, 840, 160, 320); // BR tower
+    b(760, cy, 120, 240); // left-mid tower
+    b(1640, cy, 120, 240); // right-mid tower
+    b(cx, 280, 200, 100); // top-center
+    b(cx, 920, 200, 100); // bottom-center
+    c(cx, cy - 160, 170, 26); // top neon arch
+    c(cx, cy + 160, 170, 26); // bottom neon arch
+    p(cx - 220, cy);
+    p(cx + 220, cy);
   }
 
   private attach() {
@@ -1239,21 +1606,11 @@ export class GameEngine {
     this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  /** Window resize handler: refresh the canvas size, then in the single-screen
-   *  biohazard arena re-sync the world bounds to the new viewport so the whole
-   *  playfield stays visible and the air walls stay at the screen edges. */
+  /** Window resize handler: refresh the canvas size. World bounds are fixed
+   *  (every mode uses the expanded RUNTIME world), so there is nothing to
+   *  re-sync here — the camera simply keeps following the player. */
   private onResize() {
     this.resize();
-    if (this.gameMode === "biohazard") {
-      this.worldW = this.W;
-      this.worldH = this.H;
-      this.walls = this.buildWalls();
-      this.camX = 0;
-      this.camY = 0;
-      // keep the (neutralised) bases/blobs aligned to the new viewport
-      this.base.y = this.worldH - 120;
-      this.enemyBase.y = 120;
-    }
   }
 
   // ----------------------------------------------------------------- input
@@ -1529,6 +1886,7 @@ export class GameEngine {
     }
 
     this.updatePlayer(dt);
+    if (this.isDM) this.tickDeathmatch(dt);
     this.simulateWorld(dt);
 
     // ---- host: simulate the remote avatar + stream snapshots ----
@@ -1546,6 +1904,7 @@ export class GameEngine {
       }
       if (
         this.gameMode !== "biohazard" &&
+        !this.isDM &&
         this.base.hp <= 0 &&
         !this.gameOver
       )
@@ -1674,8 +2033,10 @@ export class GameEngine {
     p.x = Math.max(m, Math.min(this.worldW - m, p.x));
     p.y = Math.max(m, Math.min(this.worldH - m, p.y));
     this.collideWalls(p, p.size);
-    this.collideBase(p, p.size);
-    this.collideBase(p, p.size, this.enemyBase);
+    if (!this.isDM) {
+      this.collideBase(p, p.size);
+      this.collideBase(p, p.size, this.enemyBase);
+    }
     p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
 
     // mobile aim assist (touch only): auto-lock onto the nearest threat so the
@@ -1792,6 +2153,31 @@ export class GameEngine {
         bx = p.x + Math.cos(a) * (p.size + g.barrel);
         by = p.y + Math.sin(a) * (p.size + g.barrel);
       }
+      // 投射榴弹炮：不发射平行弹药，而是向瞄准落点抛射（z 轴抛物线），落地爆炸
+      if (g.id === "mortar") {
+        const tgt = this.mortarTarget(g);
+        const dist = Math.hypot(tgt.x - bx, tgt.y - by);
+        const dur = 0.5 + Math.min(0.9, dist / 1400);
+        this.bullets.push({
+          x: bx, y: by, vx: 0, vy: 0,
+          life: dur + 0.2,
+          damage: dmg,
+          size: (g.bulletSize ?? 8) + 2,
+          color: g.color, glow: g.glow,
+          pierce: 0, knockback: g.knockback,
+          explosive: false,
+          explosionRadius: g.explosionRadius ?? 70,
+          kind: "mortar",
+          hit: new Set<number>(),
+          owner: this.player === this.foe ? "foe" : "self",
+          ownerCid: this.player.cid ?? 0,
+          trail: false,
+          lobSx: bx, lobSy: by, lobTx: tgt.x, lobTy: tgt.y,
+          lobDur: dur, lobT: 0, lobPeak: 50 + dist * 0.18,
+          weapon: g.id,
+        });
+        continue;
+      }
       const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
       this.bullets.push({
         x: bx,
@@ -1812,6 +2198,7 @@ export class GameEngine {
         kind: g.kind,
         hit: new Set(),
         owner: this.player === this.foe ? "foe" : "self",
+        ownerCid: this.isDM ? (this.player.cid ?? 0) : undefined,
         trail: g.kind === "tracer",
         bounces: g.bounces,
         ignoreWalls: g.ignoreWalls,
@@ -1835,9 +2222,46 @@ export class GameEngine {
     }
   }
 
+  /** Clamped mortar landing point. The landing is the aim point clamped to the
+   *  weapon's max lob range (g.range) around the firing player, then kept inside
+   *  the world. Shared by firing and the deployable-style aim indicator so the
+   *  shell always lands where the marker shows — never at the raw mouse when the
+   *  cursor is past the max-range ring. */
+  private mortarTarget(g: GunDef): { x: number; y: number; maxD: number; beyond: boolean } {
+    const p = this.player;
+    const maxD = g.range ?? (g.bulletSpeed ?? 500) * (g.life ?? 2) * 0.9;
+    let dx = this.mouse.x - p.x;
+    let dy = this.mouse.y - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const beyond = d > maxD;
+    if (beyond) {
+      dx = (dx / d) * maxD;
+      dy = (dy / d) * maxD;
+    }
+    return {
+      x: Math.max(20, Math.min(this.worldW - 20, p.x + dx)),
+      y: Math.max(20, Math.min(this.worldH - 20, p.y + dy)),
+      maxD,
+      beyond,
+    };
+  }
+
   // ------------------------------------------------------------- melee
-  /** The human opponent of whoever is currently `this.player` (the melee attacker). */
+  /** The melee target of whoever is currently `this.player` (the attacker). */
   private meleeOpponent(): Player | null {
+    if (this.isDM) {
+      let best = Infinity;
+      let target: Player | null = null;
+      for (const c of this.combatants()) {
+        if (c === this.player || (c.deadTimer && c.deadTimer > 0)) continue;
+        const d = Math.hypot(c.x - this.player.x, c.y - this.player.y);
+        if (d < best) {
+          best = d;
+          target = c;
+        }
+      }
+      return target;
+    }
     if (!this.foe || !this.localPlayer) return null;
     // during host simulation this.player === this.foe (we're simulating the foe),
     // so the target is the host's own avatar
@@ -1922,7 +2346,7 @@ export class GameEngine {
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
           const kx = Math.cos(ang) * g.knockback;
           const ky = Math.sin(ang) * g.knockback;
-          this.damagePlayerEntity(opp, dmg * dmgMult, undefined, kx, ky);
+          this.damagePlayerEntity(opp, dmg * dmgMult, undefined, kx, ky, this.player.cid);
           if (isSaber) {
             opp.electrifiedTime = 0.7;
             opp.electrifiedGlow = g.glow;
@@ -1935,6 +2359,9 @@ export class GameEngine {
     }
     for (const w of this.walls) {
       if (!w.destructible) continue;
+      // buildings can only be struck by the 大锤 (hammer) in melee — all other
+      // melee weapons (sword/bat/spear/whip/etc.) deal no damage to buildings.
+      if (w.building && g.id !== "hammer") continue;
       const cx = Math.max(w.x, Math.min(p.x, w.x + w.w));
       const cy = Math.max(w.y, Math.min(p.y, w.y + w.h));
       const d = Math.hypot(cx - p.x, cy - p.y);
@@ -1981,7 +2408,7 @@ export class GameEngine {
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
         const a = Math.atan2(opp.y - p.y, opp.x - p.x);
-        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), undefined, Math.cos(a) * 420, Math.sin(a) * 420);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), undefined, Math.cos(a) * 420, Math.sin(a) * 420, this.player.cid);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -2237,6 +2664,8 @@ export class GameEngine {
       explosionRadius: 0,
       kind: g.kind,
       hit: new Set(),
+      owner: this.player === this.foe ? "foe" : "self",
+      ownerCid: this.isDM ? (this.player.cid ?? 0) : undefined,
       trail: true,
       weapon: g.id,
     });
@@ -2429,6 +2858,20 @@ export class GameEngine {
   private updateBullets(dt: number) {
     const next: Bullet[] = [];
     for (const b of this.bullets) {
+      // ---- mortar lob: arc (z-axis) to the landing point, explode on arrival ----
+      if (b.lobTx !== undefined) {
+        b.lobT = (b.lobT ?? 0) + dt;
+        const prog = Math.min(1, b.lobT / (b.lobDur ?? 1));
+        b.x = (b.lobSx ?? b.x) + ((b.lobTx ?? b.x) - (b.lobSx ?? b.x)) * prog;
+        b.y = (b.lobSy ?? b.y) + ((b.lobTy ?? b.y) - (b.lobSy ?? b.y)) * prog;
+        b.z = (b.lobPeak ?? 0) * Math.sin(prog * Math.PI);
+        if (prog >= 1) {
+          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, undefined, 0);
+          continue; // landed → dead, not carried forward
+        }
+        next.push(b);
+        continue;
+      }
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.x += (b.driftX ?? 0) * dt;
@@ -2475,10 +2918,10 @@ export class GameEngine {
             this.spawnParticles(b.x, b.y, b.glow, 4, 100, 0.2);
           } else if (b.explosive && b.bounced) {
             // MGL32: explode on second wall hit
-            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, undefined, 0);
             dead = true;
           } else {
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, undefined, undefined, 0);
             else this.spawnParticles(b.x, b.y, b.glow, 4, 120, 0.22);
             dead = true;
           }
@@ -2512,7 +2955,7 @@ export class GameEngine {
           if (ddx * ddx + ddy * ddy <= rr * rr) {
             b.hit.add(e.id);
             if (b.explosive) {
-              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, undefined, 0);
               dead = true;
               break;
             }
@@ -2520,8 +2963,8 @@ export class GameEngine {
             this.damageEnemy(
               e,
               b.damage,
-              Math.cos(Math.atan2(b.vy, b.vx)) * b.knockback,
-              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback,
+              0,
+              0,
               false,
               { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
             );
@@ -2535,20 +2978,37 @@ export class GameEngine {
       }
 
       // ---- PvP ownership ----
-      // self bullets: damage foe base (enemyBase) + foe player
-      // foe bullets: damage local base + local player
+      if (this.isDM) {
+        // deathmatch: a bullet hurts any combatant other than its shooter
+        if (!dead && b.ownerCid !== undefined) {
+          for (const c of this.combatants()) {
+            if (c.cid === b.ownerCid) continue;
+            if (c.deadTimer && c.deadTimer > 0) continue;
+            if (this.hitsPlayer(b, c)) {
+              const kx = 0;
+              const ky = 0;
+              this.damagePlayerEntity(c, b.damage, b, kx, ky, b.ownerCid);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.ownerCid, undefined, 0);
+              dead = true;
+              break;
+            }
+          }
+        }
+      } else {
+        // self bullets: damage foe base (enemyBase) + foe player
+        // foe bullets: damage local base + local player
       if (!dead) {
         if (b.owner === "foe") {
           if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
             this.damagePlayerEntity(this.player, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, undefined, undefined, 0);
             dead = true;
           } else {
             const bb = this.base;
             const rr = bb.radius + b.size;
             if ((bb.x - b.x) ** 2 + (bb.y - b.y) ** 2 <= rr * rr) {
               this.damageBase(b.damage);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, undefined, undefined, 0);
               dead = true;
             }
           }
@@ -2558,18 +3018,41 @@ export class GameEngine {
           const rr = eb.radius + b.size;
           if ((eb.x - b.x) ** 2 + (eb.y - b.y) ** 2 <= rr * rr) {
             this.damageEnemyBase(b.damage);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, undefined, undefined, 0);
             dead = true;
           } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
             this.damagePlayerEntity(this.foe, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, undefined, undefined, 0);
             dead = true;
+          }
+        }
+      }
+      }
+
+      // ---- deployables: turrets & healing stations are solid, hittable entities.
+      // A bullet damages any deployable it overlaps, unless that deployable belongs
+      // to the shooter (you can't shoot your own gadget).
+      if (!dead) {
+        for (const d of this.deployables) {
+          if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station") continue;
+          if (d.hp <= 0) continue;
+          const sameOwner = this.isDM
+            ? (b.ownerCid ?? -1) === (d.ownerCid ?? -2)
+            : (b.owner ?? "") === (d.owner ?? "");
+          if (sameOwner) continue;
+          const rr = d.size + b.size;
+          if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr * rr) {
+            d.hp -= b.damage;
+            this.spawnParticles(b.x, b.y, d.color, 6, 120, 0.25);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, undefined, 0);
+            dead = true;
+            break;
           }
         }
       }
 
       if (dead && b.explosive && b.life <= 0 && b.hit.size === 0 && !b.bounced) {
-        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, undefined, undefined, 0);
       }
       if (!dead) next.push(b);
     }
@@ -2688,6 +3171,10 @@ export class GameEngine {
       color: def.color,
       size: 16,
       targets: [],
+      // multiplayer: remember who deployed this so it attacks the right side
+      owner: (this.player === this.foe ? "foe" : "self") as "self" | "foe",
+      // deathmatch: remember the combatant id so gadgets target the right side
+      ownerCid: this.isDM ? (this.player.cid ?? 0) : undefined,
     };
 
     switch (def.kind) {
@@ -2801,13 +3288,41 @@ export class GameEngine {
       // find nearest enemy in range for turrets
       if (d.kind === "turret_mg" || d.kind === "turret_cannon") {
         d.timer -= dt;
-        let target: Enemy | null = null;
+        let target: { x: number; y: number } | null = null;
         let bestD = d.radius;
-        for (const e of this.enemies) {
-          const dist = Math.hypot(e.x - d.x, e.y - d.y);
-          if (dist < bestD) {
-            bestD = dist;
-            target = e;
+        if (this.isDM) {
+          // deathmatch: turrets fire at the nearest combatant that isn't the owner
+          const ownerCid = d.ownerCid ?? 0;
+          for (const c of this.combatants()) {
+            if ((c.cid ?? 0) === ownerCid) continue;
+            if (c.deadTimer && c.deadTimer > 0) continue;
+            const dist = Math.hypot(c.x - d.x, c.y - d.y);
+            if (dist < bestD) {
+              bestD = dist;
+              target = c;
+            }
+          }
+        } else if (this.mode === "local") {
+          // single-player: acquire the nearest monster
+          for (const e of this.enemies) {
+            const dist = Math.hypot(e.x - d.x, e.y - d.y);
+            if (dist < bestD) {
+              bestD = dist;
+              target = e;
+            }
+          }
+        } else {
+          // multiplayer PvP: there are no AI bots — target the opposing player.
+          // A turret owned by "self" fires at the foe; one owned by "foe" fires
+          // at the host's own player. (simulateWorld always runs with this.player
+          // = local and this.foe = opponent, so this resolves correctly.)
+          const foe = d.owner === "foe" ? this.player : this.foe;
+          if (foe && !(foe.deadTimer && foe.deadTimer > 0)) {
+            const dist = Math.hypot(foe.x - d.x, foe.y - d.y);
+            if (dist < bestD) {
+              bestD = dist;
+              target = foe;
+            }
           }
         }
         if (target) {
@@ -2822,7 +3337,8 @@ export class GameEngine {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 0.6,
-                damage: 28,
+                // 14% damage reduction (see task)
+                damage: 28 * 0.86,
                 size: 4,
                 color: "#bae6fd",
                 glow: d.color,
@@ -2832,6 +3348,9 @@ export class GameEngine {
                 explosionRadius: 0,
                 kind: "bullet",
                 hit: new Set(),
+                owner: d.owner,
+                ownerCid: d.ownerCid,
+                weapon: "turret_mg",
               });
               this.spawnParticles(d.x + Math.cos(d.angle) * 14, d.y + Math.sin(d.angle) * 14, d.color, 2, 80, 0.15);
             } else {
@@ -2844,7 +3363,8 @@ export class GameEngine {
                 vx: Math.cos(d.angle) * sp,
                 vy: Math.sin(d.angle) * sp,
                 life: 1.2,
-                damage: 44,
+                // 14% damage reduction (see task)
+                damage: 44 * 0.86,
                 size: 7,
                 color: "#ddd6fe",
                 glow: d.color,
@@ -2854,13 +3374,32 @@ export class GameEngine {
                 explosionRadius: 56,
                 kind: "grenade",
                 hit: new Set(),
+                owner: d.owner,
+                ownerCid: d.ownerCid,
+                weapon: "turret_cannon",
               });
             }
           }
         }
-        // turrets can be damaged by enemies on contact
+        // turrets can be damaged on contact — by monsters (PvE) or the opposing
+        // player (PvP). The owning player never damages their own turret.
         for (const e of this.enemies) {
           if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + d.size) {
+            d.hp -= 75 * dt;
+          }
+        }
+        if (this.isDM) {
+          // deathmatch: opposing combatants can also destroy a turret on contact
+          const ownerCid = d.ownerCid ?? 0;
+          for (const c of this.combatants()) {
+            if ((c.cid ?? 0) === ownerCid) continue;
+            if (Math.hypot(c.x - d.x, c.y - d.y) < c.size + d.size) {
+              d.hp -= 75 * dt;
+            }
+          }
+        } else if (this.mode !== "local" && d.owner) {
+          const foe = d.owner === "foe" ? this.player : this.foe;
+          if (foe && Math.hypot(foe.x - d.x, foe.y - d.y) < foe.size + d.size) {
             d.hp -= 75 * dt;
           }
         }
@@ -2873,40 +3412,55 @@ export class GameEngine {
       // mines
       if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
         if (d.armed <= 0) {
+          let triggered = false;
+          // PvE: monsters trigger mines
           for (const e of this.enemies) {
             if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + 24) {
-              // triggered
-              if (d.kind === "mine_explosive") {
-                this.explode(d.x, d.y, d.radius, 160, d.color);
-              } else if (d.kind === "mine_poison") {
-                this.effects.push({
-                  type: "poisoncloud",
-                  x: d.x,
-                  y: d.y,
-                  t: 0,
-                  duration: 5,
-                  radius: d.radius,
-                  color: d.color,
-                  dps: 60,
-                  slow: 0.5,
-                  tickT: 0,
-                });
-              } else {
-                this.effects.push({
-                  type: "firefield",
-                  x: d.x,
-                  y: d.y,
-                  t: 0,
-                  duration: 5,
-                  radius: d.radius,
-                  color: d.color,
-                  dps: 90,
-                  tickT: 0,
-                });
-              }
-              d.life = 0;
+              triggered = true;
               break;
             }
+          }
+          // deathmatch: any enemy combatant (not the owner) triggers the mine
+          if (!triggered && this.isDM) {
+            const ownerCid = d.ownerCid ?? 0;
+            for (const c of this.combatants()) {
+              if ((c.cid ?? 0) === ownerCid) continue;
+              if (Math.hypot(c.x - d.x, c.y - d.y) < c.size + 24) {
+                triggered = true;
+                break;
+              }
+            }
+          }
+          if (triggered) {
+            if (d.kind === "mine_explosive") {
+              this.explode(d.x, d.y, d.radius, 160, d.color, d.ownerCid);
+            } else if (d.kind === "mine_poison") {
+              this.effects.push({
+                type: "poisoncloud",
+                x: d.x,
+                y: d.y,
+                t: 0,
+                duration: 5,
+                radius: d.radius,
+                color: d.color,
+                dps: 60,
+                slow: 0.5,
+                tickT: 0,
+              });
+            } else {
+              this.effects.push({
+                type: "firefield",
+                x: d.x,
+                y: d.y,
+                t: 0,
+                duration: 5,
+                radius: d.radius,
+                color: d.color,
+                dps: 90,
+                tickT: 0,
+              });
+            }
+            d.life = 0;
           }
         }
         if (d.life > 0) next.push(d);
@@ -2914,11 +3468,21 @@ export class GameEngine {
       }
       // healing station
       if (d.kind === "healing_station") {
-        const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
-        if (dist < d.radius + this.player.size && this.player.hp < this.player.maxHp) {
-          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45 * dt);
-          if (Math.random() < 0.3)
-            this.spawnParticles(this.player.x, this.player.y, "#4ade80", 1, 50, 0.3);
+        if (this.isDM) {
+          // deathmatch: heals the combatant that deployed it
+          const owner = this.combatants().find((c) => (c.cid ?? 0) === (d.ownerCid ?? 0));
+          if (owner && owner.hp < owner.maxHp) {
+            owner.hp = Math.min(owner.maxHp, owner.hp + 45 * dt);
+            if (Math.random() < 0.3)
+              this.spawnParticles(owner.x, owner.y, "#4ade80", 1, 50, 0.3);
+          }
+        } else {
+          const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
+          if (dist < d.radius + this.player.size && this.player.hp < this.player.maxHp) {
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45 * dt);
+            if (Math.random() < 0.3)
+              this.spawnParticles(this.player.x, this.player.y, "#4ade80", 1, 50, 0.3);
+          }
         }
         if (d.life > 0 && d.hp > 0) next.push(d);
         continue;
@@ -2974,6 +3538,20 @@ export class GameEngine {
           continue;
         }
       }
+      // enemy bullets can also destroy turrets / healing stations (PvE defense)
+      let hitDep = false;
+      for (const d of this.deployables) {
+        if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station") continue;
+        if (d.hp <= 0) continue;
+        const rr = d.size + b.size;
+        if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr * rr) {
+          d.hp -= b.damage;
+          this.spawnParticles(b.x, b.y, d.color, 6, 120, 0.25);
+          hitDep = true;
+          break;
+        }
+      }
+      if (hitDep) continue;
       next.push(b);
     }
     this.enemyBullets = next;
@@ -3177,8 +3755,8 @@ export class GameEngine {
         }
       }
 
-      // MAP BOUNDARY — in biohazard the arena == the player's view, so monsters
-      // can never wander outside the visible screen.
+      // MAP BOUNDARY — keep monsters inside the (now scrolling) world so they
+      // can never escape the arena entirely, even in biohazard.
       if (bio) {
         const m = e.size;
         e.x = Math.max(m, Math.min(this.worldW - m, e.x));
@@ -3206,6 +3784,20 @@ export class GameEngine {
               this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true);
               e.burnT = Math.max(e.burnT, 1);
               e.burnDps = Math.max(e.burnDps, 20);
+            }
+          }
+        }
+        // deathmatch: poison/fire fields also hurt every combatant inside
+        if (this.isDM) {
+          for (const c of this.combatants()) {
+            if (c.deadTimer && c.deadTimer > 0) continue;
+            if (Math.hypot(c.x - fx.x, c.y - fx.y) < fx.radius + c.size) {
+              if (fx.type === "poisoncloud") {
+                this.damagePlayerEntity(c, ((fx.dps ?? 20) * 0.25) * 0.8, undefined, 0, 0, undefined, true);
+                c.slowT = Math.max(c.slowT ?? 0, 0.3);
+              } else {
+                this.damagePlayerEntity(c, (fx.dps ?? 20) * 0.25, undefined, 0, 0, undefined, true);
+              }
             }
           }
         }
@@ -3419,7 +4011,7 @@ export class GameEngine {
 
   private damageBase(dmg: number) {
     if (this.base.hp <= 0) return;
-    if (this.gameMode === "biohazard") return; // no bases in biohazard
+    if (this.gameMode === "biohazard" || this.isDM) return; // no bases in biohazard / deathmatch
     this.base.hp -= dmg;
     this.base.flash = 1;
     this.shake = Math.min(12, this.shake + dmg * 0.25);
@@ -3441,6 +4033,7 @@ export class GameEngine {
 
   private damageEnemyBase(dmg: number) {
     if (this.enemyBase.hp <= 0) return;
+    if (this.isDM) return; // no bases in deathmatch
     dmg *= RUNTIME.playerDamageMult;
     this.enemyBase.hp -= dmg;
     this.enemyBase.flash = 1;
@@ -3481,17 +4074,21 @@ export class GameEngine {
     return (p.x - b.x) ** 2 + (p.y - b.y) ** 2 <= rr * rr;
   }
 
-  /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
+  /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer.
+   *  `attackerCid` (deathmatch only) credits the kill to that combatant.
+   *  `ignoreIframes` lets damage-over-time (fields) bypass i-frames. */
   private damagePlayerEntity(
     p: Player,
     dmg: number,
     _b?: Bullet,
     knockX = 0,
-    knockY = 0
+    knockY = 0,
+    attackerCid?: number,
+    ignoreIframes = false
   ) {
     // already downed and waiting to respawn -> ignore further hits
     if (p.deadTimer && p.deadTimer > 0) return;
-    if (p.iframes > 0 || p.shieldTime > 0) {
+    if (!ignoreIframes && (p.iframes > 0 || p.shieldTime > 0)) {
       if (p.shieldTime > 0) this.spawnParticles(p.x, p.y, "#60a5fa", 4, 90, 0.3);
       return;
     }
@@ -3530,7 +4127,20 @@ export class GameEngine {
         this.beamActive = false;
         this.flameActive = false;
       }
-      if (p === this.foe) {
+      if (this.isDM) {
+        const killer = attackerCid;
+        if (killer !== undefined && killer !== p.cid) {
+          this.scores[killer] = (this.scores[killer] ?? 0) + 1;
+          this.score = this.scores[0] ?? 0;
+          this.kills = this.scores[0] ?? 0;
+          this.banner = { text: `⚔ ${this.nameOf(killer)} 击杀 ${this.nameOf(p.cid ?? 0)}！`, t: 1.6 };
+          this.checkDeathmatchEnd();
+        } else if (p.cid === 0) {
+          this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
+        } else {
+          this.banner = { text: `${this.nameOf(p.cid ?? 0)} 阵亡，复活中…`, t: 1.6 };
+        }
+      } else if (p === this.foe) {
         // you downed the opponent
         this.kills += 1;
         this.score += 250;
@@ -3742,6 +4352,8 @@ export class GameEngine {
           maxHp: w.destructible ? w.maxHp : -1,
           destructible: w.destructible,
           glue: !!w.glue,
+          building: !!w.building,
+          seed: w.seed,
         })),
       effects: this.effects.map((e) => {
         let id = this.fxIds.get(e);
@@ -3941,11 +4553,290 @@ export class GameEngine {
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.tickRespawns(dt);
-    if (this.matchLive) this.updateWaves(dt);
+    if (this.matchLive && !this.isDM) this.updateWaves(dt);
     // online PvP time limit — end the match at MATCH_DURATION seconds
     if (this.mode !== "local" && this.matchLive && !this.gameOver && this.time >= MATCH_DURATION) {
       this.endGame("时间到！");
     }
+  }
+
+  // ============================== DEATHMATCH (human vs bots)
+  /** Advance the offline deathmatch: drive every bot, respawn the downed, and
+   *  end the match on a score/time limit. Called once per frame in local mode. */
+  private tickDeathmatch(dt: number) {
+    if (this.gameOver) return;
+    this.dmClock += dt;
+    for (let i = 0; i < this.bots.length; i++) this.simulateBot(i, dt);
+    // respawn downed bots at their spawn anchor
+    for (let i = 0; i < this.bots.length; i++) {
+      const b = this.bots[i];
+      if (b.deadTimer && b.deadTimer > 0) {
+        b.deadTimer -= dt;
+        if (b.deadTimer <= 0) {
+          b.deadTimer = 0;
+          b.hp = b.maxHp;
+          const sp = this.botSpawn(i);
+          b.x = sp.x;
+          b.y = sp.y;
+          b.vx = 0;
+          b.vy = 0;
+          b.iframes = 2;
+          b.dashVx = 0;
+          b.dashVy = 0;
+          b.dashTime = 0;
+          this.spawnParticles(b.x, b.y, this.botColor[i], 24, 200, 0.6);
+        }
+      }
+    }
+    if (!this.gameOver && this.dmClock >= this.dmDuration) {
+      let best = -1;
+      let bestCid = 0;
+      for (let c = 0; c < this.scores.length; c++) {
+        if (this.scores[c] > best) {
+          best = this.scores[c];
+          bestCid = c;
+        }
+      }
+      this.endGame(`时间到！${this.nameOf(bestCid)} 以 ${best} 分获胜`);
+    }
+  }
+
+  private botSpawn(i: number): { x: number; y: number } {
+    const cx = this.worldW / 2;
+    const cy = this.worldH / 2;
+    const spawns = [
+      { x: cx, y: 220 },
+      { x: 360, y: 360 },
+      { x: this.worldW - 360, y: 360 },
+      { x: 300, y: cy },
+      { x: this.worldW - 300, y: cy },
+      { x: cx, y: this.worldH - 360 },
+    ];
+    return spawns[i % spawns.length];
+  }
+
+  private nameOf(cid: number): string {
+    if (cid <= 0) return "你";
+    return this.botName[cid - 1] ?? `Bot${cid}`;
+  }
+
+  /** End the deathmatch if any combatant reached the kill target. */
+  private checkDeathmatchEnd() {
+    if (this.gameOver) return;
+    for (let c = 0; c < this.scores.length; c++) {
+      if (this.scores[c] >= this.dmTarget) {
+        this.endGame(`${this.nameOf(c)} 达成 ${this.dmTarget} 杀，获胜！`);
+        return;
+      }
+    }
+  }
+
+  /** Simple wall raycast so bots don't fire through cover. */
+  private hasLineOfSight(x0: number, y0: number, x1: number, y1: number): boolean {
+    const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 24);
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps;
+      if (this.pointInWall(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 6)) return false;
+    }
+    return true;
+  }
+
+  /** Decide a bot's intent for this frame (movement keys, aim, fire, one-shots). */
+  private thinkBot(i: number, dt: number): {
+    keys: Set<string>;
+    mx: number;
+    my: number;
+    firing: boolean;
+    skill: boolean;
+    gadget: number;
+    reload: boolean;
+    switchW: boolean;
+  } {
+    const bot = this.bots[i];
+    const ai = this.botAi[i];
+    const intent = {
+      keys: new Set<string>(),
+      mx: ai.mx,
+      my: ai.my,
+      firing: false,
+      skill: false,
+      gadget: -1,
+      reload: false,
+      switchW: false,
+    };
+    if (!bot || (bot.deadTimer && bot.deadTimer > 0)) return intent;
+    // nearest living opponent
+    let target: Player | null = null;
+    let best = Infinity;
+    for (const c of this.combatants()) {
+      if (c === bot || (c.deadTimer && c.deadTimer > 0)) continue;
+      const d = Math.hypot(c.x - bot.x, c.y - bot.y);
+      if (d < best) {
+        best = d;
+        target = c;
+      }
+    }
+    if (!target) return intent;
+    const dx = target.x - bot.x;
+    const dy = target.y - bot.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // throttled decisions
+    ai.think -= dt;
+    if (ai.think <= 0) {
+      ai.think = 0.12;
+      ai.strafeT -= 0.12;
+      if (ai.strafeT <= 0) {
+        ai.strafeT = 0.8 + Math.random() * 1.2;
+        ai.strafe = Math.random() < 0.5 ? 1 : -1;
+      }
+      ai.aimErr = (Math.random() - 0.5) * 0.18;
+      ai.gadget = -1;
+      const gs = this.botGadgets[i];
+      for (let k = 0; k < gs.length; k++) {
+        const cd = this.botGadgetCd[i].get(gs[k].id) ?? 0;
+        if (cd <= 0 && Math.random() < 0.25) {
+          ai.gadget = k;
+          break;
+        }
+      }
+      ai.skill = (bot.skillCd ?? 0) <= 0 && Math.random() < 0.06;
+    }
+
+    // movement: hold a preferred range, strafe, avoid walls
+    const pref = 320;
+    const minR = 170;
+    let mvx = 0;
+    let mvy = 0;
+    if (dist > pref * 1.25) {
+      mvx = nx;
+      mvy = ny;
+    } else if (dist < minR) {
+      mvx = -nx;
+      mvy = -ny;
+    } else {
+      mvx = -ny * ai.strafe;
+      mvy = nx * ai.strafe;
+    }
+    for (const w of this.walls) {
+      if (w.glue || w.invisible) continue;
+      const cxw = w.x + w.w / 2;
+      const cyw = w.y + w.h / 2;
+      const ddx = bot.x - cxw;
+      const ddy = bot.y - cyw;
+      const d = Math.hypot(ddx, ddy);
+      const reach = Math.max(w.w, w.h) / 2 + 120;
+      if (d < reach && d > 0.001) {
+        const f = (reach - d) / reach;
+        mvx += (ddx / d) * f * 1.5;
+        mvy += (ddy / d) * f * 1.5;
+      }
+    }
+    const ml = Math.hypot(mvx, mvy) || 1;
+    mvx /= ml;
+    mvy /= ml;
+    if (mvy < -0.35) intent.keys.add("KeyW");
+    else if (mvy > 0.35) intent.keys.add("KeyS");
+    if (mvx < -0.35) intent.keys.add("KeyA");
+    else if (mvx > 0.35) intent.keys.add("KeyD");
+
+    // aim (lead the target) + fire if facing, in range and with line of sight
+    const g = this.botGuns[i][bot.gunIndex ?? 0] ?? this.botGuns[i][0];
+    const bsp = g.bulletSpeed ?? 600;
+    const tLead = Math.min(0.4, dist / bsp);
+    const tx = target.x + (target.vx ?? 0) * tLead;
+    const ty = target.y + (target.vy ?? 0) * tLead;
+    const aimAng = Math.atan2(ty - bot.y, tx - bot.x) + ai.aimErr;
+    intent.mx = bot.x + Math.cos(aimAng) * 100;
+    intent.my = bot.y + Math.sin(aimAng) * 100;
+    const facing = Math.abs(this.angleDiff(aimAng, Math.atan2(dy, dx)));
+    const range = g.range ?? 9999;
+    if (dist < range && facing < 0.5 && this.hasLineOfSight(bot.x, bot.y, target.x, target.y)) {
+      intent.firing = true;
+    }
+    intent.skill = ai.skill;
+    intent.gadget = ai.gadget;
+    ai.mx = intent.mx;
+    ai.my = intent.my;
+    return intent;
+  }
+
+  /** Run one bot's simulation by swapping the engine's single-player context
+   *  (the same trick the authoritative server uses for peers). */
+  private simulateBot(i: number, dt: number) {
+    const bot = this.bots[i];
+    if (!bot || (bot.deadTimer && bot.deadTimer > 0)) return;
+    const intent = this.thinkBot(i, dt);
+    const sp = this.player;
+    const sg = this.gunIndex;
+    const sk = this.keys;
+    const sm = this.mouse;
+    const sf = this.firing;
+    const sGuns = this.guns;
+    const sGadgets = this.gadgets;
+    const sGadgetCd = this.gadgetCd;
+    const sSkillCd = this.skillCd;
+    const sDash = this.dashCharges;
+    const sDashR = this.dashRecharge;
+    const sLastG = this.lastGadget;
+    const sSemi = this.semiAutoLatch;
+    const svmx = this.virtualMove.x;
+    const svmy = this.virtualMove.y;
+    const sChar = this.character;
+    const sOut = this.outfit;
+    const sSkillDef = this.skill;
+    // load bot state into the engine context
+    this.player = bot;
+    this.guns = this.botGuns[i];
+    this.gunIndex = Math.min(bot.gunIndex ?? 0, this.guns.length - 1);
+    this.keys = intent.keys;
+    this.mouse = { x: intent.mx, y: intent.my };
+    this.virtualMove.x = 0;
+    this.virtualMove.y = 0;
+    this.firing = intent.firing;
+    this.skillCd = bot.skillCd ?? 0;
+    this.dashCharges = bot.dashCharges ?? MAX_DASH_CHARGES;
+    this.dashRecharge = bot.dashRecharge ?? 0;
+    this.lastGadget = bot.lastGadget ?? 0;
+    this.gadgets = this.botGadgets[i];
+    this.gadgetCd = this.botGadgetCd[i];
+    this.semiAutoLatch = false;
+    this.character = this.botChar[i] ?? this.character;
+    this.outfit = this.botOutfit[i] ?? this.outfit;
+    this.skill = this.botSkill[i];
+    for (const [k, v] of this.gadgetCd) if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
+    this.updatePlayer(dt);
+    if (intent.switchW) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+    if (intent.skill) this.activateSkill();
+    if (intent.reload) this.reloadCurrent();
+    if (intent.gadget >= 0) this.deployGadget(intent.gadget, this.mouse.x, this.mouse.y);
+    // write back per-bot state
+    bot.gunIndex = this.gunIndex;
+    bot.skillCd = this.skillCd;
+    bot.dashCharges = this.dashCharges;
+    bot.dashRecharge = this.dashRecharge;
+    bot.lastGadget = this.lastGadget;
+    // restore the human's engine context
+    this.player = sp;
+    this.guns = sGuns;
+    this.gunIndex = sg;
+    this.keys = sk;
+    this.mouse = sm;
+    this.firing = sf;
+    this.gadgets = sGadgets;
+    this.gadgetCd = sGadgetCd;
+    this.skillCd = sSkillCd;
+    this.dashCharges = sDash;
+    this.dashRecharge = sDashR;
+    this.lastGadget = sLastG;
+    this.semiAutoLatch = sSemi;
+    this.virtualMove.x = svmx;
+    this.virtualMove.y = svmy;
+    this.character = sChar;
+    this.outfit = sOut;
+    this.skill = sSkillDef;
   }
 
   /**
@@ -4039,6 +4930,7 @@ export class GameEngine {
     if (!s) return;
     // adopt the host-authoritative scene + pause state
     this.sceneTheme = SCENES[s.scene] ?? SCENES[0];
+    this.sceneIndex = s.scene ?? 0; // keeps per-map building art in sync with the host
     // pause is a single-player-only feature; ignore any stale `paused` flag from the wire
     if (this.mode === "local") this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
@@ -4112,6 +5004,8 @@ export class GameEngine {
         maxHp: sw.destructible ? sw.maxHp : Infinity,
         destructible: sw.destructible,
         glue: sw.glue,
+        building: sw.building,
+        seed: sw.seed,
       }));
     }
     if (s.gameOver && !this.gameOver) {
@@ -4352,7 +5246,11 @@ export class GameEngine {
     radius: number,
     damage: number,
     color: string,
-    srcWpn?: string
+    srcCid?: number,
+    srcWpn?: string,
+    /** knockback magnitude applied to victims (px). Bullets must pass 0 so they
+     *  never teleport combatants — see the human-vs-AI "鬼畜闪现" fix. */
+    knock = 260
   ) {
     this.effects.push({
       type: "explosion",
@@ -4385,11 +5283,33 @@ export class GameEngine {
           this.damageEnemy(
             e,
             damage * (0.5 + fall * 0.5),
-            Math.cos(a) * 260 * fall,
-            Math.sin(a) * 260 * fall,
+            Math.cos(a) * knock * fall,
+            Math.sin(a) * knock * fall,
             false,
             { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) }
           );
+        }
+      }
+      // deathmatch: explosions also hurt every combatant in blast radius
+      if (this.isDM) {
+        for (const c of this.combatants()) {
+          if (c.deadTimer && c.deadTimer > 0) continue;
+          // 爆炸不伤害释放者自己：否则机器人绕掩体时会被自己的火箭误伤击退/秒杀，
+          // 表现为「闪现」式的瞬移
+          if (srcCid !== undefined && c.cid === srcCid) continue;
+          const d = Math.hypot(c.x - x, c.y - y);
+          if (d < radius + c.size) {
+            const fall = 1 - d / (radius + c.size);
+            const a = Math.atan2(c.y - y, c.x - x);
+            this.damagePlayerEntity(
+              c,
+              damage * (0.5 + fall * 0.5),
+              undefined,
+              Math.cos(a) * knock * fall,
+              Math.sin(a) * knock * fall,
+              srcCid
+            );
+          }
         }
       }
     }
@@ -4626,24 +5546,34 @@ export class GameEngine {
     const speed = def.speed * RUNTIME.enemySpeedMult;
     const dmg = Math.round(def.damage * dmgScale);
 
-    // spawn just inside a random screen edge
+    // Spawn just outside the player's current view (screen edges) so monsters
+    // still swarm in from off-screen even though the arena is now a large,
+    // scrolling world the camera follows. Clamp into the world bounds.
     const m = def.size + 6;
+    const halfW = this.W / 2;
+    const halfH = this.H / 2;
+    const left = this.player.x - halfW;
+    const right = this.player.x + halfW;
+    const top = this.player.y - halfH;
+    const bottom = this.player.y + halfH;
     const edge = Math.floor(Math.random() * 4);
     let x = 0;
     let y = 0;
     if (edge === 0) {
-      x = m;
-      y = Math.random() * this.worldH;
+      x = left + m;
+      y = top + m + Math.random() * Math.max(1, bottom - top - 2 * m);
     } else if (edge === 1) {
-      x = this.worldW - m;
-      y = Math.random() * this.worldH;
+      x = right - m;
+      y = top + m + Math.random() * Math.max(1, bottom - top - 2 * m);
     } else if (edge === 2) {
-      x = Math.random() * this.worldW;
-      y = m;
+      x = left + m + Math.random() * Math.max(1, right - left - 2 * m);
+      y = top + m;
     } else {
-      x = Math.random() * this.worldW;
-      y = this.worldH - m;
+      x = left + m + Math.random() * Math.max(1, right - left - 2 * m);
+      y = bottom - m;
     }
+    x = Math.max(m, Math.min(this.worldW - m, x));
+    y = Math.max(m, Math.min(this.worldH - m, y));
 
     const e: Enemy = {
       id: this.enemyId++,
@@ -4844,6 +5774,11 @@ export class GameEngine {
     if (!immediate && now - this.lastHudEmit < 50) return;
     this.lastHudEmit = now;
     void immediate;
+    // deathmatch: keep the human's HUD score/kills in sync with the scoreboard
+    if (this.isDM) {
+      this.score = this.scores[0] ?? 0;
+      this.kills = this.scores[0] ?? 0;
+    }
     const p = this.player;
     const s = this.skill;
     const g = this.gun;
@@ -4931,6 +5866,17 @@ export class GameEngine {
         this.mode === "local"
           ? null
           : Math.max(0, MATCH_DURATION - (this.mode === "guest" ? this.lastSnapTime : this.time)),
+      dmPlayers: this.isDM
+        ? this.combatants().map((c) => ({
+            name: this.nameOf(c.cid ?? 0),
+            score: this.scores[c.cid ?? 0] ?? 0,
+            isSelf: (c.cid ?? 0) === 0,
+            color: (c.cid ?? 0) === 0 ? "#38bdf8" : this.botColor[(c.cid ?? 1) - 1] ?? "#ffffff",
+            alive: !(c.deadTimer && c.deadTimer > 0),
+          }))
+        : undefined,
+      killTarget: this.isDM ? this.dmTarget : undefined,
+      dmTimeLeft: this.isDM ? Math.max(0, Math.ceil(this.dmDuration - this.dmClock)) : null,
     };
     this.onHud(hud);
   }
@@ -4963,7 +5909,7 @@ export class GameEngine {
 
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    if (this.gameMode !== "biohazard") {
+    if (!this.isDM && this.gameMode !== "biohazard") {
       this.drawBase(ctx, this.enemyBase, false);
       this.drawBase(ctx, this.base, true);
     }
@@ -4994,6 +5940,28 @@ export class GameEngine {
       );
       if (this.foe.electrifiedTime && this.foe.electrifiedTime > 0) {
         this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
+      }
+    }
+    // deathmatch bots
+    for (let i = 0; i < this.bots.length; i++) {
+      const b = this.bots[i];
+      if (b.deadTimer && b.deadTimer > 0) continue;
+      this.drawNetCharacter(
+        ctx,
+        b.x,
+        b.y,
+        b.angle,
+        this.botChar[i]?.id ?? "raider",
+        this.botOutfit[i]?.id ?? "tactical",
+        b.gunIndex ?? 0,
+        this.botGuns[i],
+        this.botName[i],
+        b.hp / b.maxHp,
+        this.time,
+        b.size
+      );
+      if (b.electrifiedTime && b.electrifiedTime > 0) {
+        this.drawElectricArcs(ctx, b.x, b.y, b.size, b.electrifiedGlow ?? "#38bdf8", this.time);
       }
     }
     // gadget aiming preview (selection highlight + throw/deploy hint)
@@ -5028,6 +5996,7 @@ export class GameEngine {
       [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
       [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"],
     ];
+    if (!this.isDM)
     for (const [bx, by, col] of blobs) {
       const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
       rg.addColorStop(0, rgba(col, 0.18));
@@ -5185,7 +6154,9 @@ export class GameEngine {
     for (const w of this.walls) {
       if (w.invisible) continue;
       ctx.save();
-      if (w.glue) {
+      if (w.building) {
+        this.drawBuilding(ctx, w);
+      } else if (w.glue) {
         // glue wall — translucent cyan gel
         const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
         g.addColorStop(0, rgba("#22d3ee", 0.5));
@@ -5284,6 +6255,216 @@ export class GameEngine {
       }
       ctx.restore();
     }
+  }
+
+  /** Render a solid building: a tower-like rooftop slab with neon trim, a seeded
+   *  window grid and a central rooftop unit. Drawn at world coords (the caller
+   *  has already applied the camera transform). */
+  /** Render a solid building. The slab colour follows the map palette
+   *  (sceneTheme.wallColor → wallDark); the *structure* drawn on top depends on
+   *  the map (this.sceneIndex) so every map has its own building style. */
+  private drawBuilding(ctx: CanvasRenderingContext2D, w: Wall) {
+    // ground shadow so the slab reads as a raised structure
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(w.x + w.w / 2, w.y + w.h + 6, w.w / 2, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    switch (this.sceneIndex) {
+      case 1:
+        this.bldDesert(ctx, w);
+        break;
+      case 2:
+        this.bldArctic(ctx, w);
+        break;
+      case 3:
+        this.bldRuin(ctx, w);
+        break;
+      case 4:
+        this.bldCyber(ctx, w);
+        break;
+      default:
+        this.bldNeon(ctx, w);
+        break;
+    }
+    // hp bar when damaged
+    const frac = Math.max(0, w.hp / w.maxHp);
+    if (frac < 1) {
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(w.x + 4, w.y + w.h + 3, w.w - 8, 3);
+      ctx.fillStyle = rgba("#fbbf24", 0.9);
+      ctx.fillRect(w.x + 4, w.y + w.h + 3, (w.w - 8) * frac, 3);
+    }
+  }
+
+  /** Base concrete slab (gradient wallColor→wallDark) shared by every style. */
+  private bldSlab(ctx: CanvasRenderingContext2D, w: Wall) {
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, this.sceneTheme.wallColor || "#5b6478");
+    g.addColorStop(1, this.sceneTheme.wallDark || "#2a3140");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(8,10,18,0.85)";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.stroke();
+  }
+
+  /** Seeded lit/dark window grid. `thr` raises the lit-window rarity; `cell`
+   *  sets the grid pitch; `alpha` the glow strength. */
+  private bldWindows(
+    ctx: CanvasRenderingContext2D,
+    w: Wall,
+    seed: number,
+    accent: string,
+    cell: number,
+    thr: number,
+    alpha: number,
+  ) {
+    const padX = 12;
+    const padY = 12;
+    const cols = Math.max(2, Math.floor((w.w - padX * 2) / cell));
+    const rows = Math.max(2, Math.floor((w.h - padY * 2) / cell));
+    const stepX = (w.w - padX * 2) / cols;
+    const stepY = (w.h - padY * 2) / rows;
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const hh = Math.abs(Math.sin((seed * 12.9898 + i * 78.233 + j * 37.719) * 43758.5453));
+        const lit = hh - Math.floor(hh) > thr;
+        const wx = w.x + padX + i * stepX;
+        const wy = w.y + padY + j * stepY;
+        ctx.fillStyle = lit ? rgba(accent, alpha) : "rgba(120,130,150,0.16)";
+        ctx.fillRect(wx, wy, stepX - 6, stepY - 6);
+      }
+    }
+  }
+
+  /** 霓虹都市 — glass tower: neon inner trim + dense lit windows + rooftop hatch. */
+  private bldNeon(ctx: CanvasRenderingContext2D, w: Wall) {
+    const accent = this.sceneTheme.accent;
+    this.bldSlab(ctx, w);
+    ctx.strokeStyle = rgba(accent, 0.55);
+    ctx.lineWidth = 2.5;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 9);
+    ctx.stroke();
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 22, 0.55, 0.5);
+    const hw = Math.min(w.w, w.h) * 0.32;
+    ctx.fillStyle = "rgba(0,0,0,0.32)";
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.fill();
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = 1;
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.stroke();
+  }
+
+  /** 沙漠废墟 — adobe block: pale roof parapet, sparse warm windows, door arch. */
+  private bldDesert(ctx: CanvasRenderingContext2D, w: Wall) {
+    this.bldSlab(ctx, w);
+    // flat roof parapet (lighter strip on top)
+    ctx.fillStyle = "rgba(255,240,210,0.22)";
+    roundRect(ctx, w.x + 2, w.y + 2, w.w - 4, Math.max(8, w.h * 0.1), 6);
+    ctx.fill();
+    // sparse, mostly-dark windows with the odd warm glow
+    this.bldWindows(ctx, w, w.seed ?? 1, "#f59e0b", 30, 0.82, 0.5);
+    // door arch at the bottom centre
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    roundRect(ctx, w.x + w.w / 2 - 12, w.y + w.h - 22, 24, 22, 4);
+    ctx.fill();
+  }
+
+  /** 冰原基地 — frozen bunker: snow cap, panel lines, icy windows, light rim. */
+  private bldArctic(ctx: CanvasRenderingContext2D, w: Wall) {
+    const accent = this.sceneTheme.accent;
+    this.bldSlab(ctx, w);
+    // snow cap
+    ctx.fillStyle = "rgba(236,246,255,0.9)";
+    roundRect(ctx, w.x + 2, w.y + 2, w.w - 4, Math.max(8, w.h * 0.14), 6);
+    ctx.fill();
+    // panel seams
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    for (let k = 1; k <= 3; k++) {
+      const yy = w.y + (k * w.h) / 4;
+      ctx.beginPath();
+      ctx.moveTo(w.x, yy);
+      ctx.lineTo(w.x + w.w, yy - 10);
+      ctx.stroke();
+    }
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 24, 0.6, 0.5);
+    // light icy rim
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 9);
+    ctx.stroke();
+  }
+
+  /** 末日废墟 — broken concrete: cracks, mostly-dark windows, rubble at the base. */
+  private bldRuin(ctx: CanvasRenderingContext2D, w: Wall) {
+    this.bldSlab(ctx, w);
+    // deterministic cracks
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.lineWidth = 1.5;
+    const seed = w.seed ?? 1;
+    for (let n = 0; n < 3; n++) {
+      const hh = Math.abs(Math.sin((seed * 12.9898 + n * 53.7) * 43758.5453));
+      let x = w.x + (hh - Math.floor(hh)) * w.w;
+      let y = w.y;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      while (y < w.y + w.h) {
+        y += 14;
+        x += ((Math.sin(y * 0.7 + n * 3 + seed) * 7) | 0);
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    // broken windows — almost all dark, rare dim red glow
+    this.bldWindows(ctx, w, seed, "#ef4444", 26, 0.86, 0.3);
+    // rubble at the base
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    for (let r = 0; r < 5; r++) {
+      const hh = Math.abs(Math.sin((seed * 7.13 + r * 19.1) * 43758.5453));
+      const rx = w.x + 6 + ((hh - Math.floor(hh)) * (w.w - 12));
+      ctx.beginPath();
+      ctx.arc(rx, w.y + w.h - 3, 2 + (r % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  /** 赛博都市 — dark tower: neon grid overlay, bright vertical strips, hot windows. */
+  private bldCyber(ctx: CanvasRenderingContext2D, w: Wall) {
+    const accent = this.sceneTheme.accent;
+    this.bldSlab(ctx, w);
+    // neon grid overlay
+    ctx.save();
+    roundRect(ctx, w.x + 1, w.y + 1, w.w - 2, w.h - 2, 9);
+    ctx.clip();
+    ctx.strokeStyle = rgba(accent, 0.12);
+    ctx.lineWidth = 1;
+    for (let gx = w.x; gx < w.x + w.w; gx += 24) {
+      ctx.beginPath();
+      ctx.moveTo(gx, w.y);
+      ctx.lineTo(gx, w.y + w.h);
+      ctx.stroke();
+    }
+    for (let gy = w.y; gy < w.y + w.h; gy += 24) {
+      ctx.beginPath();
+      ctx.moveTo(w.x, gy);
+      ctx.lineTo(w.x + w.w, gy);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // bright vertical neon strips
+    ctx.fillStyle = rgba(accent, 0.35);
+    ctx.fillRect(w.x + 6, w.y + 6, 4, w.h - 12);
+    ctx.fillRect(w.x + w.w - 10, w.y + 6, 4, w.h - 12);
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 20, 0.45, 0.6);
+    // inner neon edge
+    ctx.strokeStyle = rgba(accent, 0.5);
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 9);
+    ctx.stroke();
   }
 
   private drawDeployables(ctx: CanvasRenderingContext2D) {
@@ -6050,6 +7231,28 @@ export class GameEngine {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const b of this.bullets) {
+      if (b.z && b.z > 1) {
+        // ground shadow at the (current) landing-projected position
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y, b.size * 1.5, b.size * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // shell raised by its arc height (z-axis)
+        ctx.globalCompositeOperation = "lighter";
+        const rg0 = ctx.createRadialGradient(b.x, b.y - b.z, 0, b.x, b.y - b.z, b.size * 3);
+        rg0.addColorStop(0, rgba(b.glow, 0.9));
+        rg0.addColorStop(1, rgba(b.glow, 0));
+        ctx.fillStyle = rg0;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y - b.z, b.size * 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y - b.z, b.size, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3.4);
       rg.addColorStop(0, rgba(b.glow, 0.85));
       rg.addColorStop(1, rgba(b.glow, 0));
@@ -6478,51 +7681,56 @@ export class GameEngine {
     ctx.restore();
   }
 
-  /** Deployable-style targeting marker for the 投射榴弹炮: a dashed line, a
-   *  max-range ring and a coverage circle sized to the blast radius. */
+  /** Deployable-style targeting marker for the 投射榴弹炮. Mirrors drawPlaceMarker:
+   *  a dashed line from the player to the (clamped) landing point, a max-range
+   *  ring drawn around the player, and a coverage circle sized to the blast
+   *  radius. The landing marker is clamped to the ring, so when the cursor is
+   *  past max range the shell lands on the ring edge — never at the raw mouse. */
   private drawLauncherIndicator(ctx: CanvasRenderingContext2D) {
     if (this.gameOver || this.paused) return;
     const p = this.player;
     const g = this.gun;
     const radius = g.explosionRadius ?? 60;
-    // aim point = the crosshair (world coords)
-    let tx = this.mouse.x;
-    let ty = this.mouse.y;
-    const maxD = (g.bulletSpeed ?? 500) * (g.life ?? 2) * 0.9;
-    let dx = tx - p.x;
-    let dy = ty - p.y;
-    const d = Math.hypot(dx, dy) || 1;
-    if (d > maxD) {
-      dx = (dx / d) * maxD;
-      dy = (dy / d) * maxD;
-    }
-    tx = Math.max(20, Math.min(this.worldW - 20, p.x + dx));
-    ty = Math.max(20, Math.min(this.worldH - 20, p.y + dy));
+    const tgt = this.mortarTarget(g);
+    const tx = tgt.x;
+    const ty = tgt.y;
     const col = g.glow;
+    const cx = p.x - this.camX;
+    const cy = p.y - this.camY;
+    const sx = tx - this.camX;
+    const sy = ty - this.camY;
     ctx.save();
+    // dashed line from player to (clamped) landing point
     ctx.setLineDash([5, 5]);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = rgba(col, 0.5);
+    ctx.strokeStyle = tgt.beyond ? rgba(col, 0.3) : rgba(col, 0.55);
     ctx.beginPath();
-    ctx.moveTo(p.x - this.camX, p.y - this.camY);
-    ctx.lineTo(tx - this.camX, ty - this.camY);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(sx, sy);
     ctx.stroke();
     ctx.setLineDash([]);
-    // blast coverage at the target
-    ctx.globalAlpha = 0.5;
+    // max-range ring around the player (like deployable placement)
+    ctx.strokeStyle = rgba(col, 0.18);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, tgt.maxD, 0, Math.PI * 2);
+    ctx.stroke();
+    // ghost blast coverage at the landing point
+    ctx.globalAlpha = tgt.beyond ? 0.35 : 0.6;
     ctx.fillStyle = rgba(col, 0.22);
     ctx.beginPath();
-    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.arc(sx, sy, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+    // landing marker ring
     ctx.strokeStyle = rgba(col, 0.95);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(tx - this.camX, ty - this.camY, radius, 0, Math.PI * 2);
+    ctx.arc(sx, sy, 14, 0, Math.PI * 2);
     ctx.stroke();
-    // center marker
+    // center dot
     ctx.beginPath();
-    ctx.arc(tx - this.camX, ty - this.camY, 6, 0, Math.PI * 2);
+    ctx.arc(sx, sy, 6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }

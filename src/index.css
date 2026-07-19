@@ -49,3 +49,12 @@ body {
 .banner-pop {
   animation: bannerPop 2.4s ease-out;
 }
+
+/* Hide the side scrollbar (the "quick drag bar") while keeping scroll working. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
