@@ -2602,6 +2602,10 @@ var GameEngine = class {
   /** combatant id whose context is currently "live" (so bullets/melee/beam
    *  credit the right attacker). 0 = human. */
   activeId = 0;
+  /** true while we're temporarily swapping the simulation context onto a bot /
+   *  remote foe (inside `simulateBot` / `simulateRemote`). Used to suppress HUD
+   *  emits so the player's own HUD never flickers to an opponent's state. */
+  simulatingOther = false;
   /** kills needed to win the deathmatch */
   dmKillLimit = 15;
   /** respawn anchor points (one per combatant) */
@@ -4003,7 +4007,7 @@ var GameEngine = class {
       if (d <= range + e.size) {
         const ang = Math.atan2(dy, dx);
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          this.damageEnemy(e, dmg * dmgMult, Math.cos(ang) * g.knockback, Math.sin(ang) * g.knockback, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
+          this.damageEnemy(e, dmg * dmgMult, 0, 0, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
           if (isSaber) {
             e.electrifiedTime = 0.7;
             e.electrifiedGlow = g.glow;
@@ -4022,8 +4026,8 @@ var GameEngine = class {
       if (d <= range + opp.size) {
         const ang = Math.atan2(dy, dx);
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          const kx = Math.cos(ang) * g.knockback;
-          const ky = Math.sin(ang) * g.knockback;
+          const kx = 0;
+          const ky = 0;
           this.damagePlayerEntity(opp, dmg * dmgMult, void 0, kx, ky, this.activeId);
           if (isSaber) {
             opp.electrifiedTime = 0.7;
@@ -4073,7 +4077,7 @@ var GameEngine = class {
       if (d <= radius + e.size) {
         const fall = 1 - d / (radius + e.size);
         const a = Math.atan2(e.y - p.y, e.x - p.x);
-        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), Math.cos(a) * 420, Math.sin(a) * 420, false, { weapon: g.id, dx: Math.cos(a), dy: Math.sin(a) });
+        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), 0, 0, false, { weapon: g.id, dx: Math.cos(a), dy: Math.sin(a) });
       }
     }
     const opp = this.meleeOpponent();
@@ -4082,7 +4086,7 @@ var GameEngine = class {
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
         const a = Math.atan2(opp.y - p.y, opp.x - p.x);
-        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, Math.cos(a) * 420, Math.sin(a) * 420, this.activeId);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, 0, 0, this.activeId);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -4633,8 +4637,8 @@ var GameEngine = class {
             this.damageEnemy(
               e,
               b.damage,
-              Math.cos(Math.atan2(b.vy, b.vx)) * b.knockback,
-              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback,
+              0,
+              0,
               false,
               { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
             );
@@ -5741,6 +5745,7 @@ var GameEngine = class {
     const foe = this.foe;
     const inp = this.remoteInput;
     if (!foe || !inp) return;
+    this.simulatingOther = true;
     if (foe.deadTimer && foe.deadTimer > 0) return;
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse, sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets, sGadgetCd = this.gadgetCd;
     const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch;
@@ -5790,6 +5795,7 @@ var GameEngine = class {
     this.semiAutoLatch = sSemi;
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
+    this.simulatingOther = false;
   }
   // ------------------------------------------------------ deathmatch AI bots
   /** Simulate one AI bot through the SAME per-player combat code by swapping the
@@ -5797,6 +5803,7 @@ var GameEngine = class {
    *  (`botThink`) + `updatePlayer`, then restoring the human's context. */
   simulateBot(c, dt) {
     if (c.player.deadTimer && c.player.deadTimer > 0) return;
+    this.simulatingOther = true;
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse, sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets, sGadgetCd = this.gadgetCd, sWs = this.weaponStates;
     const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch, sChar = this.character, sOut = this.outfit, sSkillDef = this.skill, sActive = this.activeId;
     const svmx = this.virtualMove.x, svmy = this.virtualMove.y;
@@ -5864,6 +5871,7 @@ var GameEngine = class {
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
     this.activeId = sActive;
+    this.simulatingOther = false;
   }
   /** Effective engagement range of a gun (px), used by bot target-range logic. */
   gunEffRange(g) {
@@ -7101,6 +7109,7 @@ var GameEngine = class {
   }
   lastHudEmit = 0;
   emit(immediate = false) {
+    if (this.simulatingOther) return;
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     if (!immediate && now - this.lastHudEmit < 50) return;
     this.lastHudEmit = now;

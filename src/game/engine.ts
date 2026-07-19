@@ -697,6 +697,10 @@ export class GameEngine {
   /** combatant id whose context is currently "live" (so bullets/melee/beam
    *  credit the right attacker). 0 = human. */
   private activeId = 0;
+  /** true while we're temporarily swapping the simulation context onto a bot /
+   *  remote foe (inside `simulateBot` / `simulateRemote`). Used to suppress HUD
+   *  emits so the player's own HUD never flickers to an opponent's state. */
+  private simulatingOther = false;
   /** kills needed to win the deathmatch */
   private dmKillLimit = 15;
   /** respawn anchor points (one per combatant) */
@@ -2352,7 +2356,7 @@ export class GameEngine {
       if (d <= range + e.size) {
         const ang = Math.atan2(dy, dx);
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          this.damageEnemy(e, dmg * dmgMult, Math.cos(ang) * g.knockback, Math.sin(ang) * g.knockback, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
+          this.damageEnemy(e, dmg * dmgMult, 0, 0, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
           if (isSaber) {
             e.electrifiedTime = 0.7;
             e.electrifiedGlow = g.glow;
@@ -2372,8 +2376,8 @@ export class GameEngine {
       if (d <= range + opp.size) {
         const ang = Math.atan2(dy, dx);
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          const kx = Math.cos(ang) * g.knockback;
-          const ky = Math.sin(ang) * g.knockback;
+          const kx = 0;
+          const ky = 0;
           this.damagePlayerEntity(opp, dmg * dmgMult, undefined, kx, ky, this.activeId);
           if (isSaber) {
             opp.electrifiedTime = 0.7;
@@ -2426,7 +2430,7 @@ export class GameEngine {
       if (d <= radius + e.size) {
         const fall = 1 - d / (radius + e.size);
         const a = Math.atan2(e.y - p.y, e.x - p.x);
-        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), Math.cos(a) * 420, Math.sin(a) * 420, false, { weapon: g.id, dx: Math.cos(a), dy: Math.sin(a) });
+        this.damageEnemy(e, dmg * (0.55 + fall * 0.5), 0, 0, false, { weapon: g.id, dx: Math.cos(a), dy: Math.sin(a) });
       }
     }
     // player-vs-player slam (hammer)
@@ -2436,7 +2440,7 @@ export class GameEngine {
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
         const a = Math.atan2(opp.y - p.y, opp.x - p.x);
-        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), undefined, Math.cos(a) * 420, Math.sin(a) * 420, this.activeId);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), undefined, 0, 0, this.activeId);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -3046,8 +3050,8 @@ export class GameEngine {
             this.damageEnemy(
               e,
               b.damage,
-              Math.cos(Math.atan2(b.vy, b.vx)) * b.knockback,
-              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback,
+              0,
+              0,
               false,
               { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
             );
@@ -4283,6 +4287,7 @@ export class GameEngine {
     const foe = this.foe;
     const inp = this.remoteInput;
     if (!foe || !inp) return;
+    this.simulatingOther = true;
     // downed opponent: no movement / firing until it respawns
     if (foe.deadTimer && foe.deadTimer > 0) return;
     const sp = this.player,
@@ -4353,6 +4358,7 @@ export class GameEngine {
     // restore the host's own joystick vector
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
+    this.simulatingOther = false;
   }
 
   // ------------------------------------------------------ deathmatch AI bots
@@ -4361,6 +4367,7 @@ export class GameEngine {
    *  (`botThink`) + `updatePlayer`, then restoring the human's context. */
   private simulateBot(c: Combatant, dt: number) {
     if (c.player.deadTimer && c.player.deadTimer > 0) return;
+    this.simulatingOther = true;
     // save the human's (combatant 0) single-simulation context
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse,
       sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets,
@@ -4442,6 +4449,7 @@ export class GameEngine {
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
     this.activeId = sActive;
+    this.simulatingOther = false;
   }
 
   /** Effective engagement range of a gun (px), used by bot target-range logic. */
@@ -5863,7 +5871,12 @@ export class GameEngine {
   }
 
   private lastHudEmit = 0;
-  private emit(immediate = false) {
+    private emit(immediate = false) {
+    // While simulating a bot / remote foe we swap the engine's single context
+    // onto them; any emit() here would push THEIR state into the player's HUD
+    // and cause a brief flicker (e.g. the bot uses a skill). Skip it — the
+    // per-frame HUD refresh in `loop()` still runs with the human's context.
+    if (this.simulatingOther) return;
     // Rate-limit non-immediate HUD pushes to ~20Hz. The main loop already
     // throttles to ~16Hz, but the multiplayer update path used to call
     // emit(true) every frame, forcing a React re-render 60x/sec and tanking
