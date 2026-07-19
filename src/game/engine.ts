@@ -3078,6 +3078,33 @@ export class GameEngine {
         }
       }
 
+      // ---- deployed turrets / stations are solid & destructible ----
+      if (!dead) {
+        for (const d of this.deployables) {
+          if (
+            d.kind !== "turret_mg" &&
+            d.kind !== "turret_cannon" &&
+            d.kind !== "healing_station"
+          )
+            continue;
+          const rr = d.size + b.size + 2;
+          const ddx = d.x - b.x;
+          const ddy = d.y - b.y;
+          if (ddx * ddx + ddy * ddy <= rr * rr) {
+            // an owner never hurts their own structure (bullets pass through)
+            if ((d.ownerId ?? -1) === (b.ownerId ?? -1)) continue;
+            if (b.explosive) {
+              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
+              dead = true;
+              break;
+            }
+            this.damageDeployable(d, b.damage, b.ownerId);
+            dead = true;
+            break;
+          }
+        }
+      }
+
       if (dead && b.explosive && b.life <= 0 && b.hit.size === 0 && !b.bounced) {
         this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
       }
@@ -4159,15 +4186,22 @@ export class GameEngine {
     if (this.isDM) {
       for (const c of this.combatants) {
         const sp = this.dmSpawns[c.id] ?? { x: this.worldW / 2, y: this.worldH / 2 };
-        this.reviveIfReady(c.player, sp.x, sp.y, dt);
+        this.reviveIfReady(c.player, sp.x, sp.y, dt, c.guns, c.weaponStates);
       }
       return;
     }
-    this.reviveIfReady(this.player, this.worldW / 2, this.worldH - 200, dt);
+    this.reviveIfReady(this.player, this.worldW / 2, this.worldH - 200, dt, this.guns, this.weaponStates);
     if (this.foe) this.reviveIfReady(this.foe, this.worldW / 2, 220, dt);
   }
 
-  private reviveIfReady(p: Player, spawnX: number, spawnY: number, dt: number) {
+  private reviveIfReady(
+    p: Player,
+    spawnX: number,
+    spawnY: number,
+    dt: number,
+    guns?: GunDef[],
+    weaponStates?: Map<string, WeaponState>
+  ) {
     if (!p.deadTimer || p.deadTimer <= 0) return;
     p.deadTimer -= dt;
     if (p.deadTimer <= 0) {
@@ -4181,6 +4215,19 @@ export class GameEngine {
       p.dashVx = 0;
       p.dashVy = 0;
       p.dashTime = 0;
+      // respawn with every weapon fully loaded so the player never has to
+      // reload immediately after reviving.
+      if (guns && weaponStates) {
+        for (const g of guns) {
+          const ws = weaponStates.get(g.id);
+          if (ws) {
+            ws.ammo = g.magazine ?? 0;
+            ws.reload = 0;
+            ws.heat = 0;
+            ws.overheated = false;
+          }
+        }
+      }
       this.spawnParticles(p.x, p.y, "#4ade80", 24, 200, 0.6);
     }
   }
@@ -5133,6 +5180,14 @@ export class GameEngine {
     this.shake = Math.min(14, this.shake + 5);
   }
 
+  private damageDeployable(d: Deployable, dmg: number, _ownerId?: number) {
+    d.hp -= dmg;
+    // small spark so the player can tell the structure is taking fire
+    if (Math.random() < 0.8)
+      this.spawnParticles(d.x, d.y, d.color, 4, 120, 0.25);
+    // removal + death FX (explosion) happen in `updateDeployables` once hp <= 0
+  }
+
   private explode(
     x: number,
     y: number,
@@ -5199,6 +5254,22 @@ export class GameEngine {
               ownerId
             );
           }
+        }
+      }
+      // splash also damages deployed turrets / stations — but never the
+      // owner's own structure.
+      for (const d of this.deployables) {
+        if (
+          d.kind !== "turret_mg" &&
+          d.kind !== "turret_cannon" &&
+          d.kind !== "healing_station"
+        )
+          continue;
+        if ((d.ownerId ?? -1) === (ownerId ?? -1)) continue;
+        const d2 = Math.hypot(d.x - x, d.y - y);
+        if (d2 < radius + d.size) {
+          const fall = 1 - d2 / (radius + d.size);
+          this.damageDeployable(d, damage * (0.5 + fall * 0.5), ownerId);
         }
       }
     }
