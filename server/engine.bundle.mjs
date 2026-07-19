@@ -3947,6 +3947,29 @@ var GameEngine = class {
       p.y -= Math.sin(base) * 3;
       this.shake = Math.min(14, this.shake + (g.id === "rocket" || g.id === "mgl32" ? 7 : 4));
     }
+    this.swatPointBlank(g.damage * this.character.damageMult, g.knockback ?? 0);
+  }
+  /** Point-blank "swat": deal damage to any enemy whose body overlaps the player.
+   *  See the call site in fireGun for why this is needed. Also used by the bow. */
+  swatPointBlank(dmg, knockback) {
+    const p = this.player;
+    for (const e of this.enemies) {
+      if (e.hp <= 0 || e.spawnT < 1) continue;
+      const rr = e.size + p.size + 5;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      if (dx * dx + dy * dy <= rr * rr) {
+        const ang = Math.atan2(dy, dx) || p.angle;
+        this.damageEnemy(
+          e,
+          dmg,
+          Math.cos(ang) * knockback,
+          Math.sin(ang) * knockback,
+          false,
+          { weapon: "swat", dx: Math.cos(ang), dy: Math.sin(ang) }
+        );
+      }
+    }
   }
   /** Clamped mortar landing point. The landing is the aim point clamped to the
    *  weapon's max lob range (g.range) around the firing player, then kept inside
@@ -4234,7 +4257,7 @@ var GameEngine = class {
         const d = Math.hypot(dx, dy);
         if (d <= range + e.size) {
           const ang = Math.atan2(dy, dx);
-          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
+          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone || d <= e.size + this.player.size) {
             const fall = 1 - d / (range + e.size);
             this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0, false, { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) });
             e.burnT = Math.max(e.burnT, 1.2);
@@ -4325,7 +4348,7 @@ var GameEngine = class {
         const d = Math.hypot(dx, dy);
         if (d <= range + e.size) {
           const ang = Math.atan2(dy, dx);
-          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
+          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone || d <= e.size + this.player.size) {
             this.applyPoison(e, dps * dt * 0.5);
           }
         }
@@ -4417,6 +4440,7 @@ var GameEngine = class {
       trail: true,
       weapon: g.id
     });
+    this.swatPointBlank(dmg, g.knockback * dmgMult);
     sound.shoot("sniper");
     this.spawnParticles(bx, by, g.glow, 4, 120, 0.25);
     if (chargePct >= 0.85) {

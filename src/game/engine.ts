@@ -2282,6 +2282,34 @@ export class GameEngine {
       p.y -= Math.sin(base) * 3;
       this.shake = Math.min(14, this.shake + (g.id === "rocket" || g.id === "mgl32" ? 7 : 4));
     }
+    // point-blank "swat" — a monster clinging to the avatar (e.g. the biohazard
+    // crawler that rushes the face) overlaps the player, so a normally-spawned
+    // bullet starts at the muzzle already outside its hitbox and can never
+    // connect. Firing still deals this damage so such attackers stay killable.
+    this.swatPointBlank(g.damage * this.character.damageMult, g.knockback ?? 0);
+  }
+
+  /** Point-blank "swat": deal damage to any enemy whose body overlaps the player.
+   *  See the call site in fireGun for why this is needed. Also used by the bow. */
+  private swatPointBlank(dmg: number, knockback: number) {
+    const p = this.player;
+    for (const e of this.enemies) {
+      if (e.hp <= 0 || e.spawnT < 1) continue;
+      const rr = e.size + p.size + 5;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      if (dx * dx + dy * dy <= rr * rr) {
+        const ang = Math.atan2(dy, dx) || p.angle;
+        this.damageEnemy(
+          e,
+          dmg,
+          Math.cos(ang) * knockback,
+          Math.sin(ang) * knockback,
+          false,
+          { weapon: "swat", dx: Math.cos(ang), dy: Math.sin(ang) }
+        );
+      }
+    }
   }
 
   /** Clamped mortar landing point. The landing is the aim point clamped to the
@@ -2590,7 +2618,9 @@ export class GameEngine {
         const d = Math.hypot(dx, dy);
         if (d <= range + e.size) {
           const ang = Math.atan2(dy, dx);
-          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
+          // a monster overlapping the player is at the muzzle origin (angle
+          // undefined) — always burn it rather than requiring a perfect aim.
+          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone || d <= e.size + this.player.size) {
             const fall = 1 - d / (range + e.size);
             this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0, false, { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) });
             e.burnT = Math.max(e.burnT, 1.2);
@@ -2688,7 +2718,9 @@ export class GameEngine {
         const d = Math.hypot(dx, dy);
         if (d <= range + e.size) {
           const ang = Math.atan2(dy, dx);
-          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
+          // a monster overlapping the player is at the muzzle origin (angle
+          // undefined) — always gas it rather than requiring a perfect aim.
+          if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone || d <= e.size + this.player.size) {
             this.applyPoison(e, dps * dt * 0.5);
           }
         }
@@ -2787,6 +2819,9 @@ export class GameEngine {
       trail: true,
       weapon: g.id,
     });
+    // point-blank "swat": a crawler clinging to the face is behind the arrow's
+    // spawn point too, so fire still hits it.
+    this.swatPointBlank(dmg, g.knockback * dmgMult);
     sound.shoot("sniper");
     this.spawnParticles(bx, by, g.glow, 4, 120, 0.25);
     if (chargePct >= 0.85) {
