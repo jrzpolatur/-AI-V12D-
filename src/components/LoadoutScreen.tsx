@@ -352,22 +352,42 @@ function PickCard({
 export default function LoadoutScreen({
   onConfirm,
   onBack,
+  initialLoadout,
+  onChange,
 }: {
   onConfirm: (loadout: Loadout) => void;
   onBack?: () => void;
+  initialLoadout?: Loadout;
+  onChange?: (loadout: Loadout) => void;
 }) {
-  const [characterId, setCharacterId] = useState("raider");
-  const [outfitId, setOutfitId] = useState("tactical");
-  const [gunIds, setGunIds] = useState<string[]>(["mac11", "sniper"]);
-  const [skillId, setSkillId] = useState("dash");
-  const [gadgetIds, setGadgetIds] = useState<string[]>([
-    "turret_mg",
-    "turret_cannon",
-    "mine_explosive",
-  ]);
-  const [gameMode, setGameMode] = useState<"defense" | "biohazard" | "deathmatch">("defense");
+  const [characterId, setCharacterId] = useState(initialLoadout?.characterId ?? "raider");
+  const [outfitId, setOutfitId] = useState(initialLoadout?.outfitId ?? "tactical");
+  const [gunIds, setGunIds] = useState<string[]>(initialLoadout?.gunIds ?? ["mac11", "sniper"]);
+  const [skillId, setSkillId] = useState(initialLoadout?.skillId ?? "dash");
+  const [gadgetIds, setGadgetIds] = useState<string[]>(
+    initialLoadout?.gadgetIds ?? ["turret_mg", "turret_cannon", "mine_explosive"]
+  );
+  const [gameMode, setGameMode] = useState<"defense" | "biohazard" | "deathmatch">(
+    initialLoadout?.gameMode ?? "defense"
+  );
 
   const gunId = gunIds[0] ?? "mac11";
+
+  // keep the parent's loadout in sync live so selections survive exiting /
+  // switching screens (pre-store), not just on confirm.
+  useEffect(() => {
+    onChange?.({
+      characterId,
+      outfitId,
+      gunId,
+      gunIds,
+      skillId,
+      gadgetIds,
+      gameMode,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characterId, outfitId, gunIds, skillId, gadgetIds, gameMode]);
+
   const toggleGun = (id: string) => {
     setGunIds((prev) => {
       if (prev.includes(id)) {
