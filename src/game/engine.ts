@@ -1206,7 +1206,7 @@ export class GameEngine {
 
         const hostSpawn = this.dmSpawns[0];
         const guestSpawn = this.dmSpawns[1];
-        if (this.selfPid === 1) {
+        if (this.mode === "host") {
           this.player.x = hostSpawn.x;
           this.player.y = hostSpawn.y;
           this.foe.x = guestSpawn.x;
@@ -5621,7 +5621,7 @@ export class GameEngine {
     if (s.gameOver && !this.gameOver) {
       // The host's gameOverReason is from the host's POV; derive the guest's
       // outcome from the base HPs relative to THIS client's role.
-      const iAmJoiner = this.selfPid === 2;
+      const iAmJoiner = this.mode === "guest";
       let reason: string;
       if (this.isDM && s.dmKills) {
         const hostKills = s.dmKills[0];
@@ -5728,8 +5728,8 @@ export class GameEngine {
     // (pid 1) defends the bottom one (this.base). Use selfPid so the
     // authoritative path (both peers run as "guest") orients correctly.
     if (this.gameMode !== "biohazard") {
-      const ownBase = this.selfPid === 2 ? this.enemyBase : this.base;
-      const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
+      const ownBase = this.mode === "guest" ? this.enemyBase : this.base;
+      const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
       this.drawBase(ctx, ownBase, true);
       this.drawBase(ctx, foeBase, false);
     }
@@ -6486,10 +6486,10 @@ export class GameEngine {
       // the top base (this.enemyBase); the creator (pid 1) defends the bottom
       // one (this.base). Use selfPid (not mode) so the authoritative path — where
       // BOTH peers run as "guest" — still orients each client correctly.
-      baseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.enemyBase.hp : this.base.hp)),
-      baseMaxHp: this.selfPid === 2 ? this.enemyBase.maxHp : this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.base.hp : this.enemyBase.hp)),
-      enemyBaseMaxHp: this.selfPid === 2 ? this.base.maxHp : this.enemyBase.maxHp,
+      baseHp: Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)),
+      baseMaxHp: this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp,
+      enemyBaseHp: Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)),
+      enemyBaseMaxHp: this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
@@ -6641,8 +6641,8 @@ export class GameEngine {
 
     // blobs at base positions (in world space, but we draw in screen space)
     // own base glows blue, opponent's glows red — for both host and guest
-    const myBase = this.selfPid === 2 ? this.enemyBase : this.base;
-    const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
+    const myBase = this.mode === "guest" ? this.enemyBase : this.base;
+    const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
     const blobs: [number, number, string][] = [
       [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
       [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"],

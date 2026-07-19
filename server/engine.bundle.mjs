@@ -3172,7 +3172,7 @@ var GameEngine = class {
         this.foe.cid = this.peerPid;
         const hostSpawn = this.dmSpawns[0];
         const guestSpawn = this.dmSpawns[1];
-        if (this.selfPid === 1) {
+        if (this.mode === "host") {
           this.player.x = hostSpawn.x;
           this.player.y = hostSpawn.y;
           this.foe.x = guestSpawn.x;
@@ -7036,7 +7036,7 @@ var GameEngine = class {
       if (guestC) guestC.kills = s.dmKills[1];
     }
     if (s.gameOver && !this.gameOver) {
-      const iAmJoiner = this.selfPid === 2;
+      const iAmJoiner = this.mode === "guest";
       let reason;
       if (this.isDM && s.dmKills) {
         const hostKills = s.dmKills[0];
@@ -7116,8 +7116,8 @@ var GameEngine = class {
       return prev;
     };
     if (this.gameMode !== "biohazard") {
-      const ownBase = this.selfPid === 2 ? this.enemyBase : this.base;
-      const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
+      const ownBase = this.mode === "guest" ? this.enemyBase : this.base;
+      const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
       this.drawBase(ctx, ownBase, true);
       this.drawBase(ctx, foeBase, false);
     }
@@ -7785,10 +7785,10 @@ var GameEngine = class {
       // the top base (this.enemyBase); the creator (pid 1) defends the bottom
       // one (this.base). Use selfPid (not mode) so the authoritative path — where
       // BOTH peers run as "guest" — still orients each client correctly.
-      baseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.enemyBase.hp : this.base.hp)),
-      baseMaxHp: this.selfPid === 2 ? this.enemyBase.maxHp : this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.selfPid === 2 ? this.base.hp : this.enemyBase.hp)),
-      enemyBaseMaxHp: this.selfPid === 2 ? this.base.maxHp : this.enemyBase.maxHp,
+      baseHp: Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)),
+      baseMaxHp: this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp,
+      enemyBaseHp: Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)),
+      enemyBaseMaxHp: this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
@@ -7915,8 +7915,8 @@ var GameEngine = class {
     g.addColorStop(1, theme.bgBottom);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, this.W, this.H);
-    const myBase = this.selfPid === 2 ? this.enemyBase : this.base;
-    const foeBase = this.selfPid === 2 ? this.base : this.enemyBase;
+    const myBase = this.mode === "guest" ? this.enemyBase : this.base;
+    const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
     const blobs = [
       [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
       [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"]
