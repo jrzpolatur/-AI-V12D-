@@ -2706,6 +2706,57 @@ var GameEngine = class {
   wave = 0;
   waveTimer = 0;
   spawnTimer = 0;
+  scoreFeed = [];
+  killFeed = [];
+  nextScoreFeedId = 0;
+  nextKillFeedId = 0;
+  addScoreFeed(text, score) {
+    if (this.gameMode === "biohazard") return;
+    if (text === "\u4F24\u5BB3\u51FB\u4E2D") {
+      const existing = this.scoreFeed.find((f) => f.text === "\u4F24\u5BB3\u51FB\u4E2D" && f.timer > 0.5);
+      if (existing) {
+        existing.score += score;
+        existing.timer = 2;
+        this.emit(true);
+        return;
+      }
+    }
+    this.scoreFeed.push({
+      id: this.nextScoreFeedId++,
+      text,
+      score,
+      timer: 2
+    });
+    if (this.scoreFeed.length > 4) {
+      this.scoreFeed.shift();
+    }
+    this.emit(true);
+  }
+  addKillFeed(killerName, victimName, weaponId, killerC) {
+    if (this.gameMode === "biohazard") return;
+    let iconShape = "pistol";
+    let glow = "#ef4444";
+    const wId = weaponId || (killerC ? killerC.guns[killerC.gunIndex]?.id : void 0);
+    if (wId) {
+      const g = GUNS.find((gn) => gn.id === wId);
+      if (g) {
+        iconShape = g.iconShape;
+        glow = g.color;
+      }
+    }
+    this.killFeed.push({
+      id: this.nextKillFeedId++,
+      killerName,
+      victimName,
+      weaponIconShape: iconShape,
+      weaponGlow: glow,
+      timer: 4
+    });
+    if (this.killFeed.length > 5) {
+      this.killFeed.shift();
+    }
+    this.emit(true);
+  }
   maxConcurrent = 10;
   intermission = 0;
   banner = null;
@@ -3105,8 +3156,8 @@ var GameEngine = class {
       this.combatants = [];
     }
     if (this.mode !== "local" && this.net) {
-      this.selfPid = this.reqSelfPid ?? (this.mode === "host" ? 1 : 2);
-      this.peerPid = this.reqPeerPid ?? (this.mode === "host" ? 2 : 1);
+      this.selfPid = this.reqSelfPid ?? (this.net.youPid || (this.mode === "host" ? 1 : 2));
+      this.peerPid = this.reqPeerPid ?? (this.net.peerPid || (this.selfPid === 1 ? 2 : 1));
       this.foeGuns = this.guns.slice();
       this.gunIndex = Math.max(0, this.guns.findIndex((g) => g.id === this.loadout.gunId));
       this.player.gunIndex = this.gunIndex;
@@ -3781,6 +3832,24 @@ var GameEngine = class {
   }
   // ---------------------------------------------------------------- update
   update(dt) {
+    let feedDirty = false;
+    for (let i = this.scoreFeed.length - 1; i >= 0; i--) {
+      this.scoreFeed[i].timer -= dt;
+      if (this.scoreFeed[i].timer <= 0) {
+        this.scoreFeed.splice(i, 1);
+        feedDirty = true;
+      }
+    }
+    for (let i = this.killFeed.length - 1; i >= 0; i--) {
+      this.killFeed[i].timer -= dt;
+      if (this.killFeed[i].timer <= 0) {
+        this.killFeed.splice(i, 1);
+        feedDirty = true;
+      }
+    }
+    if (feedDirty) {
+      this.emit(true);
+    }
     if (this.mode !== "local" && this.net) this.pumpNet();
     if (this.authoritative) {
       this.applySnapshot();
@@ -6005,6 +6074,8 @@ var GameEngine = class {
   /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
   damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0, attackerId) {
     if (p.deadTimer && p.deadTimer > 0) return;
+    const prevHp = p.hp;
+    const prevShield = p.shieldHp ?? 0;
     if (p.iframes > 0 || p.shieldTime > 0) {
       if (p.shieldTime > 0) this.spawnParticles(p.x, p.y, "#60a5fa", 4, 90, 0.3);
       return;
@@ -6019,6 +6090,19 @@ var GameEngine = class {
         this.shake = 12;
         sound.explosion();
       }
+      const shieldDiff = prevShield - p.shieldHp;
+      if (shieldDiff > 0 && this.gameMode !== "biohazard") {
+        const isLocalAttacker = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
+        if (isLocalAttacker) {
+          const scoreGained = Math.round(shieldDiff);
+          if (scoreGained > 0) {
+            const killerC = this.combatants.find((c) => c.id === (attackerId ?? 0));
+            if (killerC) killerC.score += scoreGained;
+            else this.score += scoreGained;
+            this.addScoreFeed("\u4F24\u5BB3\u51FB\u4E2D", scoreGained);
+          }
+        }
+      }
       return;
     }
     p.hp -= dmg;
@@ -6031,6 +6115,19 @@ var GameEngine = class {
     if (knockX || knockY) {
       p.x = Math.max(p.size, Math.min(this.worldW - p.size, p.x + knockX));
       p.y = Math.max(p.size, Math.min(this.worldH - p.size, p.y + knockY));
+    }
+    const hpDiff = prevHp - p.hp;
+    if (hpDiff > 0 && this.gameMode !== "biohazard") {
+      const isLocalAttacker = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
+      if (isLocalAttacker) {
+        const scoreGained = Math.round(hpDiff);
+        if (scoreGained > 0) {
+          const killerC = this.combatants.find((c) => c.id === (attackerId ?? 0));
+          if (killerC) killerC.score += scoreGained;
+          else this.score += scoreGained;
+          this.addScoreFeed("\u4F24\u5BB3\u51FB\u4E2D", scoreGained);
+        }
+      }
     }
     if (p.hp <= 0) {
       p.hp = 0;
@@ -6054,20 +6151,28 @@ var GameEngine = class {
         if (killer && victim && killer.id !== victim.id) {
           killer.kills += 1;
           killer.score += 250;
-          const kName = killer.name;
-          const vName = victim.name;
-          if (killer.id === 0) this.banner = { text: `\u51FB\u6740 ${vName}\uFF01`, t: 1.6 };
-          else if (victim.id === 0) this.banner = { text: `\u4F60\u88AB ${kName} \u51FB\u8D25\uFF01`, t: 1.6 };
-          else this.banner = { text: `${kName} \u51FB\u6740 ${vName}`, t: 1.6 };
-          if (killer.kills >= this.dmKillLimit && !this.gameOver) {
-            this.endGame(killer.id === 0 ? "\u4F60\u8D62\u4E86\uFF01" : `${kName} \u83B7\u80DC\uFF01`);
+          const kName = killer.id === this.selfPid ? "\u4F60" : killer.name;
+          const vName = victim.id === this.selfPid ? "\u4F60" : victim.name;
+          this.addKillFeed(kName, vName, _b?.weapon, killer);
+          if (killer.id === this.selfPid || this.mode === "local" && killer.id === 0) {
+            this.addScoreFeed("\u51FB\u6740\u5F97\u5206", 250);
           }
-        } else if (victim && victim.id === 0) {
+          if (killer.id === this.selfPid || this.mode === "local" && killer.id === 0) {
+            this.banner = { text: `\u51FB\u6740 ${vName}\uFF01`, t: 1.6 };
+          } else if (victim.id === this.selfPid || this.mode === "local" && victim.id === 0) {
+            this.banner = { text: `\u4F60\u88AB ${kName} \u51FB\u8D25\uFF01`, t: 1.6 };
+          }
+          if (killer.kills >= this.dmKillLimit && !this.gameOver) {
+            this.endGame(killer.id === this.selfPid || this.mode === "local" && killer.id === 0 ? "\u4F60\u8D62\u4E86\uFF01" : `${kName} \u83B7\u80DC\uFF01`);
+          }
+        } else if (victim && (victim.id === this.selfPid || this.mode === "local" && victim.id === 0)) {
           this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${RESPAWN_TIME} \u79D2\u540E\u590D\u6D3B`, t: 1.6 };
         }
       } else if (p === this.foe) {
         this.kills += 1;
         this.score += 250;
+        this.addKillFeed("\u4F60", this.peerName || "\u5BF9\u624B", _b?.weapon);
+        this.addScoreFeed("\u51FB\u6740\u5F97\u5206", 250);
         this.banner = { text: `\u51FB\u6740 ${this.peerName || "\u5BF9\u624B"}\uFF01`, t: 1.6 };
       } else {
         this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${RESPAWN_TIME} \u79D2\u540E\u590D\u6D3B`, t: 1.6 };
@@ -6852,7 +6957,7 @@ var GameEngine = class {
     this.sceneIndex = s.scene ?? 0;
     if (this.mode === "local") this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
-    const foe = s.players.find((p) => p.id !== this.selfPid) ?? s.players[1];
+    const foe = s.players.find((p) => p.id !== me.id) ?? s.players[1];
     if (me) {
       if (this.mode === "guest" || this.authoritative) {
         const distSq = (this.player.x - me.x) ** 2 + (this.player.y - me.y) ** 2;
@@ -7692,6 +7797,8 @@ var GameEngine = class {
       banner: this.banner ? this.banner.text : null,
       kills: this.isDM ? this.mode === "local" ? this.combatants[0]?.kills ?? 0 : this.combatants.find((c) => c.id === this.selfPid)?.kills ?? 0 : this.kills,
       gold: this.gold,
+      scoreFeed: this.scoreFeed.map((f) => ({ id: f.id, text: f.text, score: f.score })),
+      killFeed: this.killFeed.map((f) => ({ id: f.id, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
       shieldMaxHp: this.gun.shieldMaxHp ?? null,

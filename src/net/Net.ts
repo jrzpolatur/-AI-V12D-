@@ -36,6 +36,7 @@ export class Net {
   peerName = "";
   /** the pid assigned to THIS client by the (authoritative) server */
   youPid = 0;
+  peerPid = 0;
   /** buffered game messages received from the peer (drained by the engine) */
   private inbox: GameMsg[] = [];
   private autoReconnect = false;
@@ -188,6 +189,7 @@ export class Net {
         break;
       case "peer":
         this.peerName = m.name;
+        this.peerPid = m.pid!;
         this.events.onPeer?.(m.pid, m.name, !!m.host);
         break;
       case "start":

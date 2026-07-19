@@ -130,6 +130,8 @@ export interface HudState {
   banner: string | null;
   kills: number;
   gold: number;
+  scoreFeed: { id: number; text: string; score: number }[];
+  killFeed: { id: number; killerName: string; victimName: string; weaponIconShape: string; weaponGlow: string }[];
   /** bow charge 0..1 (0 when not drawing) */
   bowChargePct: number;
   /** shield HP (null if not a shield weapon) */
@@ -676,6 +678,59 @@ export class GameEngine {
   private wave = 0;
   private waveTimer = 0;
   private spawnTimer = 0;
+  public scoreFeed: { id: number; text: string; score: number; timer: number }[] = [];
+  public killFeed: { id: number; killerName: string; victimName: string; weaponIconShape: string; weaponGlow: string; timer: number }[] = [];
+  private nextScoreFeedId = 0;
+  private nextKillFeedId = 0;
+
+  addScoreFeed(text: string, score: number) {
+    if (this.gameMode === "biohazard") return;
+    if (text === "伤害击中") {
+      const existing = this.scoreFeed.find(f => f.text === "伤害击中" && f.timer > 0.5);
+      if (existing) {
+        existing.score += score;
+        existing.timer = 2.0;
+        this.emit(true);
+        return;
+      }
+    }
+    this.scoreFeed.push({
+      id: this.nextScoreFeedId++,
+      text,
+      score,
+      timer: 2.0,
+    });
+    if (this.scoreFeed.length > 4) {
+      this.scoreFeed.shift();
+    }
+    this.emit(true);
+  }
+
+  addKillFeed(killerName: string, victimName: string, weaponId?: string, killerC?: Combatant) {
+    if (this.gameMode === "biohazard") return;
+    let iconShape = "pistol";
+    let glow = "#ef4444";
+    const wId = weaponId || (killerC ? killerC.guns[killerC.gunIndex]?.id : undefined);
+    if (wId) {
+      const g = GUNS.find(gn => gn.id === wId);
+      if (g) {
+        iconShape = g.iconShape;
+        glow = g.color;
+      }
+    }
+    this.killFeed.push({
+      id: this.nextKillFeedId++,
+      killerName,
+      victimName,
+      weaponIconShape: iconShape,
+      weaponGlow: glow,
+      timer: 4.0,
+    });
+    if (this.killFeed.length > 5) {
+      this.killFeed.shift();
+    }
+    this.emit(true);
+  }
   private maxConcurrent = 10;
   private intermission = 0;
   private banner: { text: string; t: number } | null = null;
@@ -1133,8 +1188,8 @@ export class GameEngine {
       // counter. The server's pid is NOT guaranteed to be 1/2 (it increments
       // across all rooms), so relying on it silently swapped "me"/"foe" in some
       // sessions -> the player mirrored the opponent and could not move.
-      this.selfPid = this.reqSelfPid ?? (this.mode === "host" ? 1 : 2);
-      this.peerPid = this.reqPeerPid ?? (this.mode === "host" ? 2 : 1);
+      this.selfPid = this.reqSelfPid ?? (this.net.youPid || (this.mode === "host" ? 1 : 2));
+      this.peerPid = this.reqPeerPid ?? (this.net.peerPid || (this.selfPid === 1 ? 2 : 1));
       this.foeGuns = this.guns.slice();
       this.gunIndex = Math.max(0, this.guns.findIndex((g) => g.id === this.loadout.gunId));
       this.player.gunIndex = this.gunIndex;
@@ -1913,6 +1968,26 @@ export class GameEngine {
 
   // ---------------------------------------------------------------- update
   private update(dt: number) {
+    // ---- tick feed timers ----
+    let feedDirty = false;
+    for (let i = this.scoreFeed.length - 1; i >= 0; i--) {
+      this.scoreFeed[i].timer -= dt;
+      if (this.scoreFeed[i].timer <= 0) {
+        this.scoreFeed.splice(i, 1);
+        feedDirty = true;
+      }
+    }
+    for (let i = this.killFeed.length - 1; i >= 0; i--) {
+      this.killFeed[i].timer -= dt;
+      if (this.killFeed[i].timer <= 0) {
+        this.killFeed.splice(i, 1);
+        feedDirty = true;
+      }
+    }
+    if (feedDirty) {
+      this.emit(true);
+    }
+
     // ---- multiplayer: pump peer messages ----
     if (this.mode !== "local" && this.net) this.pumpNet();
 
@@ -4436,6 +4511,9 @@ export class GameEngine {
   ) {
     // already downed and waiting to respawn -> ignore further hits
     if (p.deadTimer && p.deadTimer > 0) return;
+    const prevHp = p.hp;
+    const prevShield = p.shieldHp ?? 0;
+
     if (p.iframes > 0 || p.shieldTime > 0) {
       if (p.shieldTime > 0) this.spawnParticles(p.x, p.y, "#60a5fa", 4, 90, 0.3);
       return;
@@ -4449,6 +4527,20 @@ export class GameEngine {
         p.shieldCd = this.gun.shieldRechargeTime ?? 8;
         this.shake = 12;
         sound.explosion();
+      }
+      // Track score for shield damage
+      const shieldDiff = prevShield - p.shieldHp;
+      if (shieldDiff > 0 && this.gameMode !== "biohazard") {
+        const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
+        if (isLocalAttacker) {
+          const scoreGained = Math.round(shieldDiff);
+          if (scoreGained > 0) {
+            const killerC = this.combatants.find((c) => c.id === (attackerId ?? 0));
+            if (killerC) killerC.score += scoreGained;
+            else this.score += scoreGained;
+            this.addScoreFeed("伤害击中", scoreGained);
+          }
+        }
       }
       return;
     }
@@ -4469,6 +4561,22 @@ export class GameEngine {
       p.x = Math.max(p.size, Math.min(this.worldW - p.size, p.x + knockX));
       p.y = Math.max(p.size, Math.min(this.worldH - p.size, p.y + knockY));
     }
+
+    // Track score for health damage
+    const hpDiff = prevHp - p.hp;
+    if (hpDiff > 0 && this.gameMode !== "biohazard") {
+      const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
+      if (isLocalAttacker) {
+        const scoreGained = Math.round(hpDiff);
+        if (scoreGained > 0) {
+          const killerC = this.combatants.find((c) => c.id === (attackerId ?? 0));
+          if (killerC) killerC.score += scoreGained;
+          else this.score += scoreGained;
+          this.addScoreFeed("伤害击中", scoreGained);
+        }
+      }
+    }
+
     if (p.hp <= 0) {
       p.hp = 0;
       p.deadTimer = RESPAWN_TIME;
@@ -4500,21 +4608,32 @@ export class GameEngine {
         if (killer && victim && killer.id !== victim.id) {
           killer.kills += 1;
           killer.score += 250;
-          const kName = killer.name;
-          const vName = victim.name;
-          if (killer.id === 0) this.banner = { text: `击杀 ${vName}！`, t: 1.6 };
-          else if (victim.id === 0) this.banner = { text: `你被 ${kName} 击败！`, t: 1.6 };
-          else this.banner = { text: `${kName} 击杀 ${vName}`, t: 1.6 };
-          if (killer.kills >= this.dmKillLimit && !this.gameOver) {
-            this.endGame(killer.id === 0 ? "你赢了！" : `${kName} 获胜！`);
+          const kName = killer.id === this.selfPid ? "你" : killer.name;
+          const vName = victim.id === this.selfPid ? "你" : victim.name;
+          
+          this.addKillFeed(kName, vName, _b?.weapon, killer);
+          if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
+            this.addScoreFeed("击杀得分", 250);
           }
-        } else if (victim && victim.id === 0) {
+
+          if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
+            this.banner = { text: `击杀 ${vName}！`, t: 1.6 };
+          } else if (victim.id === this.selfPid || (this.mode === "local" && victim.id === 0)) {
+            this.banner = { text: `你被 ${kName} 击败！`, t: 1.6 };
+          }
+
+          if (killer.kills >= this.dmKillLimit && !this.gameOver) {
+            this.endGame(killer.id === this.selfPid || (this.mode === "local" && killer.id === 0) ? "你赢了！" : `${kName} 获胜！`);
+          }
+        } else if (victim && (victim.id === this.selfPid || (this.mode === "local" && victim.id === 0))) {
           this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
         }
       } else if (p === this.foe) {
         // you downed the opponent
         this.kills += 1;
         this.score += 250;
+        this.addKillFeed("你", this.peerName || "对手", _b?.weapon);
+        this.addScoreFeed("击杀得分", 250);
         this.banner = { text: `击杀 ${this.peerName || "对手"}！`, t: 1.6 };
       } else {
         this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
@@ -5406,7 +5525,7 @@ export class GameEngine {
     // pause is a single-player-only feature; ignore any stale `paused` flag from the wire
     if (this.mode === "local") this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
-    const foe = s.players.find((p) => p.id !== this.selfPid) ?? s.players[1];
+    const foe = s.players.find((p) => p.id !== me.id) ?? s.players[1];
     if (me) {
       if (this.mode === "guest" || this.authoritative) {
         // Client-side prediction position reconciliation
@@ -6379,6 +6498,8 @@ export class GameEngine {
       banner: this.banner ? this.banner.text : null,
       kills: this.isDM ? (this.mode === "local" ? this.combatants[0]?.kills ?? 0 : this.combatants.find(c => c.id === this.selfPid)?.kills ?? 0) : this.kills,
       gold: this.gold,
+      scoreFeed: this.scoreFeed.map(f => ({ id: f.id, text: f.text, score: f.score })),
+      killFeed: this.killFeed.map(f => ({ id: f.id, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
       shieldMaxHp: this.gun.shieldMaxHp ?? null,

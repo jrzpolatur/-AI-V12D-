@@ -181,7 +181,7 @@ wss.on("connection", (ws) => {
       ws.room = code;
       ws.pid = pid;
 
-      const other = pid === 1 ? room.peers.get(2) : room.peers.get(1);
+      const other = Array.from(room.peers.values()).find((p) => p.pid !== pid);
       send(ws, { t: "peer", pid: other?.pid ?? 0, name: other?.name ?? "", host: other?.host ?? false });
       send(ws, { t: "start", youPid: pid });
       if (other && !other.disconnected) send(other.ws, { t: "peerBack" });
@@ -197,7 +197,7 @@ wss.on("connection", (ws) => {
     if (!peer) return;
 
     peer.disconnected = true;
-    const other = ws.pid === 1 ? room.peers.get(2) : room.peers.get(1);
+    const other = ws.pid != null ? Array.from(room.peers.values()).find((p) => p.pid !== ws.pid) : null;
     if (other && !other.disconnected) send(other.ws, { t: "peerGone" });
 
     if (!room.graceTimers) room.graceTimers = new Map();

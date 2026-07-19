@@ -1371,11 +1371,11 @@ export function drawWeaponIcon(
   /** Draw the main steel body with a glow outline. */
   const body = (p: () => void) => {
     ctx.save();
-    ctx.shadowColor = rgba(glow, 0.55);
-    ctx.shadowBlur = 5;
+    ctx.shadowColor = rgba(glow, 0.65);
+    ctx.shadowBlur = 8;
     ctx.fillStyle = grad;
     ctx.strokeStyle = glow;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2.2;
     p();
     ctx.fill();
     ctx.shadowBlur = 0;

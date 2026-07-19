@@ -668,6 +668,65 @@ export default function GameScreen({
         </div>
       )}
 
+      {/* ============ BATTLEFIELD STYLE SCORE FEED ============ */}
+      {hud.scoreFeed && hud.scoreFeed.length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[32%] flex flex-col items-center justify-center gap-1 z-50">
+          {hud.scoreFeed.map((sf) => (
+            <div
+              key={sf.id}
+              className="flex items-center gap-2 text-center animate-score-pop"
+              style={{
+                filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.85))"
+              }}
+            >
+              <span className="text-xl font-black text-amber-400 font-mono">+{sf.score}</span>
+              <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">{sf.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ============ TOP RIGHT KILL FEED ============ */}
+      {hud.killFeed && hud.killFeed.length > 0 && (
+        <div className="pointer-events-none absolute right-3 top-20 z-50 flex flex-col items-end gap-1.5 sm:right-4">
+          {hud.killFeed.map((kf) => (
+            <div
+              key={kf.id}
+              className="flex items-center gap-2 rounded-lg bg-black/55 px-3 py-1 text-xs font-bold text-white shadow-lg border border-white/5 backdrop-blur-sm animate-kf-slide"
+            >
+              <span className="text-sky-300">{kf.killerName}</span>
+              <span
+                className="flex items-center justify-center rounded bg-slate-950/80 px-1.5 py-0.5 border border-white/10"
+                style={{ boxShadow: `0 0 5px ${kf.weaponGlow}44` }}
+              >
+                <WeaponIcon iconShape={kf.weaponIconShape} glow={kf.weaponGlow} size={20} />
+              </span>
+              <span className="text-rose-300">{kf.victimName}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes bf-score-pop {
+          0% { transform: translateY(15px) scale(0.85); opacity: 0; }
+          12% { transform: translateY(0) scale(1.05); opacity: 1; }
+          25% { transform: translateY(0) scale(1); opacity: 1; }
+          80% { transform: translateY(0) scale(1); opacity: 1; }
+          100% { transform: translateY(-10px) scale(1); opacity: 0; }
+        }
+        @keyframes kf-slide-in {
+          0% { transform: translateX(40px); opacity: 0; }
+          100% { transform: translateX(0); opacity: 1; }
+        }
+        .animate-score-pop {
+          animation: bf-score-pop 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-kf-slide {
+          animation: kf-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
     </div>
   );
 }

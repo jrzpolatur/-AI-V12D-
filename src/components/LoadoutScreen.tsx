@@ -112,7 +112,7 @@ function CharPreview({
 function WeaponIcon({
   iconShape,
   glow,
-  size = 28,
+  size = 36,
 }: {
   iconShape: string;
   glow: string;
@@ -129,7 +129,16 @@ function WeaponIcon({
     ctx.clearRect(0, 0, size, size);
     drawWeaponIcon(ctx, iconShape, size / 2, size / 2, size * 0.78, glow);
   }, [iconShape, glow, size]);
-  return <canvas ref={ref} style={{ width: size, height: size }} />;
+  return (
+    <div
+      className="flex items-center justify-center rounded-xl p-2.5 bg-black/60 border border-white/10 transition-transform duration-200"
+      style={{
+        boxShadow: `0 0 15px ${glow}20, inset 0 0 8px ${glow}10`,
+      }}
+    >
+      <canvas ref={ref} style={{ width: size, height: size, filter: `drop-shadow(0 0 3px ${glow}88)` }} />
+    </div>
+  );
 }
 
 /** Small canvas rendering a gadget's vector silhouette. */
