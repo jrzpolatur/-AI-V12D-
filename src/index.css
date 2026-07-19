@@ -50,7 +50,18 @@ body {
   animation: bannerPop 2.4s ease-out;
 }
 
-/* Hide the side scrollbar (the "quick drag bar") while keeping scroll working. */
+/* Hide the page + element scrollbars (the "quick drag bar") while keeping
+   scroll working via wheel / trackpad. Without this the whole window (body)
+   scrolls on tall screens and shows an OS scrollbar. */
+html,
+body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;

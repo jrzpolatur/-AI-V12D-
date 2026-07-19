@@ -9,7 +9,7 @@ var guns_default = [
     iconShape: "pistol",
     damage: 55,
     fireRate: 7,
-    bulletSpeed: 1102,
+    bulletSpeed: 760,
     bulletSize: 5,
     spread: 0.03,
     pellets: 1,
@@ -34,7 +34,7 @@ var guns_default = [
     iconShape: "mac11",
     damage: 18,
     fireRate: 16,
-    bulletSpeed: 1218,
+    bulletSpeed: 840,
     bulletSize: 4,
     spread: 0.13,
     pellets: 1,
@@ -58,7 +58,7 @@ var guns_default = [
     iconShape: "mp5",
     damage: 26,
     fireRate: 11,
-    bulletSpeed: 1334,
+    bulletSpeed: 920,
     bulletSize: 4.5,
     spread: 0.08,
     pellets: 1,
@@ -111,7 +111,7 @@ var guns_default = [
     iconShape: "sniper",
     damage: 270,
     fireRate: 0.9,
-    bulletSpeed: 2538,
+    bulletSpeed: 1750,
     bulletSize: 6,
     spread: 0,
     pellets: 1,
@@ -135,7 +135,7 @@ var guns_default = [
     iconShape: "rocket",
     damage: 225,
     fireRate: 0.72,
-    bulletSpeed: 696,
+    bulletSpeed: 480,
     bulletSize: 9,
     spread: 0.02,
     pellets: 1,
@@ -161,7 +161,7 @@ var guns_default = [
     iconShape: "akm",
     damage: 37,
     fireRate: 10,
-    bulletSpeed: 1363,
+    bulletSpeed: 940,
     bulletSize: 5,
     spread: 0.05,
     pellets: 1,
@@ -185,7 +185,7 @@ var guns_default = [
     iconShape: "fcar",
     damage: 46,
     fireRate: 9,
-    bulletSpeed: 1450,
+    bulletSpeed: 1e3,
     bulletSize: 6,
     spread: 0.045,
     pellets: 1,
@@ -310,7 +310,7 @@ var guns_default = [
     iconShape: "sa1216",
     damage: 22,
     fireRate: 5.5,
-    bulletSpeed: 1189,
+    bulletSpeed: 820,
     bulletSize: 4.5,
     spread: 0.18,
     pellets: 8,
@@ -386,7 +386,7 @@ var guns_default = [
     iconShape: "drone",
     damage: 56,
     fireRate: 1.6,
-    bulletSpeed: 551,
+    bulletSpeed: 380,
     bulletSize: 9,
     spread: 0.1,
     pellets: 1,
@@ -412,7 +412,7 @@ var guns_default = [
     iconShape: "recurve_bow",
     damage: 44,
     fireRate: 1.5,
-    bulletSpeed: 870,
+    bulletSpeed: 600,
     bulletSize: 5,
     spread: 0.01,
     pellets: 1,
@@ -468,7 +468,7 @@ var guns_default = [
     iconShape: "shak50",
     damage: 42,
     fireRate: 7,
-    bulletSpeed: 1305,
+    bulletSpeed: 900,
     bulletSize: 6,
     spread: 0,
     pellets: 2,
@@ -495,7 +495,7 @@ var guns_default = [
     iconShape: "pistol",
     damage: 118,
     fireRate: 3.2,
-    bulletSpeed: 1450,
+    bulletSpeed: 1e3,
     bulletSize: 5.5,
     spread: 0.012,
     pellets: 1,
@@ -520,7 +520,7 @@ var guns_default = [
     iconShape: "sniper",
     damage: 320,
     fireRate: 0.85,
-    bulletSpeed: 2755,
+    bulletSpeed: 1900,
     bulletSize: 7,
     spread: 0,
     pellets: 1,
@@ -544,7 +544,7 @@ var guns_default = [
     iconShape: "gatling",
     damage: 24,
     fireRate: 19,
-    bulletSpeed: 1523,
+    bulletSpeed: 1050,
     bulletSize: 4.5,
     spread: 0.11,
     pellets: 1,
@@ -1061,9 +1061,7 @@ var MONSTERS = [
 ];
 var getCharacter = (id) => CHARACTERS.find((c) => c.id === id) ?? CHARACTERS[0];
 var getOutfit = (id) => OUTFITS.find((o) => o.id === id) ?? OUTFITS[0];
-var getGun = (id) => GUNS.find((g) => g.id === id) ?? GUNS[0];
 var getSkill = (id) => SKILLS.find((s) => s.id === id) ?? SKILLS[0];
-var getGadget = (id) => GADGETS.find((g) => g.id === id) ?? GADGETS[0];
 var SCENES = [
   {
     id: "neon",
@@ -2401,14 +2399,8 @@ var RUNTIME_DEFAULTS = {
   playerSpeedMult: 1,
   playerBaseHp: 250,
   // unified max HP for every player (character/outfit HP bonuses disabled)
-  enemyHp: 250,
+  enemyHp: 250
   // unified enemy base HP ×2.5 to match 250 player HP (per-wave hpScale & elite mult still apply)
-  botCount: 3,
-  // bots in a human-vs-bots deathmatch
-  killTarget: 15,
-  // first to this many kills wins
-  dmDuration: 300
-  // 5-minute time limit
 };
 var RUNTIME = { ...RUNTIME_DEFAULTS };
 
@@ -2562,35 +2554,6 @@ var GameEngine = class {
   foeGadgets = [];
   /** the opponent's per-gadget cooldown timers (separate from the host's own) */
   foeGadgetCd = /* @__PURE__ */ new Map();
-  // ---- deathmatch (human vs bots) state ----
-  /** true when the current match is a human-vs-bots deathmatch (offline PvP) */
-  get isDM() {
-    return this.gameMode === "deathmatch";
-  }
-  /** bot avatars (combatants 1..N). The human is always this.player (cid 0). */
-  bots = [];
-  botChar = [];
-  botOutfit = [];
-  botSkill = [];
-  botGuns = [];
-  botGadgets = [];
-  botGadgetCd = [];
-  botName = [];
-  botColor = [];
-  /** per-combatant score; index = cid (0 = human). First to killTarget wins. */
-  scores = [];
-  /** cached AI intent for each bot, refreshed by thinkBot */
-  botAi = [];
-  dmTarget = 10;
-  dmDuration = 300;
-  dmClock = 0;
-  /** stable list of all live combatants (human + bots).
-   *  Always leads with `localPlayer` (the human) — NOT `player`, because
-   *  `player` is temporarily swapped to a bot while `simulateBot` runs and
-   *  `emit`/targeting can be invoked from within that window. */
-  combatants() {
-    return [this.localPlayer, ...this.bots];
-  }
   /** the host's own avatar; never swapped while simulating the foe */
   localPlayer = null;
   // one-shot action intents captured on the guest, sent with the next input
@@ -2842,7 +2805,7 @@ var GameEngine = class {
       flash: 0,
       t: 0
     };
-    if (this.gameMode === "biohazard" || this.isDM) {
+    if (this.gameMode === "biohazard") {
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
@@ -2873,7 +2836,7 @@ var GameEngine = class {
     this.beamHit = null;
     this.flameActive = false;
     this.banner = {
-      text: this.gameMode === "biohazard" ? "\u751F\u5316\u5371\u673A \xB7 \u6D3B\u4E0B\u53BB\uFF01" : this.isDM ? `\u4EBA\u673A\u5BF9\u6218 \xB7 \u5148\u51FB\u6740 ${this.dmTarget} \u4EBA\u83B7\u80DC\uFF01` : "\u5B88\u62A4\u57FA\u5730\uFF01",
+      text: this.gameMode === "biohazard" ? "\u751F\u5316\u5371\u673A \xB7 \u6D3B\u4E0B\u53BB\uFF01" : "\u5B88\u62A4\u57FA\u5730\uFF01",
       t: 2.2
     };
     this.enemyId = 1;
@@ -2895,7 +2858,6 @@ var GameEngine = class {
       angle: 0,
       hp: maxHp,
       maxHp,
-      cid: 0,
       size: c.size,
       speed,
       fireTimer: 0,
@@ -2940,8 +2902,6 @@ var GameEngine = class {
       this.foe = this.makeFoe();
       this.net.sendGame({ t: "hello", name: this.character.name, loadout: this.loadout });
     }
-    this.dmClock = 0;
-    this.setupBots();
   }
   makeFoe() {
     const c = getCharacter("raider");
@@ -2986,140 +2946,6 @@ var GameEngine = class {
       dashRecharge: 0,
       lastGadget: 0
     };
-  }
-  /** Build the offline bot squad for a human-vs-bots deathmatch. No-op for any
-   *  other mode. Each bot is a full Player avatar (own character / gun / skill /
-   *  gadgets) with a stable combatant id (cid). They are spread around the arena
-   *  and respawn on death like the human. */
-  setupBots() {
-    this.bots = [];
-    this.botChar = [];
-    this.botOutfit = [];
-    this.botSkill = [];
-    this.botGuns = [];
-    this.botGadgets = [];
-    this.botGadgetCd = [];
-    this.botName = [];
-    this.botColor = [];
-    this.scores = [];
-    this.botAi = [];
-    if (!this.isDM || this.mode !== "local") return;
-    const count = Math.max(1, RUNTIME.botCount | 0);
-    this.dmTarget = RUNTIME.killTarget | 0 || 15;
-    this.dmDuration = RUNTIME.dmDuration | 0 || 300;
-    this.scores = [0];
-    const chars = ["raider", "juggernaut", "phantom", "sentinel", "raider", "juggernaut"];
-    const gunsPool = [
-      "mac11",
-      "mp5",
-      "akm",
-      "sniper",
-      "shak50",
-      "gatling",
-      "fcar",
-      "sa1216"
-    ];
-    const skills = ["dash", "shield", "timewarp", "overdrive", "grenade"];
-    const gadgetsPool = [
-      "turret_mg",
-      "mine_explosive",
-      "mine_fire",
-      "healing_station",
-      "glue_grenade",
-      "fire_grenade"
-    ];
-    const names = ["\u963F\u5C14\u6CD5", "\u5E03\u96F7\u6CFD", "\u8770\u86C7", "\u5E7D\u7075", "\u94C1\u58C1", "\u730E\u624B"];
-    const colors = ["#f472b6", "#34d399", "#fbbf24", "#60a5fa", "#a78bfa", "#fb923c"];
-    const cx = this.worldW / 2;
-    const cy = this.worldH / 2;
-    const spawns = [
-      { x: cx, y: 220 },
-      { x: 360, y: 360 },
-      { x: this.worldW - 360, y: 360 },
-      { x: 300, y: cy },
-      { x: this.worldW - 300, y: cy },
-      { x: cx, y: this.worldH - 360 }
-    ];
-    const maxHp = RUNTIME.playerBaseHp > 0 ? RUNTIME.playerBaseHp : 250;
-    for (let i = 0; i < count; i++) {
-      const cid = i + 1;
-      const c = getCharacter(chars[i % chars.length]);
-      const o = getOutfit("tactical");
-      const g1 = getGun(gunsPool[(i * 3 + 1) % gunsPool.length]);
-      const g2 = getGun(gunsPool[(i * 5 + 4) % gunsPool.length]);
-      const guns = g1.id === g2.id ? [g1, getGun(gunsPool[(i + 2) % gunsPool.length])] : [g1, g2];
-      const skill = getSkill(skills[i % skills.length]);
-      const gi1 = i * 2 % gadgetsPool.length;
-      const gi2 = (gi1 + 3) % gadgetsPool.length;
-      const gadgets = [
-        getGadget(gadgetsPool[gi1]),
-        getGadget(gadgetsPool[gi2])
-      ].filter(Boolean);
-      this.ensureWeaponStates(guns);
-      const spawn = spawns[i % spawns.length];
-      const bot = {
-        x: spawn.x,
-        y: spawn.y,
-        vx: 0,
-        vy: 0,
-        angle: Math.atan2(cy - spawn.y, cx - spawn.x),
-        hp: maxHp,
-        maxHp,
-        size: c.size,
-        speed: c.speed * (1 + o.speedBonus),
-        fireTimer: 0,
-        iframes: 0,
-        flash: 0,
-        dashVx: 0,
-        dashVy: 0,
-        dashTime: 0,
-        shieldTime: 0,
-        overdriveTime: 0,
-        slamCd: 0,
-        t: 0,
-        swingTimer: 0,
-        swingDur: 0.22,
-        comboStep: 0,
-        comboTimer: 0,
-        lunge: 0,
-        bowCharge: 0,
-        bowDrawing: false,
-        shieldBlockTime: 0,
-        shieldHp: 0,
-        shieldCd: 0,
-        lastHitTime: 0,
-        cid,
-        gunIndex: 0,
-        skillCd: 0,
-        dashCharges: MAX_DASH_CHARGES,
-        dashRecharge: 0,
-        lastGadget: 0
-      };
-      this.bots.push(bot);
-      this.botChar.push(c);
-      this.botOutfit.push(o);
-      this.botSkill.push(skill);
-      this.botGuns.push(guns);
-      this.botGadgets.push(gadgets);
-      this.botGadgetCd.push(/* @__PURE__ */ new Map());
-      this.botName.push(names[i % names.length]);
-      this.botColor.push(colors[i % colors.length]);
-      this.scores.push(0);
-      this.botAi.push({
-        keys: /* @__PURE__ */ new Set(),
-        mx: cx,
-        my: cy,
-        firing: false,
-        skill: false,
-        gadget: -1,
-        reload: false,
-        switchW: false,
-        strafe: Math.random() < 0.5 ? 1 : -1,
-        strafeT: 0,
-        think: 0,
-        aimErr: (Math.random() - 0.5) * 0.18
-      });
-    }
   }
   /** Make sure every gun in the list has a WeaponState entry (host simulates foe guns too). */
   ensureWeaponStates(guns) {
@@ -3612,7 +3438,6 @@ var GameEngine = class {
       return;
     }
     this.updatePlayer(dt);
-    if (this.isDM) this.tickDeathmatch(dt);
     this.simulateWorld(dt);
     if (this.mode === "host") {
       this.tickRespawns(dt);
@@ -3625,7 +3450,7 @@ var GameEngine = class {
         this.snapAccum = 0;
         this.sendSnapshot();
       }
-      if (this.gameMode !== "biohazard" && !this.isDM && this.base.hp <= 0 && !this.gameOver)
+      if (this.gameMode !== "biohazard" && this.base.hp <= 0 && !this.gameOver)
         this.endGame("\u57FA\u5730\u5931\u5B88\uFF0C\u4F60\u8F93\u4E86\uFF01");
     }
     if (this.dashCharges < MAX_DASH_CHARGES) {
@@ -3728,10 +3553,8 @@ var GameEngine = class {
     p.x = Math.max(m, Math.min(this.worldW - m, p.x));
     p.y = Math.max(m, Math.min(this.worldH - m, p.y));
     this.collideWalls(p, p.size);
-    if (!this.isDM) {
-      this.collideBase(p, p.size);
-      this.collideBase(p, p.size, this.enemyBase);
-    }
+    this.collideBase(p, p.size);
+    this.collideBase(p, p.size, this.enemyBase);
     p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
     if (this.touchMode) {
       const tgt = this.findAimTarget(p);
@@ -3834,7 +3657,6 @@ var GameEngine = class {
           kind: "mortar",
           hit: /* @__PURE__ */ new Set(),
           owner: this.player === this.foe ? "foe" : "self",
-          ownerCid: this.player.cid ?? 0,
           trail: false,
           lobSx: bx,
           lobSy: by,
@@ -3867,7 +3689,6 @@ var GameEngine = class {
         kind: g.kind,
         hit: /* @__PURE__ */ new Set(),
         owner: this.player === this.foe ? "foe" : "self",
-        ownerCid: this.isDM ? this.player.cid ?? 0 : void 0,
         trail: g.kind === "tracer",
         bounces: g.bounces,
         ignoreWalls: g.ignoreWalls,
@@ -3914,21 +3735,8 @@ var GameEngine = class {
     };
   }
   // ------------------------------------------------------------- melee
-  /** The melee target of whoever is currently `this.player` (the attacker). */
+  /** The human opponent of whoever is currently `this.player` (the melee attacker). */
   meleeOpponent() {
-    if (this.isDM) {
-      let best = Infinity;
-      let target = null;
-      for (const c of this.combatants()) {
-        if (c === this.player || c.deadTimer && c.deadTimer > 0) continue;
-        const d = Math.hypot(c.x - this.player.x, c.y - this.player.y);
-        if (d < best) {
-          best = d;
-          target = c;
-        }
-      }
-      return target;
-    }
     if (!this.foe || !this.localPlayer) return null;
     if (this.player === this.foe) return this.localPlayer;
     return this.foe;
@@ -4002,7 +3810,7 @@ var GameEngine = class {
         if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
           const kx = Math.cos(ang) * g.knockback;
           const ky = Math.sin(ang) * g.knockback;
-          this.damagePlayerEntity(opp, dmg * dmgMult, void 0, kx, ky, this.player.cid);
+          this.damagePlayerEntity(opp, dmg * dmgMult, void 0, kx, ky);
           if (isSaber) {
             opp.electrifiedTime = 0.7;
             opp.electrifiedGlow = g.glow;
@@ -4060,7 +3868,7 @@ var GameEngine = class {
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
         const a = Math.atan2(opp.y - p.y, opp.x - p.x);
-        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, Math.cos(a) * 420, Math.sin(a) * 420, this.player.cid);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, Math.cos(a) * 420, Math.sin(a) * 420);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -4300,8 +4108,6 @@ var GameEngine = class {
       explosionRadius: 0,
       kind: g.kind,
       hit: /* @__PURE__ */ new Set(),
-      owner: this.player === this.foe ? "foe" : "self",
-      ownerCid: this.isDM ? this.player.cid ?? 0 : void 0,
       trail: true,
       weapon: g.id
     });
@@ -4464,7 +4270,7 @@ var GameEngine = class {
         b.y = (b.lobSy ?? b.y) + ((b.lobTy ?? b.y) - (b.lobSy ?? b.y)) * prog;
         b.z = (b.lobPeak ?? 0) * Math.sin(prog * Math.PI);
         if (prog >= 1) {
-          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
+          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, "mortar");
           continue;
         }
         next.push(b);
@@ -4507,10 +4313,10 @@ var GameEngine = class {
             b.bounced = true;
             this.spawnParticles(b.x, b.y, b.glow, 4, 100, 0.2);
           } else if (b.explosive && b.bounced) {
-            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
+            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
             dead = true;
           } else {
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, void 0, void 0, 0);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
             else this.spawnParticles(b.x, b.y, b.glow, 4, 120, 0.22);
             dead = true;
           }
@@ -4551,15 +4357,15 @@ var GameEngine = class {
           if (ddx * ddx + ddy * ddy <= rr * rr) {
             b.hit.add(e.id);
             if (b.explosive) {
-              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
+              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
               dead = true;
               break;
             }
             this.damageEnemy(
               e,
               b.damage,
-              0,
-              0,
+              Math.cos(Math.atan2(b.vy, b.vx)) * b.knockback,
+              Math.sin(Math.atan2(b.vy, b.vx)) * b.knockback,
               false,
               { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
             );
@@ -4571,70 +4377,37 @@ var GameEngine = class {
           }
         }
       }
-      if (this.isDM) {
-        if (!dead && b.ownerCid !== void 0) {
-          for (const c of this.combatants()) {
-            if (c.cid === b.ownerCid) continue;
-            if (c.deadTimer && c.deadTimer > 0) continue;
-            if (this.hitsPlayer(b, c)) {
-              const kx = 0;
-              const ky = 0;
-              this.damagePlayerEntity(c, b.damage, b, kx, ky, b.ownerCid);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.ownerCid, void 0, 0);
-              dead = true;
-              break;
-            }
-          }
-        }
-      } else {
-        if (!dead) {
-          if (b.owner === "foe") {
-            if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
-              this.damagePlayerEntity(this.player, b.damage, b);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
-              dead = true;
-            } else {
-              const bb = this.base;
-              const rr = bb.radius + b.size;
-              if ((bb.x - b.x) ** 2 + (bb.y - b.y) ** 2 <= rr * rr) {
-                this.damageBase(b.damage);
-                if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
-                dead = true;
-              }
-            }
-          } else {
-            const eb = this.enemyBase;
-            const rr = eb.radius + b.size;
-            if ((eb.x - b.x) ** 2 + (eb.y - b.y) ** 2 <= rr * rr) {
-              this.damageEnemyBase(b.damage);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
-              dead = true;
-            } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
-              this.damagePlayerEntity(this.foe, b.damage, b);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, void 0, void 0, 0);
-              dead = true;
-            }
-          }
-        }
-      }
       if (!dead) {
-        for (const d of this.deployables) {
-          if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station") continue;
-          if (d.hp <= 0) continue;
-          const sameOwner = this.isDM ? (b.ownerCid ?? -1) === (d.ownerCid ?? -2) : (b.owner ?? "") === (d.owner ?? "");
-          if (sameOwner) continue;
-          const rr = d.size + b.size;
-          if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr * rr) {
-            d.hp -= b.damage;
-            this.spawnParticles(b.x, b.y, d.color, 6, 120, 0.25);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.ownerCid, void 0, 0);
+        if (b.owner === "foe") {
+          if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
+            this.damagePlayerEntity(this.player, b.damage, b);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
             dead = true;
-            break;
+          } else {
+            const bb = this.base;
+            const rr = bb.radius + b.size;
+            if ((bb.x - b.x) ** 2 + (bb.y - b.y) ** 2 <= rr * rr) {
+              this.damageBase(b.damage);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+              dead = true;
+            }
+          }
+        } else {
+          const eb = this.enemyBase;
+          const rr = eb.radius + b.size;
+          if ((eb.x - b.x) ** 2 + (eb.y - b.y) ** 2 <= rr * rr) {
+            this.damageEnemyBase(b.damage);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            dead = true;
+          } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
+            this.damagePlayerEntity(this.foe, b.damage, b);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            dead = true;
           }
         }
       }
       if (dead && b.explosive && b.life <= 0 && b.hit.size === 0 && !b.bounced) {
-        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, void 0, void 0, 0);
+        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
       }
       if (!dead) next.push(b);
     }
@@ -4740,9 +4513,7 @@ var GameEngine = class {
       size: 16,
       targets: [],
       // multiplayer: remember who deployed this so it attacks the right side
-      owner: this.player === this.foe ? "foe" : "self",
-      // deathmatch: remember the combatant id so gadgets target the right side
-      ownerCid: this.isDM ? this.player.cid ?? 0 : void 0
+      owner: this.player === this.foe ? "foe" : "self"
     };
     switch (def.kind) {
       case "turret_mg":
@@ -4850,18 +4621,7 @@ var GameEngine = class {
         d.timer -= dt;
         let target = null;
         let bestD = d.radius;
-        if (this.isDM) {
-          const ownerCid = d.ownerCid ?? 0;
-          for (const c of this.combatants()) {
-            if ((c.cid ?? 0) === ownerCid) continue;
-            if (c.deadTimer && c.deadTimer > 0) continue;
-            const dist = Math.hypot(c.x - d.x, c.y - d.y);
-            if (dist < bestD) {
-              bestD = dist;
-              target = c;
-            }
-          }
-        } else if (this.mode === "local") {
+        if (this.mode === "local") {
           for (const e of this.enemies) {
             const dist = Math.hypot(e.x - d.x, e.y - d.y);
             if (dist < bestD) {
@@ -4903,7 +4663,6 @@ var GameEngine = class {
                 kind: "bullet",
                 hit: /* @__PURE__ */ new Set(),
                 owner: d.owner,
-                ownerCid: d.ownerCid,
                 weapon: "turret_mg"
               });
               this.spawnParticles(d.x + Math.cos(d.angle) * 14, d.y + Math.sin(d.angle) * 14, d.color, 2, 80, 0.15);
@@ -4928,7 +4687,6 @@ var GameEngine = class {
                 kind: "grenade",
                 hit: /* @__PURE__ */ new Set(),
                 owner: d.owner,
-                ownerCid: d.ownerCid,
                 weapon: "turret_cannon"
               });
             }
@@ -4939,15 +4697,7 @@ var GameEngine = class {
             d.hp -= 75 * dt;
           }
         }
-        if (this.isDM) {
-          const ownerCid = d.ownerCid ?? 0;
-          for (const c of this.combatants()) {
-            if ((c.cid ?? 0) === ownerCid) continue;
-            if (Math.hypot(c.x - d.x, c.y - d.y) < c.size + d.size) {
-              d.hp -= 75 * dt;
-            }
-          }
-        } else if (this.mode !== "local" && d.owner) {
+        if (this.mode !== "local" && d.owner) {
           const foe = d.owner === "foe" ? this.player : this.foe;
           if (foe && Math.hypot(foe.x - d.x, foe.y - d.y) < foe.size + d.size) {
             d.hp -= 75 * dt;
@@ -4961,73 +4711,50 @@ var GameEngine = class {
       }
       if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
         if (d.armed <= 0) {
-          let triggered = false;
           for (const e of this.enemies) {
             if (Math.hypot(e.x - d.x, e.y - d.y) < e.size + 24) {
-              triggered = true;
+              if (d.kind === "mine_explosive") {
+                this.explode(d.x, d.y, d.radius, 160, d.color);
+              } else if (d.kind === "mine_poison") {
+                this.effects.push({
+                  type: "poisoncloud",
+                  x: d.x,
+                  y: d.y,
+                  t: 0,
+                  duration: 5,
+                  radius: d.radius,
+                  color: d.color,
+                  dps: 60,
+                  slow: 0.5,
+                  tickT: 0
+                });
+              } else {
+                this.effects.push({
+                  type: "firefield",
+                  x: d.x,
+                  y: d.y,
+                  t: 0,
+                  duration: 5,
+                  radius: d.radius,
+                  color: d.color,
+                  dps: 90,
+                  tickT: 0
+                });
+              }
+              d.life = 0;
               break;
             }
-          }
-          if (!triggered && this.isDM) {
-            const ownerCid = d.ownerCid ?? 0;
-            for (const c of this.combatants()) {
-              if ((c.cid ?? 0) === ownerCid) continue;
-              if (Math.hypot(c.x - d.x, c.y - d.y) < c.size + 24) {
-                triggered = true;
-                break;
-              }
-            }
-          }
-          if (triggered) {
-            if (d.kind === "mine_explosive") {
-              this.explode(d.x, d.y, d.radius, 160, d.color, d.ownerCid);
-            } else if (d.kind === "mine_poison") {
-              this.effects.push({
-                type: "poisoncloud",
-                x: d.x,
-                y: d.y,
-                t: 0,
-                duration: 5,
-                radius: d.radius,
-                color: d.color,
-                dps: 60,
-                slow: 0.5,
-                tickT: 0
-              });
-            } else {
-              this.effects.push({
-                type: "firefield",
-                x: d.x,
-                y: d.y,
-                t: 0,
-                duration: 5,
-                radius: d.radius,
-                color: d.color,
-                dps: 90,
-                tickT: 0
-              });
-            }
-            d.life = 0;
           }
         }
         if (d.life > 0) next.push(d);
         continue;
       }
       if (d.kind === "healing_station") {
-        if (this.isDM) {
-          const owner = this.combatants().find((c) => (c.cid ?? 0) === (d.ownerCid ?? 0));
-          if (owner && owner.hp < owner.maxHp) {
-            owner.hp = Math.min(owner.maxHp, owner.hp + 45 * dt);
-            if (Math.random() < 0.3)
-              this.spawnParticles(owner.x, owner.y, "#4ade80", 1, 50, 0.3);
-          }
-        } else {
-          const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
-          if (dist < d.radius + this.player.size && this.player.hp < this.player.maxHp) {
-            this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45 * dt);
-            if (Math.random() < 0.3)
-              this.spawnParticles(this.player.x, this.player.y, "#4ade80", 1, 50, 0.3);
-          }
+        const dist = Math.hypot(this.player.x - d.x, this.player.y - d.y);
+        if (dist < d.radius + this.player.size && this.player.hp < this.player.maxHp) {
+          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 45 * dt);
+          if (Math.random() < 0.3)
+            this.spawnParticles(this.player.x, this.player.y, "#4ade80", 1, 50, 0.3);
         }
         if (d.life > 0 && d.hp > 0) next.push(d);
         continue;
@@ -5075,19 +4802,6 @@ var GameEngine = class {
           continue;
         }
       }
-      let hitDep = false;
-      for (const d of this.deployables) {
-        if (d.kind !== "turret_mg" && d.kind !== "turret_cannon" && d.kind !== "healing_station") continue;
-        if (d.hp <= 0) continue;
-        const rr2 = d.size + b.size;
-        if ((d.x - b.x) ** 2 + (d.y - b.y) ** 2 <= rr2 * rr2) {
-          d.hp -= b.damage;
-          this.spawnParticles(b.x, b.y, d.color, 6, 120, 0.25);
-          hitDep = true;
-          break;
-        }
-      }
-      if (hitDep) continue;
       next.push(b);
     }
     this.enemyBullets = next;
@@ -5287,19 +5001,6 @@ var GameEngine = class {
               this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true);
               e.burnT = Math.max(e.burnT, 1);
               e.burnDps = Math.max(e.burnDps, 20);
-            }
-          }
-        }
-        if (this.isDM) {
-          for (const c of this.combatants()) {
-            if (c.deadTimer && c.deadTimer > 0) continue;
-            if (Math.hypot(c.x - fx.x, c.y - fx.y) < fx.radius + c.size) {
-              if (fx.type === "poisoncloud") {
-                this.damagePlayerEntity(c, (fx.dps ?? 20) * 0.25 * 0.8, void 0, 0, 0, void 0, true);
-                c.slowT = Math.max(c.slowT ?? 0, 0.3);
-              } else {
-                this.damagePlayerEntity(c, (fx.dps ?? 20) * 0.25, void 0, 0, 0, void 0, true);
-              }
             }
           }
         }
@@ -5505,7 +5206,7 @@ var GameEngine = class {
   }
   damageBase(dmg) {
     if (this.base.hp <= 0) return;
-    if (this.gameMode === "biohazard" || this.isDM) return;
+    if (this.gameMode === "biohazard") return;
     this.base.hp -= dmg;
     this.base.flash = 1;
     this.shake = Math.min(12, this.shake + dmg * 0.25);
@@ -5526,7 +5227,6 @@ var GameEngine = class {
   }
   damageEnemyBase(dmg) {
     if (this.enemyBase.hp <= 0) return;
-    if (this.isDM) return;
     dmg *= RUNTIME.playerDamageMult;
     this.enemyBase.hp -= dmg;
     this.enemyBase.flash = 1;
@@ -5563,12 +5263,10 @@ var GameEngine = class {
     const rr = p.size + b.size;
     return (p.x - b.x) ** 2 + (p.y - b.y) ** 2 <= rr * rr;
   }
-  /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer.
-   *  `attackerCid` (deathmatch only) credits the kill to that combatant.
-   *  `ignoreIframes` lets damage-over-time (fields) bypass i-frames. */
-  damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0, attackerCid, ignoreIframes = false) {
+  /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
+  damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0) {
     if (p.deadTimer && p.deadTimer > 0) return;
-    if (!ignoreIframes && (p.iframes > 0 || p.shieldTime > 0)) {
+    if (p.iframes > 0 || p.shieldTime > 0) {
       if (p.shieldTime > 0) this.spawnParticles(p.x, p.y, "#60a5fa", 4, 90, 0.3);
       return;
     }
@@ -5586,7 +5284,7 @@ var GameEngine = class {
     }
     p.hp -= dmg;
     p.flash = 1;
-    p.iframes = 0.45;
+    if (!this.isDM) p.iframes = 0.45;
     p.lastHitTime = this.time;
     sound.hurt();
     this.shake = Math.min(16, this.shake + dmg * 0.4);
@@ -5605,20 +5303,7 @@ var GameEngine = class {
         this.beamActive = false;
         this.flameActive = false;
       }
-      if (this.isDM) {
-        const killer = attackerCid;
-        if (killer !== void 0 && killer !== p.cid) {
-          this.scores[killer] = (this.scores[killer] ?? 0) + 1;
-          this.score = this.scores[0] ?? 0;
-          this.kills = this.scores[0] ?? 0;
-          this.banner = { text: `\u2694 ${this.nameOf(killer)} \u51FB\u6740 ${this.nameOf(p.cid ?? 0)}\uFF01`, t: 1.6 };
-          this.checkDeathmatchEnd();
-        } else if (p.cid === 0) {
-          this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${RESPAWN_TIME} \u79D2\u540E\u590D\u6D3B`, t: 1.6 };
-        } else {
-          this.banner = { text: `${this.nameOf(p.cid ?? 0)} \u9635\u4EA1\uFF0C\u590D\u6D3B\u4E2D\u2026`, t: 1.6 };
-        }
-      } else if (p === this.foe) {
+      if (p === this.foe) {
         this.kills += 1;
         this.score += 250;
         this.banner = { text: `\u51FB\u6740 ${this.peerName || "\u5BF9\u624B"}\uFF01`, t: 1.6 };
@@ -5966,262 +5651,10 @@ var GameEngine = class {
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.tickRespawns(dt);
-    if (this.matchLive && !this.isDM) this.updateWaves(dt);
+    if (this.matchLive) this.updateWaves(dt);
     if (this.mode !== "local" && this.matchLive && !this.gameOver && this.time >= MATCH_DURATION) {
       this.endGame("\u65F6\u95F4\u5230\uFF01");
     }
-  }
-  // ============================== DEATHMATCH (human vs bots)
-  /** Advance the offline deathmatch: drive every bot, respawn the downed, and
-   *  end the match on a score/time limit. Called once per frame in local mode. */
-  tickDeathmatch(dt) {
-    if (this.gameOver) return;
-    this.dmClock += dt;
-    for (let i = 0; i < this.bots.length; i++) this.simulateBot(i, dt);
-    for (let i = 0; i < this.bots.length; i++) {
-      const b = this.bots[i];
-      if (b.deadTimer && b.deadTimer > 0) {
-        b.deadTimer -= dt;
-        if (b.deadTimer <= 0) {
-          b.deadTimer = 0;
-          b.hp = b.maxHp;
-          const sp = this.botSpawn(i);
-          b.x = sp.x;
-          b.y = sp.y;
-          b.vx = 0;
-          b.vy = 0;
-          b.iframes = 2;
-          b.dashVx = 0;
-          b.dashVy = 0;
-          b.dashTime = 0;
-          this.spawnParticles(b.x, b.y, this.botColor[i], 24, 200, 0.6);
-        }
-      }
-    }
-    if (!this.gameOver && this.dmClock >= this.dmDuration) {
-      let best = -1;
-      let bestCid = 0;
-      for (let c = 0; c < this.scores.length; c++) {
-        if (this.scores[c] > best) {
-          best = this.scores[c];
-          bestCid = c;
-        }
-      }
-      this.endGame(`\u65F6\u95F4\u5230\uFF01${this.nameOf(bestCid)} \u4EE5 ${best} \u5206\u83B7\u80DC`);
-    }
-  }
-  botSpawn(i) {
-    const cx = this.worldW / 2;
-    const cy = this.worldH / 2;
-    const spawns = [
-      { x: cx, y: 220 },
-      { x: 360, y: 360 },
-      { x: this.worldW - 360, y: 360 },
-      { x: 300, y: cy },
-      { x: this.worldW - 300, y: cy },
-      { x: cx, y: this.worldH - 360 }
-    ];
-    return spawns[i % spawns.length];
-  }
-  nameOf(cid) {
-    if (cid <= 0) return "\u4F60";
-    return this.botName[cid - 1] ?? `Bot${cid}`;
-  }
-  /** End the deathmatch if any combatant reached the kill target. */
-  checkDeathmatchEnd() {
-    if (this.gameOver) return;
-    for (let c = 0; c < this.scores.length; c++) {
-      if (this.scores[c] >= this.dmTarget) {
-        this.endGame(`${this.nameOf(c)} \u8FBE\u6210 ${this.dmTarget} \u6740\uFF0C\u83B7\u80DC\uFF01`);
-        return;
-      }
-    }
-  }
-  /** Simple wall raycast so bots don't fire through cover. */
-  hasLineOfSight(x0, y0, x1, y1) {
-    const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 24);
-    for (let s = 1; s < steps; s++) {
-      const t = s / steps;
-      if (this.pointInWall(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 6)) return false;
-    }
-    return true;
-  }
-  /** Decide a bot's intent for this frame (movement keys, aim, fire, one-shots). */
-  thinkBot(i, dt) {
-    const bot = this.bots[i];
-    const ai = this.botAi[i];
-    const intent = {
-      keys: /* @__PURE__ */ new Set(),
-      mx: ai.mx,
-      my: ai.my,
-      firing: false,
-      skill: false,
-      gadget: -1,
-      reload: false,
-      switchW: false
-    };
-    if (!bot || bot.deadTimer && bot.deadTimer > 0) return intent;
-    let target = null;
-    let best = Infinity;
-    for (const c of this.combatants()) {
-      if (c === bot || c.deadTimer && c.deadTimer > 0) continue;
-      const d = Math.hypot(c.x - bot.x, c.y - bot.y);
-      if (d < best) {
-        best = d;
-        target = c;
-      }
-    }
-    if (!target) return intent;
-    const dx = target.x - bot.x;
-    const dy = target.y - bot.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    const nx = dx / dist;
-    const ny = dy / dist;
-    ai.think -= dt;
-    if (ai.think <= 0) {
-      ai.think = 0.12;
-      ai.strafeT -= 0.12;
-      if (ai.strafeT <= 0) {
-        ai.strafeT = 0.8 + Math.random() * 1.2;
-        ai.strafe = Math.random() < 0.5 ? 1 : -1;
-      }
-      ai.aimErr = (Math.random() - 0.5) * 0.18;
-      ai.gadget = -1;
-      const gs = this.botGadgets[i];
-      for (let k = 0; k < gs.length; k++) {
-        const cd = this.botGadgetCd[i].get(gs[k].id) ?? 0;
-        if (cd <= 0 && Math.random() < 0.25) {
-          ai.gadget = k;
-          break;
-        }
-      }
-      ai.skill = (bot.skillCd ?? 0) <= 0 && Math.random() < 0.06;
-    }
-    const pref = 320;
-    const minR = 170;
-    let mvx = 0;
-    let mvy = 0;
-    if (dist > pref * 1.25) {
-      mvx = nx;
-      mvy = ny;
-    } else if (dist < minR) {
-      mvx = -nx;
-      mvy = -ny;
-    } else {
-      mvx = -ny * ai.strafe;
-      mvy = nx * ai.strafe;
-    }
-    for (const w of this.walls) {
-      if (w.glue || w.invisible) continue;
-      const cxw = w.x + w.w / 2;
-      const cyw = w.y + w.h / 2;
-      const ddx = bot.x - cxw;
-      const ddy = bot.y - cyw;
-      const d = Math.hypot(ddx, ddy);
-      const reach = Math.max(w.w, w.h) / 2 + 120;
-      if (d < reach && d > 1e-3) {
-        const f = (reach - d) / reach;
-        mvx += ddx / d * f * 1.5;
-        mvy += ddy / d * f * 1.5;
-      }
-    }
-    const ml = Math.hypot(mvx, mvy) || 1;
-    mvx /= ml;
-    mvy /= ml;
-    if (mvy < -0.35) intent.keys.add("KeyW");
-    else if (mvy > 0.35) intent.keys.add("KeyS");
-    if (mvx < -0.35) intent.keys.add("KeyA");
-    else if (mvx > 0.35) intent.keys.add("KeyD");
-    const g = this.botGuns[i][bot.gunIndex ?? 0] ?? this.botGuns[i][0];
-    const bsp = g.bulletSpeed ?? 600;
-    const tLead = Math.min(0.4, dist / bsp);
-    const tx = target.x + (target.vx ?? 0) * tLead;
-    const ty = target.y + (target.vy ?? 0) * tLead;
-    const aimAng = Math.atan2(ty - bot.y, tx - bot.x) + ai.aimErr;
-    intent.mx = bot.x + Math.cos(aimAng) * 100;
-    intent.my = bot.y + Math.sin(aimAng) * 100;
-    const facing = Math.abs(this.angleDiff(aimAng, Math.atan2(dy, dx)));
-    const range = g.range ?? 9999;
-    if (dist < range && facing < 0.5 && this.hasLineOfSight(bot.x, bot.y, target.x, target.y)) {
-      intent.firing = true;
-    }
-    intent.skill = ai.skill;
-    intent.gadget = ai.gadget;
-    ai.mx = intent.mx;
-    ai.my = intent.my;
-    return intent;
-  }
-  /** Run one bot's simulation by swapping the engine's single-player context
-   *  (the same trick the authoritative server uses for peers). */
-  simulateBot(i, dt) {
-    const bot = this.bots[i];
-    if (!bot || bot.deadTimer && bot.deadTimer > 0) return;
-    const intent = this.thinkBot(i, dt);
-    const sp = this.player;
-    const sg = this.gunIndex;
-    const sk = this.keys;
-    const sm = this.mouse;
-    const sf = this.firing;
-    const sGuns = this.guns;
-    const sGadgets = this.gadgets;
-    const sGadgetCd = this.gadgetCd;
-    const sSkillCd = this.skillCd;
-    const sDash = this.dashCharges;
-    const sDashR = this.dashRecharge;
-    const sLastG = this.lastGadget;
-    const sSemi = this.semiAutoLatch;
-    const svmx = this.virtualMove.x;
-    const svmy = this.virtualMove.y;
-    const sChar = this.character;
-    const sOut = this.outfit;
-    const sSkillDef = this.skill;
-    this.player = bot;
-    this.guns = this.botGuns[i];
-    this.gunIndex = Math.min(bot.gunIndex ?? 0, this.guns.length - 1);
-    this.keys = intent.keys;
-    this.mouse = { x: intent.mx, y: intent.my };
-    this.virtualMove.x = 0;
-    this.virtualMove.y = 0;
-    this.firing = intent.firing;
-    this.skillCd = bot.skillCd ?? 0;
-    this.dashCharges = bot.dashCharges ?? MAX_DASH_CHARGES;
-    this.dashRecharge = bot.dashRecharge ?? 0;
-    this.lastGadget = bot.lastGadget ?? 0;
-    this.gadgets = this.botGadgets[i];
-    this.gadgetCd = this.botGadgetCd[i];
-    this.semiAutoLatch = false;
-    this.character = this.botChar[i] ?? this.character;
-    this.outfit = this.botOutfit[i] ?? this.outfit;
-    this.skill = this.botSkill[i];
-    for (const [k, v] of this.gadgetCd) if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
-    this.updatePlayer(dt);
-    if (intent.switchW) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
-    if (intent.skill) this.activateSkill();
-    if (intent.reload) this.reloadCurrent();
-    if (intent.gadget >= 0) this.deployGadget(intent.gadget, this.mouse.x, this.mouse.y);
-    bot.gunIndex = this.gunIndex;
-    bot.skillCd = this.skillCd;
-    bot.dashCharges = this.dashCharges;
-    bot.dashRecharge = this.dashRecharge;
-    bot.lastGadget = this.lastGadget;
-    this.player = sp;
-    this.guns = sGuns;
-    this.gunIndex = sg;
-    this.keys = sk;
-    this.mouse = sm;
-    this.firing = sf;
-    this.gadgets = sGadgets;
-    this.gadgetCd = sGadgetCd;
-    this.skillCd = sSkillCd;
-    this.dashCharges = sDash;
-    this.dashRecharge = sDashR;
-    this.lastGadget = sLastG;
-    this.semiAutoLatch = sSemi;
-    this.virtualMove.x = svmx;
-    this.virtualMove.y = svmy;
-    this.character = sChar;
-    this.outfit = sOut;
-    this.skill = sSkillDef;
   }
   /**
    * Authoritative fixed-step update driven by the Node server. Both peers are
@@ -6554,7 +5987,7 @@ var GameEngine = class {
     });
     this.shake = Math.min(14, this.shake + 5);
   }
-  explode(x, y, radius, damage, color, srcCid, srcWpn, knock = 260) {
+  explode(x, y, radius, damage, color, srcWpn) {
     this.effects.push({
       type: "explosion",
       x,
@@ -6586,30 +6019,11 @@ var GameEngine = class {
           this.damageEnemy(
             e,
             damage * (0.5 + fall * 0.5),
-            Math.cos(a) * knock * fall,
-            Math.sin(a) * knock * fall,
+            Math.cos(a) * 260 * fall,
+            Math.sin(a) * 260 * fall,
             false,
             { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) }
           );
-        }
-      }
-      if (this.isDM) {
-        for (const c of this.combatants()) {
-          if (c.deadTimer && c.deadTimer > 0) continue;
-          if (srcCid !== void 0 && c.cid === srcCid) continue;
-          const d = Math.hypot(c.x - x, c.y - y);
-          if (d < radius + c.size) {
-            const fall = 1 - d / (radius + c.size);
-            const a = Math.atan2(c.y - y, c.x - x);
-            this.damagePlayerEntity(
-              c,
-              damage * (0.5 + fall * 0.5),
-              void 0,
-              Math.cos(a) * knock * fall,
-              Math.sin(a) * knock * fall,
-              srcCid
-            );
-          }
         }
       }
     }
@@ -7024,10 +6438,6 @@ var GameEngine = class {
     if (!immediate && now - this.lastHudEmit < 50) return;
     this.lastHudEmit = now;
     void immediate;
-    if (this.isDM) {
-      this.score = this.scores[0] ?? 0;
-      this.kills = this.scores[0] ?? 0;
-    }
     const p = this.player;
     const s = this.skill;
     const g = this.gun;
@@ -7106,16 +6516,7 @@ var GameEngine = class {
       shieldCdPct: p.shieldCd > 0 ? 1 - p.shieldCd / (this.gun.shieldRechargeTime ?? 8) : 1,
       hitFlash: p.flash,
       isNet: this.mode !== "local",
-      matchTimeLeft: this.mode === "local" ? null : Math.max(0, MATCH_DURATION - (this.mode === "guest" ? this.lastSnapTime : this.time)),
-      dmPlayers: this.isDM ? this.combatants().map((c) => ({
-        name: this.nameOf(c.cid ?? 0),
-        score: this.scores[c.cid ?? 0] ?? 0,
-        isSelf: (c.cid ?? 0) === 0,
-        color: (c.cid ?? 0) === 0 ? "#38bdf8" : this.botColor[(c.cid ?? 1) - 1] ?? "#ffffff",
-        alive: !(c.deadTimer && c.deadTimer > 0)
-      })) : void 0,
-      killTarget: this.isDM ? this.dmTarget : void 0,
-      dmTimeLeft: this.isDM ? Math.max(0, Math.ceil(this.dmDuration - this.dmClock)) : null
+      matchTimeLeft: this.mode === "local" ? null : Math.max(0, MATCH_DURATION - (this.mode === "guest" ? this.lastSnapTime : this.time))
     };
     this.onHud(hud);
   }
@@ -7141,7 +6542,7 @@ var GameEngine = class {
     ctx.translate(-this.camX, -this.camY);
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    if (!this.isDM && this.gameMode !== "biohazard") {
+    if (this.gameMode !== "biohazard") {
       this.drawBase(ctx, this.enemyBase, false);
       this.drawBase(ctx, this.base, true);
     }
@@ -7174,27 +6575,6 @@ var GameEngine = class {
         this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
       }
     }
-    for (let i = 0; i < this.bots.length; i++) {
-      const b = this.bots[i];
-      if (b.deadTimer && b.deadTimer > 0) continue;
-      this.drawNetCharacter(
-        ctx,
-        b.x,
-        b.y,
-        b.angle,
-        this.botChar[i]?.id ?? "raider",
-        this.botOutfit[i]?.id ?? "tactical",
-        b.gunIndex ?? 0,
-        this.botGuns[i],
-        this.botName[i],
-        b.hp / b.maxHp,
-        this.time,
-        b.size
-      );
-      if (b.electrifiedTime && b.electrifiedTime > 0) {
-        this.drawElectricArcs(ctx, b.x, b.y, b.size, b.electrifiedGlow ?? "#38bdf8", this.time);
-      }
-    }
     this.drawAimPreview(ctx);
     if (this.gun.aimIndicator) this.drawLauncherIndicator(ctx);
     this.drawBullets(ctx);
@@ -7218,14 +6598,13 @@ var GameEngine = class {
       [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
       [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"]
     ];
-    if (!this.isDM)
-      for (const [bx, by, col] of blobs) {
-        const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
-        rg.addColorStop(0, rgba(col, 0.18));
-        rg.addColorStop(1, rgba(col, 0));
-        ctx.fillStyle = rg;
-        ctx.fillRect(0, 0, this.W, this.H);
-      }
+    for (const [bx, by, col] of blobs) {
+      const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
+      rg.addColorStop(0, rgba(col, 0.18));
+      rg.addColorStop(1, rgba(col, 0));
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
     if (theme.style === "city") {
       ctx.save();
       ctx.translate(-this.camX, -this.camY);

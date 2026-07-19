@@ -15,7 +15,7 @@ const initialHud: HudState = {
   score: 0,
   wave: 0,
   enemiesLeft: 0,
-  gunId: "mac11",
+  gunId: "smg",
   guns: [],
   gunIndex: 0,
   weaponClass: "ranged",
@@ -45,7 +45,6 @@ const initialHud: HudState = {
   gameOverReason: "",
   paused: false,
   connecting: false,
-  reconnecting: false,
   banner: null,
   kills: 0,
   gold: 0,
@@ -55,8 +54,6 @@ const initialHud: HudState = {
   shieldActive: false,
   shieldCdPct: 1,
   hitFlash: 0,
-  isNet: false,
-  matchTimeLeft: null,
 };
 
 /** Small canvas that renders a weapon's vector silhouette icon. */
@@ -134,23 +131,10 @@ export default function GameScreen({
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>(initialHud);
   const [muted, setMuted] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
   const isTouch = useMemo(() => isTouchDevice(), []);
-
-  // keep fullscreen button state in sync with the browser (e.g. Esc exits FS)
-  useEffect(() => {
-    const onFs = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
-  }, []);
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.();
-  };
 
   // ---- screen shake on hit ----
   const [shake, setShake] = useState({ x: 0, y: 0 });
-  const [peerLeft, setPeerLeft] = useState(false);
   const lastHitFlash = useRef(0);
   const shakeRaf = useRef(0);
   const shakeTime = useRef(0);
@@ -182,22 +166,8 @@ export default function GameScreen({
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    // In PvP the server is authoritative: BOTH clients are thin (send input +
-    // mirror the server snapshot). We reuse the existing guest code path and
-    // just tell the engine which pid it is so it mirrors the right player.
-    const online = !!net;
-    const effectiveMode: NetMode = online ? "guest" : mode;
-    const engine = new GameEngine(canvas, loadout, setHud, {
-      mode: effectiveMode,
-      net,
-      selfPid: online ? net!.youPid : undefined,
-      peerPid: online ? (net!.youPid === 1 ? 2 : 1) : undefined,
-    });
+    const engine = new GameEngine(canvas, loadout, setHud, { mode, net });
     engineRef.current = engine;
-    // Both networked peers are thin input-senders + snapshot mirrors: the
-    // authoritative server simulates the whole world, so the client never runs
-    // a local simulation (keeps it light and in lock-step with the server).
-    if (online) engine.setAuthoritative(true);
     // NOTE: enable touch mode HERE (not from MobileControls' own effect). Child
     // effects run before the parent effect that creates the engine, so at that
     // point engineRef.current is still null and setTouchMode would silently no-op.
@@ -214,21 +184,6 @@ export default function GameScreen({
 
   const character = getCharacter(loadout.characterId);
   const outfit = getOutfit(loadout.outfitId);
-
-  // Keep the "opponent reconnecting" overlay in sync with transient disconnects,
-  // and surface a permanent leave so the player isn't stuck on a frozen screen.
-  useEffect(() => {
-    if (!net) return;
-    const gone = () => engineRef.current?.setReconnecting(true);
-    const back = () => engineRef.current?.setReconnecting(false);
-    const left = () => {
-      engineRef.current?.setReconnecting(false);
-      setPeerLeft(true);
-    };
-    net.onPeerGone(gone);
-    net.onPeerBack(back);
-    net.onPeerLeft(left);
-  }, [net]);
 
   const hpPct = hud.maxHp ? hud.hp / hud.maxHp : 0;
   const hpColor =
@@ -255,35 +210,8 @@ export default function GameScreen({
 
       {/* ============ TOP BAR ============ */}
       <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-start justify-between p-3 sm:p-4">
-        {/* Base HP (left) + Enemy base HP — hidden in biohazard/deathmatch */}
-        {hud.mode === "deathmatch" ? (
-          <div className="flex flex-col items-start gap-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-fuchsia-200/90">
-              <span>🤖</span>
-              <span>人机对战</span>
-            </div>
-            <div className="mt-0.5 flex flex-col gap-0.5 rounded-lg bg-black/45 px-2 py-1 backdrop-blur">
-              {hud.dmPlayers?.map((p, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "flex items-center gap-1.5 text-[11px]",
-                    p.isSelf ? "font-bold text-white" : "text-slate-300",
-                    !p.alive && "opacity-40"
-                  )}
-                >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: p.color, boxShadow: `0 0 6px ${p.color}` }}
-                  />
-                  <span className="w-12 truncate">{p.name}</span>
-                  <span className="ml-auto tabular-nums">{p.score}</span>
-                  {!p.alive && <span className="text-[9px]">💀</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : hud.mode === "biohazard" ? (
+        {/* Base HP (left) + Enemy base HP — hidden in biohazard */}
+        {hud.mode === "biohazard" ? (
           <div className="flex flex-col items-start gap-1">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-lime-200/90">
               <span>☣</span>
@@ -335,71 +263,35 @@ export default function GameScreen({
           </div>
         )}
 
-        {/* Center: DM target+timer, OR online match timer, OR single-player wave */}
-        {hud.mode === "deathmatch" ? (
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
-              <span className="text-xs text-slate-400">目标</span>
-              <span className="text-lg font-bold text-fuchsia-300">
-                {hud.killTarget ?? 15} 杀
-              </span>
-              <span className="ml-2 text-xs text-slate-400">剩余</span>
-              <span className="text-lg font-bold text-amber-300">
-                {hud.dmTimeLeft != null ? `${hud.dmTimeLeft}s` : "--"}
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-400">
-              你的得分 <span className="font-bold text-white">{hud.score}</span>
-            </div>
+        {/* Center: wave + enemies */}
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
+            <span className="text-xs text-slate-400">波次</span>
+            <span className="text-lg font-bold text-white">{hud.wave}</span>
+            <span className="ml-2 text-xs text-slate-400">敌人</span>
+            <span className="text-lg font-bold text-rose-300">{hud.enemiesLeft}</span>
           </div>
-        ) : hud.isNet ? (
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
-              <span className="text-xs text-slate-400">剩余</span>
-              <span className="text-lg font-bold text-amber-300">
-                {hud.matchTimeLeft != null ? `${Math.ceil(hud.matchTimeLeft)}s` : "--"}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
-              <span className="text-xs text-slate-400">波次</span>
-              <span className="text-lg font-bold text-white">{hud.wave}</span>
-              <span className="ml-2 text-xs text-slate-400">敌人</span>
-              <span className="text-lg font-bold text-rose-300">{hud.enemiesLeft}</span>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Right: score + gold + controls */}
         <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <div className="rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
               <span className="text-xs text-slate-400">分数 </span>
               <span className="text-lg font-bold text-amber-300">
                 {hud.score.toLocaleString()}
               </span>
             </div>
-            {hud.mode !== "deathmatch" && (
-              <div className="flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 backdrop-blur">
-                <span className="text-sm">🪙</span>
-                <span className="text-sm font-bold text-yellow-400">{hud.gold}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 backdrop-blur">
+              <span className="text-sm">🪙</span>
+              <span className="text-sm font-bold text-yellow-400">{hud.gold}</span>
+            </div>
             <button
               onClick={toggleMute}
               className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
               title={muted ? "开启声音" : "静音"}
             >
               {muted ? "🔇" : "🔊"}
-            </button>
-            <button
-              onClick={toggleFullscreen}
-              className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
-              title={fullscreen ? "退出全屏" : "全屏"}
-            >
-              {fullscreen ? "🗗" : "⛶"}
             </button>
             <button
               onClick={onExit}
@@ -437,23 +329,17 @@ export default function GameScreen({
         {hud.gadgets.map((gd, i) => (
           <button
             key={gd.id}
-            onClick={() => engineRef.current?.selectGadget(i)}
+            onClick={() => engineRef.current?.deployGadget(i)}
             className={cn(
               "relative flex h-12 w-12 flex-col items-center justify-center overflow-hidden rounded-xl border-2 bg-black/55 backdrop-blur transition-transform active:scale-95",
-              gd.selected
-                ? "border-white ring-2 ring-white/80 scale-105"
-                : gd.ready
+              gd.ready
                 ? "border-white/30 hover:border-white/50"
                 : "border-white/10 opacity-60"
             )}
             style={{
-              boxShadow: gd.selected
-                ? `0 0 16px ${gd.color}cc, 0 0 4px #fff`
-                : gd.ready
-                ? `0 0 10px ${gd.color}55`
-                : "none",
+              boxShadow: gd.ready ? `0 0 10px ${gd.color}55` : "none",
             }}
-            title={`${gd.name} · ${gd.deployed}/${gd.maxStack} · 点击选中后左键部署`}
+            title={`${gd.name} (F${i + 1}) · ${gd.deployed}/${gd.maxStack}`}
           >
             {!gd.ready && (
               <div
@@ -467,11 +353,6 @@ export default function GameScreen({
             <span className="relative text-[8px] font-bold text-slate-300">
               {i + 1}
             </span>
-            {gd.selected && (
-              <span className="absolute left-0.5 top-0.5 rounded-full bg-white px-1 text-[7px] font-bold text-slate-900">
-                已选
-              </span>
-            )}
             {gd.deployed > 0 && (
               <span className="absolute right-0.5 top-0.5 rounded-full bg-black/70 px-1 text-[8px] font-bold text-white">
                 {gd.deployed}
@@ -637,37 +518,6 @@ export default function GameScreen({
       {/* ============ MOBILE CONTROLS (touch only) ============ */}
       {isTouch && <MobileControls engineRef={engineRef} />}
 
-      {/* ============ OPPONENT LEFT (permanent) ============ */}
-      {peerLeft && !hud.gameOver && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3">
-            <p className="text-lg font-bold text-rose-200">对手已离开对局</p>
-            <p className="text-sm text-slate-400">本局已结束</p>
-            <button
-              onClick={onExit}
-              className="mt-1 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-6 py-2 font-bold text-slate-900 transition-transform hover:scale-105"
-            >
-              返回装配
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ============ RECONNECTING (opponent transiently dropped) ============ */}
-      {hud.reconnecting && !hud.gameOver && !hud.paused && !hud.connecting && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-amber-300/30 border-t-amber-300" />
-            <p className="text-lg font-bold text-slate-100">
-              对手掉线，正在重连…
-            </p>
-            <p className="text-sm text-slate-400">
-              对局已为你保留，请稍候
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ============ CONNECTING (peer handshake) ============ */}
       {hud.connecting && !hud.gameOver && !hud.paused && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm">
@@ -692,7 +542,7 @@ export default function GameScreen({
             <div className="mb-4 space-y-1 text-left text-xs text-slate-300">
               <p><kbd className="kbd">WASD</kbd> 移动 · <kbd className="kbd">鼠标左键</kbd> 攻击</p>
               <p><kbd className="kbd">Q</kbd> 技能 · <kbd className="kbd">R</kbd> 换弹</p>
-              <p><kbd className="kbd">1/2/3</kbd> / <kbd className="kbd">滚轮</kbd> 选择道具 · <kbd className="kbd">鼠标左键</kbd> 投掷/部署</p>
+              <p><kbd className="kbd">1/2/3</kbd> 部署道具 · <kbd className="kbd">滚轮</kbd> 切换道具</p>
               <p><kbd className="kbd">E</kbd> 切换武器</p>
               <p><kbd className="kbd">弓</kbd> 长按蓄力 · <kbd className="kbd">盾</kbd> 右键举盾</p>
               <p><kbd className="kbd">P/Esc</kbd> 继续</p>
@@ -715,46 +565,14 @@ export default function GameScreen({
               {hud.gameOverReason}
             </h2>
             <p className="mb-5 text-sm text-slate-400">
-              {hud.mode === "deathmatch"
-                ? hud.gameOverReason.includes("你")
-                  ? "🏆 你赢得了这场人机对战！"
-                  : "人机对战结束"
-                : hud.gameOverReason.includes("基地")
-                ? "防线失守…"
-                : "你倒下了…"}
+              {hud.gameOverReason.includes("基地") ? "防线失守…" : "你倒下了…"}
             </p>
-            {hud.mode === "deathmatch" ? (
-              <div className="mb-5 flex flex-col gap-1 rounded-xl bg-black/40 px-3 py-2">
-                {hud.dmPlayers
-                  ?.slice()
-                  .sort((a, b) => b.score - a.score)
-                  .map((p, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "flex items-center gap-2 text-sm",
-                        p.isSelf ? "font-bold text-white" : "text-slate-300"
-                      )}
-                    >
-                      <span className="w-4 text-slate-500">{i + 1}</span>
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: p.color, boxShadow: `0 0 6px ${p.color}` }}
-                      />
-                      <span className="w-20 truncate text-left">{p.name}</span>
-                      <span className="ml-auto tabular-nums">{p.score}</span>
-                      {!p.alive && <span className="text-[10px]">💀</span>}
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="mb-5 grid grid-cols-4 gap-2">
-                <Stat label="分数" value={hud.score.toLocaleString()} />
-                <Stat label="波数" value={`${hud.wave}`} />
-                <Stat label="击杀" value={`${hud.kills}`} />
-                <Stat label="金币" value={`${hud.gold}`} />
-              </div>
-            )}
+            <div className="mb-5 grid grid-cols-4 gap-2">
+              <Stat label="分数" value={hud.score.toLocaleString()} />
+              <Stat label="波数" value={`${hud.wave}`} />
+              <Stat label="击杀" value={`${hud.kills}`} />
+              <Stat label="金币" value={`${hud.gold}`} />
+            </div>
             <div className="space-y-2">
               <button
                 onClick={() => engineRef.current?.restart()}
