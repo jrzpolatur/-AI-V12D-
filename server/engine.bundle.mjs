@@ -2222,11 +2222,14 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // src/game/sound.ts
-var SoundManager = class {
+var SoundManager = class _SoundManager {
   ctx = null;
   master = null;
   noise = null;
   enabled = true;
+  /** master volume 0..1 (scaled by BASE so the default 0.5 matches the old 0.3 gain) */
+  volume = 0.5;
+  static BASE = 0.6;
   /** Create / resume the audio context. Call from a user gesture. */
   ensure() {
     try {
@@ -2234,7 +2237,7 @@ var SoundManager = class {
         const Ctor = window.AudioContext || window.webkitAudioContext;
         this.ctx = new Ctor();
         this.master = this.ctx.createGain();
-        this.master.gain.value = 0.3;
+        this.master.gain.value = this.volume * _SoundManager.BASE;
         this.master.connect(this.ctx.destination);
         const len = Math.floor(this.ctx.sampleRate * 0.5);
         this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -2248,6 +2251,13 @@ var SoundManager = class {
   }
   setEnabled(v) {
     this.enabled = v;
+  }
+  /** Set the master volume (0..1) and apply it immediately if the context exists. */
+  setVolume(v) {
+    this.volume = Math.min(1, Math.max(0, v));
+    if (this.master) {
+      this.master.gain.value = this.volume * _SoundManager.BASE;
+    }
   }
   now() {
     return this.ctx ? this.ctx.currentTime : 0;
@@ -2594,6 +2604,13 @@ var GameEngine = class {
   gameOver = false;
   gameOverReason = "";
   paused = false;
+  /** frame-rate cap: seconds per allowed frame (0 = uncapped / follow display). */
+  fpsInterval = 1 / 60;
+  /** accumulator used to throttle the simulation+render to `fpsInterval`. */
+  acc = 0;
+  /** called when the player presses the pause/settings hotkey (ESC or P). The
+   *  React layer wires this up to open the in-game settings overlay. */
+  onPauseRequest;
   // ---- deathmatch (offline PvP vs AI bots) ----
   /** true when the active sub-mode is deathmatch */
   isDM = false;
@@ -2735,6 +2752,11 @@ var GameEngine = class {
       }
       this.emit(true);
     }
+  }
+  /** Cycle to the next carried weapon (used by the mobile "切枪" button). */
+  cycleWeapon() {
+    if (this.guns.length <= 1) return;
+    this.selectGun((this.gunIndex + 1) % this.guns.length);
   }
   triggerSkill() {
     this.activateSkill();
@@ -3424,7 +3446,7 @@ var GameEngine = class {
     if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT" || ae.isContentEditable))
       return;
     if (e.code === "KeyP" || e.code === "Escape") {
-      if (this.mode === "local" && !this.gameOver) this.setPaused(!this.paused);
+      if (this.mode === "local" && !this.gameOver) this.onPauseRequest?.();
       e.preventDefault();
       return;
     }
@@ -3529,9 +3551,16 @@ var GameEngine = class {
   // ------------------------------------------------------------------ loop
   loop = (now) => {
     if (!this.running) return;
-    let dt = (now - this.last) / 1e3;
+    const elapsed = (now - this.last) / 1e3;
     this.last = now;
-    if (dt > 0.05) dt = 0.05;
+    this.acc += elapsed;
+    if (this.acc < this.fpsInterval) {
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
+    let dt = this.acc;
+    if (dt > 0.1) dt = 0.1;
+    this.acc = 0;
     if (!this.gameOver) this.update(dt);
     this.render();
     this.hudAccum += dt;
@@ -3541,6 +3570,11 @@ var GameEngine = class {
     }
     this.raf = requestAnimationFrame(this.loop);
   };
+  /** Set the target frame rate. Pass 0 to follow the display's refresh rate. */
+  setTargetFps(fps) {
+    this.fpsInterval = fps > 0 ? 1 / fps : 0;
+    this.acc = 0;
+  }
   // ---------------------------------------------------------------- update
   update(dt) {
     if (this.mode !== "local" && this.net) this.pumpNet();

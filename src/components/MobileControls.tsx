@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { GameEngine } from "../game/engine";
+import { useSettings, type MobileActionId } from "../game/settings";
 
 /** Shared style that kills every browser default gesture on a touch target.
  *  touch-action:none stops the OS from treating a multi-finger touch as
@@ -12,10 +13,23 @@ const NO_GESTURE: React.CSSProperties = {
   WebkitTouchCallout: "none",
 };
 
+/** Per-action button styling (kept distinct so the player can tell them apart). */
+const ACTION_STYLE: Record<MobileActionId, string> = {
+  fire: "border-rose-400/60 bg-rose-500/30 text-white",
+  reload: "border-amber-300/40 bg-amber-500/20 text-amber-100",
+  skill: "border-violet-400/50 bg-violet-500/25 text-violet-100",
+  weapon: "border-sky-400/50 bg-sky-500/25 text-sky-100",
+  gadget1: "border-emerald-400/50 bg-emerald-500/25 text-emerald-100",
+  gadget2: "border-emerald-400/50 bg-emerald-500/25 text-emerald-100",
+  gadget3: "border-emerald-400/50 bg-emerald-500/25 text-emerald-100",
+};
+
 /** On-screen controls for touch devices. Movement uses a *floating* joystick
  *  (press anywhere on the left half — the stick appears under your thumb) and
- *  the right side holds a fire + reload cluster. Aiming is handled entirely by
- *  the engine's mobile-only aim assist, so the player only moves and fires.
+ *  the action buttons (fire / reload / skill / weapon-switch / gadgets) are laid
+ *  out from the shared settings store, so the player can reposition or hide them
+ *  via the in-game "自定义键位" editor. Aiming is handled entirely by the
+ *  engine's mobile-only aim assist.
  *
  *  Multi-touch robustness: every interactive element has touch-action:none and
  *  each finger is tracked independently via its own pointerId + setPointerCapture,
@@ -25,6 +39,8 @@ export default function MobileControls({
 }: {
   engineRef: React.MutableRefObject<GameEngine | null>;
 }) {
+  const s = useSettings();
+
   // ---- movement joystick (floating, left half) ----
   const joyPointer = useRef<number | null>(null);
   const joyOrigin = useRef({ x: 0, y: 0 });
@@ -61,17 +77,17 @@ export default function MobileControls({
       dx = (dx / dist) * R;
       dy = (dy / dist) * R;
     }
-    setJoy((s) => ({ ...s, kx: dx, ky: dy }));
+    setJoy((st) => ({ ...st, kx: dx, ky: dy }));
     engineRef.current?.setVirtualMove(dx / R, dy / R);
   };
   const onJoyUp = (e: React.PointerEvent) => {
     if (joyPointer.current !== e.pointerId) return;
     joyPointer.current = null;
-    setJoy((s) => ({ ...s, active: false, kx: 0, ky: 0 }));
+    setJoy((st) => ({ ...st, active: false, kx: 0, ky: 0 }));
     engineRef.current?.setVirtualMove(0, 0);
   };
 
-  // ---- fire (right) ----
+  // ---- fire (hold) ----
   const firePointer = useRef<number | null>(null);
   const firingRef = useRef(false);
   const onFireDown = (e: React.PointerEvent) => {
@@ -92,6 +108,34 @@ export default function MobileControls({
     engineRef.current?.setVirtualFiring(false);
   };
 
+  // ---- tap actions (reload / skill / weapon / gadgets) ----
+  const tapAction = (id: MobileActionId) => {
+    const e = engineRef.current;
+    if (!e) return;
+    switch (id) {
+      case "reload":
+        e.reloadCurrent();
+        break;
+      case "skill":
+        e.triggerSkill();
+        break;
+      case "weapon":
+        e.cycleWeapon();
+        break;
+      case "gadget1":
+        e.deployGadget(0);
+        break;
+      case "gadget2":
+        e.deployGadget(1);
+        break;
+      case "gadget3":
+        e.deployGadget(2);
+        break;
+      default:
+        break;
+    }
+  };
+
   // safety net: if a finger is released/cancelled anywhere (e.g. OS steals it),
   // make sure both inputs are reset so the player doesn't get stuck moving/firing.
   useEffect(() => {
@@ -102,7 +146,7 @@ export default function MobileControls({
       }
       if (joyPointer.current !== null) {
         joyPointer.current = null;
-        setJoy((s) => ({ ...s, active: false, kx: 0, ky: 0 }));
+        setJoy((st) => ({ ...st, active: false, kx: 0, ky: 0 }));
         engineRef.current?.setVirtualMove(0, 0);
       }
     };
@@ -160,32 +204,44 @@ export default function MobileControls({
         )}
       </div>
 
-      {/* fire + reload cluster (right) */}
-      <div
-        className="pointer-events-auto absolute bottom-10 right-4 flex items-end gap-3"
-        style={NO_GESTURE}
-      >
-        <button
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            engineRef.current?.reloadCurrent();
-          }}
-          style={NO_GESTURE}
-          className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-amber-300/40 bg-black/55 text-xs font-bold text-amber-200 backdrop-blur active:scale-95"
-        >
-          换弹
-        </button>
-        <button
-          onPointerDown={onFireDown}
-          onPointerUp={onFireUp}
-          onPointerCancel={onFireUp}
-          style={NO_GESTURE}
-          className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-rose-400/60 bg-rose-500/30 text-base font-black text-white shadow-lg backdrop-blur active:scale-95"
-        >
-          开火
-        </button>
-      </div>
+      {/* action buttons (positioned from the settings layout) */}
+      {s.mobile
+        .filter((b) => b.visible)
+        .map((b) => {
+          const pos: React.CSSProperties = {
+            left: `${b.nx * 100}%`,
+            top: `${b.ny * 100}%`,
+            transform: "translate(-50%, -50%)",
+          };
+          if (b.id === "fire") {
+            return (
+              <button
+                key={b.id}
+                onPointerDown={onFireDown}
+                onPointerUp={onFireUp}
+                onPointerCancel={onFireUp}
+                style={{ ...pos, ...NO_GESTURE }}
+                className={`pointer-events-auto absolute flex h-20 w-20 items-center justify-center rounded-full border-2 text-base font-black shadow-lg backdrop-blur active:scale-95 ${ACTION_STYLE.fire}`}
+              >
+                开火
+              </button>
+            );
+          }
+          return (
+            <button
+              key={b.id}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                tapAction(b.id);
+              }}
+              style={{ ...pos, ...NO_GESTURE }}
+              className={`pointer-events-auto absolute flex h-16 w-16 items-center justify-center rounded-2xl border-2 text-[12px] font-bold backdrop-blur active:scale-95 ${ACTION_STYLE[b.id]}`}
+            >
+              {b.label}
+            </button>
+          );
+        })}
     </div>
   );
 }

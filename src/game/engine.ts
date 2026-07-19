@@ -688,6 +688,13 @@ export class GameEngine {
   private gameOver = false;
   private gameOverReason = "";
   private paused = false;
+  /** frame-rate cap: seconds per allowed frame (0 = uncapped / follow display). */
+  private fpsInterval = 1 / 60;
+  /** accumulator used to throttle the simulation+render to `fpsInterval`. */
+  private acc = 0;
+  /** called when the player presses the pause/settings hotkey (ESC or P). The
+   *  React layer wires this up to open the in-game settings overlay. */
+  onPauseRequest?: () => void;
 
   // ---- deathmatch (offline PvP vs AI bots) ----
   /** true when the active sub-mode is deathmatch */
@@ -866,6 +873,12 @@ export class GameEngine {
       }
       this.emit(true);
     }
+  }
+
+  /** Cycle to the next carried weapon (used by the mobile "切枪" button). */
+  cycleWeapon() {
+    if (this.guns.length <= 1) return;
+    this.selectGun((this.gunIndex + 1) % this.guns.length);
   }
 
   triggerSkill() {
@@ -1653,10 +1666,12 @@ export class GameEngine {
     )
       return;
     if (e.code === "KeyP" || e.code === "Escape") {
-      // Pause is a single-player convenience only. In multiplayer the host is
-      // authoritative and the guest is a dumb mirror, so pausing would just
-      // freeze both sides (and could desync). Keep it local-only.
-      if (this.mode === "local" && !this.gameOver) this.setPaused(!this.paused);
+      // Pause / settings is a single-player convenience only. In multiplayer the
+      // host is authoritative and the guest is a dumb mirror, so pausing would
+      // just freeze both sides (and could desync). Keep it local-only.
+      // We don't pause directly here — instead we ask the React layer to open the
+      // in-game settings overlay, which then pauses the sim while it's open.
+      if (this.mode === "local" && !this.gameOver) this.onPauseRequest?.();
       e.preventDefault();
       return;
     }
@@ -1782,9 +1797,20 @@ export class GameEngine {
   // ------------------------------------------------------------------ loop
   private loop = (now: number) => {
     if (!this.running) return;
-    let dt = (now - this.last) / 1000;
+    const elapsed = (now - this.last) / 1000;
     this.last = now;
-    if (dt > 0.05) dt = 0.05;
+    // ---- optional frame-rate cap ----
+    // Accumulate real elapsed time and only run a simulation+render step once
+    // `fpsInterval` worth of time has built up. This caps CPU/GPU work on
+    // high-refresh displays (e.g. 144Hz) down to the player's chosen 30/60/90.
+    this.acc += elapsed;
+    if (this.acc < this.fpsInterval) {
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
+    let dt = this.acc;
+    if (dt > 0.1) dt = 0.1; // clamp so a backgrounded tab doesn't fast-forward
+    this.acc = 0;
     if (!this.gameOver) this.update(dt);
     this.render();
     this.hudAccum += dt;
@@ -1794,6 +1820,12 @@ export class GameEngine {
     }
     this.raf = requestAnimationFrame(this.loop);
   };
+
+  /** Set the target frame rate. Pass 0 to follow the display's refresh rate. */
+  setTargetFps(fps: number) {
+    this.fpsInterval = fps > 0 ? 1 / fps : 0;
+    this.acc = 0;
+  }
 
   // ---------------------------------------------------------------- update
   private update(dt: number) {

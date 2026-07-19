@@ -8,6 +8,9 @@ class SoundManager {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   enabled = true;
+  /** master volume 0..1 (scaled by BASE so the default 0.5 matches the old 0.3 gain) */
+  volume = 0.5;
+  private static BASE = 0.6;
 
   /** Create / resume the audio context. Call from a user gesture. */
   ensure() {
@@ -19,7 +22,7 @@ class SoundManager {
             .webkitAudioContext;
         this.ctx = new Ctor();
         this.master = this.ctx.createGain();
-        this.master.gain.value = 0.3;
+        this.master.gain.value = this.volume * SoundManager.BASE;
         this.master.connect(this.ctx.destination);
         const len = Math.floor(this.ctx.sampleRate * 0.5);
         this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -34,6 +37,14 @@ class SoundManager {
 
   setEnabled(v: boolean) {
     this.enabled = v;
+  }
+
+  /** Set the master volume (0..1) and apply it immediately if the context exists. */
+  setVolume(v: number) {
+    this.volume = Math.min(1, Math.max(0, v));
+    if (this.master) {
+      this.master.gain.value = this.volume * SoundManager.BASE;
+    }
   }
 
   private now() {

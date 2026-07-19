@@ -8,6 +8,13 @@ import { drawWeaponIcon, drawGadgetIcon } from "../game/draw";
 import { cn } from "../utils/cn";
 import { isTouchDevice } from "../utils/device";
 import MobileControls from "./MobileControls";
+import SettingsOverlay from "./SettingsOverlay";
+import {
+  useSettings,
+  subscribe,
+  getSettings,
+  updateSettings,
+} from "../game/settings";
 
 const initialHud: HudState = {
   hp: 100,
@@ -133,7 +140,9 @@ export default function GameScreen({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>(initialHud);
-  const [muted, setMuted] = useState(false);
+  const settings = useSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isFull, setIsFull] = useState(false);
   const isTouch = useMemo(() => isTouchDevice(), []);
 
   // ---- screen shake on hit ----
@@ -171,6 +180,8 @@ export default function GameScreen({
     const canvas = canvasRef.current!;
     const engine = new GameEngine(canvas, loadout, setHud, { mode, net });
     engineRef.current = engine;
+    // ESC / P should open the in-game settings overlay (which then pauses).
+    engine.onPauseRequest = () => setSettingsOpen((o) => !o);
     // NOTE: enable touch mode HERE (not from MobileControls' own effect). Child
     // effects run before the parent effect that creates the engine, so at that
     // point engineRef.current is still null and setTouchMode would silently no-op.
@@ -185,6 +196,36 @@ export default function GameScreen({
     };
   }, [loadout, isTouch]);
 
+  // ---- apply saved settings to audio + frame rate, live ----
+  useEffect(() => {
+    const apply = (st: ReturnType<typeof getSettings>) => {
+      sound.setVolume(st.volume);
+      sound.setEnabled(!st.muted);
+      engineRef.current?.setTargetFps(st.fps);
+    };
+    apply(getSettings());
+    return subscribe(apply);
+  }, []);
+
+  // ---- opening settings pauses the local simulation ----
+  useEffect(() => {
+    engineRef.current?.setPaused(settingsOpen);
+  }, [settingsOpen]);
+
+  // ---- fullscreen handling ----
+  useEffect(() => {
+    const onCh = () => setIsFull(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onCh);
+    return () => document.removeEventListener("fullscreenchange", onCh);
+  }, []);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+  };
+
   const character = getCharacter(loadout.characterId);
   const outfit = getOutfit(loadout.outfitId);
 
@@ -196,9 +237,7 @@ export default function GameScreen({
     basePct > 0.5 ? "#38bdf8" : basePct > 0.25 ? "#fbbf24" : "#f87171";
 
   const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    sound.setEnabled(!next);
+    updateSettings({ muted: !settings.muted });
   };
 
   return (
@@ -319,11 +358,25 @@ export default function GameScreen({
               <span className="text-sm font-bold text-yellow-400">{hud.gold}</span>
             </div>
             <button
+              onClick={toggleFullscreen}
+              className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
+              title={isFull ? "退出全屏" : "进入全屏"}
+            >
+              {isFull ? "🗗" : "⛶"}
+            </button>
+            <button
               onClick={toggleMute}
               className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
-              title={muted ? "开启声音" : "静音"}
+              title={settings.muted ? "开启声音" : "静音"}
             >
-              {muted ? "🔇" : "🔊"}
+              {settings.muted ? "🔇" : "🔊"}
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-sm backdrop-blur hover:bg-white/10"
+              title="设置"
+            >
+              ⚙
             </button>
             <button
               onClick={onExit}
@@ -565,28 +618,15 @@ export default function GameScreen({
         </div>
       )}
 
-      {/* ============ PAUSE OVERLAY ============ */}
-      {hud.paused && !hud.gameOver && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-80 rounded-2xl border border-white/10 bg-[#15163a]/90 p-6 text-center">
-            <h2 className="mb-1 text-2xl font-bold text-white">已暂停</h2>
-            <p className="mb-4 text-sm text-slate-400">基地仍在等待守护</p>
-            <div className="mb-4 space-y-1 text-left text-xs text-slate-300">
-              <p><kbd className="kbd">WASD</kbd> 移动 · <kbd className="kbd">鼠标左键</kbd> 攻击</p>
-              <p><kbd className="kbd">Q</kbd> 技能 · <kbd className="kbd">R</kbd> 换弹</p>
-              <p><kbd className="kbd">1/2/3</kbd> 部署道具 · <kbd className="kbd">滚轮</kbd> 切换道具</p>
-              <p><kbd className="kbd">E</kbd> 切换武器</p>
-              <p><kbd className="kbd">弓</kbd> 长按蓄力 · <kbd className="kbd">盾</kbd> 右键举盾</p>
-              <p><kbd className="kbd">P/Esc</kbd> 继续</p>
-            </div>
-            <button
-              onClick={() => engineRef.current?.setPaused(false)}
-              className="w-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 py-2.5 font-bold text-slate-900 transition-transform hover:scale-105"
-            >
-              继续战斗
-            </button>
-          </div>
-        </div>
+      {/* ============ SETTINGS OVERLAY (ESC / P) ============ */}
+      {settingsOpen && !hud.gameOver && (
+        <SettingsOverlay
+          isTouch={isTouch}
+          isFull={isFull}
+          onToggleFullscreen={toggleFullscreen}
+          onExit={onExit}
+          onResume={() => setSettingsOpen(false)}
+        />
       )}
 
       {/* ============ GAME OVER ============ */}
