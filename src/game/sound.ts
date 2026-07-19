@@ -183,6 +183,22 @@ class SoundManager {
     this.tone(330, 0.14, "triangle", 0.16, 440);
     setTimeout(() => this.tone(440, 0.18, "triangle", 0.16, 550), 120);
   }
+
+  /** Reload start: magazine eject + insert clack. */
+  reload() {
+    this.noiseBurst(0.05, 0.22, 1400, 1.0);
+    this.tone(150, 0.05, "square", 0.1, 90);
+    setTimeout(() => {
+      this.noiseBurst(0.05, 0.22, 1800, 1.0);
+      this.tone(220, 0.05, "square", 0.1, 130);
+    }, 130);
+  }
+
+  /** Reload done: sharp chambering click when the magazine is seated. */
+  reloadDone() {
+    this.noiseBurst(0.04, 0.18, 2200, 1.4);
+    this.tone(300, 0.05, "sine", 0.1, 380);
+  }
 }
 
 export const sound = new SoundManager();

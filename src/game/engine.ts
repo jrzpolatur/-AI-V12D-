@@ -927,6 +927,7 @@ export class GameEngine {
     const ws = this.weaponStates.get(g.id);
     if (g.magazine && ws && ws.reload <= 0 && ws.ammo < g.magazine) {
       ws.reload = g.reloadTime ?? 1.5;
+      sound.reload();
     }
   }
 
@@ -2025,6 +2026,7 @@ export class GameEngine {
         if (s.reload <= 0) {
           s.reload = 0;
           s.ammo = g.magazine;
+          sound.reloadDone();
         }
       }
       // heat cooldown for beam, flamethrower & poison mist
@@ -2164,6 +2166,7 @@ export class GameEngine {
       }
       if (g.magazine !== undefined && ws.ammo <= 0 && ws.reload <= 0) {
         ws.reload = g.reloadTime ?? 1.5;
+        sound.reload();
       }
     }
 
@@ -4042,6 +4045,68 @@ export class GameEngine {
     e.poisonDps = Math.min(260, (e.poisonDps ?? 0) + ramp);
   }
 
+  /** Enhanced, weapon- & direction-aware coin burst FX (everywhere except
+   *  biohazard). Reused for enemy kills AND deathmatch/PvP combatant kills so
+   *  every non-biohazard enemy explodes into coins on death.
+   *  `weapon` selects the palette/flourish; `rawDx`/`rawDy` bias the spray. */
+  private spawnCoinBurstFX(
+    x: number,
+    y: number,
+    size: number,
+    big: boolean,
+    med: boolean,
+    weapon: string,
+    rawDx = 0,
+    rawDy = 0
+  ) {
+    const style = killStyleOf(weapon);
+    let dx = rawDx;
+    let dy = rawDy;
+    const dl = Math.hypot(dx, dy);
+    if (dl > 0.001) { dx /= dl; dy /= dl; } else { dx = 0; dy = 0; }
+
+    const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
+    const ringR = size * (big ? 4 : style === "explosive" ? 3.4 : 3);
+    this.effects.push({ type: "coinburst", x, y, t: 0, duration: big ? 0.72 : 0.55, radius: ringR, color: pal[0], style, dirX: dx, dirY: dy });
+    this.effects.push({ type: "shock", x, y, t: 0, duration: 0.42, radius: ringR * 0.82, color: pal[1] });
+    this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
+    const coinCount = big ? 64 : med ? 32 : 18;
+    for (let i = 0; i < coinCount; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 140 + Math.random() * 320;
+      let vx = Math.cos(a) * sp;
+      let vy = Math.sin(a) * sp - 120;
+      if (dx !== 0 || dy !== 0) {
+        vx = vx * 0.35 + dx * sp;
+        vy = vy * 0.35 + dy * sp - 60;
+      }
+      const flight = 0.35 + Math.random() * 0.15;
+      this.particles.push({
+        x, y, vx, vy,
+        life: flight + 1.0, maxLife: flight + 1.0,
+        color: pal[(Math.random() * pal.length) | 0],
+        size: 2.5 + Math.random() * 3, shrink: false,
+        gravity: 540, coin: true, spin: Math.random() * Math.PI * 2,
+        flight, rest: 1.0, landed: false,
+      });
+    }
+    if (style === "explosive") {
+      this.effects.push({ type: "coinburst", x, y, t: 0, duration: 0.85, radius: ringR * 1.5, color: "#fb923c", style: "explosive", dirX: dx, dirY: dy });
+      this.spawnParticles(x, y, "#fb923c", big ? 22 : 12, 330, 0.6);
+    } else if (style === "whip") {
+      this.effects.push({ type: "whip", x, y, t: 0, duration: 0.22, range: size * 3, radius: size * 3, color: "#7dd3fc", angle: dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : 0, arc: 0 });
+      this.spawnParticles(x, y, "#7dd3fc", 14, 280, 0.5);
+      this.spawnParticles(x, y, "#e0f2fe", 8, 200, 0.4);
+    } else if (style === "saber") {
+      this.spawnParticles(x, y, "#a5b4fc", 12, 260, 0.5);
+    } else if (style === "fire") {
+      this.spawnParticles(x, y, "#fb923c", 16, 240, 0.6);
+      this.spawnParticles(x, y, "#fde68a", 8, 160, 0.4);
+    } else if (style === "poison") {
+      this.spawnParticles(x, y, "#a3e635", 16, 240, 0.6);
+    }
+  }
+
   private killEnemy(e: Enemy) {
     this.score += e.score;
     this.kills += 1;
@@ -4053,12 +4118,6 @@ export class GameEngine {
 
     // what landed the killing blow (weapon id + bullet direction)
     const ksrc = e.lastSrc;
-    const style = killStyleOf(ksrc?.weapon ?? "");
-    let dx = ksrc?.dx ?? 0;
-    let dy = ksrc?.dy ?? 0;
-    const dl = Math.hypot(dx, dy);
-    if (dl > 0.001) { dx /= dl; dy /= dl; } else { dx = 0; dy = 0; }
-
     const bio = this.gameMode === "biohazard";
     if (bio) {
       // biohazard keeps the classic simple radial burst
@@ -4082,49 +4141,7 @@ export class GameEngine {
       }
     } else {
       // enhanced, weapon- & direction-aware burst (everywhere except biohazard)
-      const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
-      const ringR = e.size * (big ? 4 : style === "explosive" ? 3.4 : 3);
-      // styled shockwave + coinburst (direction-aware so coins fly with the bullet)
-      this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: big ? 0.72 : 0.55, radius: ringR, color: pal[0], style, dirX: dx, dirY: dy });
-      this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.42, radius: ringR * 0.82, color: pal[1] });
-      this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
-      // directional spray of spinning coins
-      const coinCount = big ? 64 : med ? 32 : 18;
-      for (let i = 0; i < coinCount; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const sp = 140 + Math.random() * 320;
-        let vx = Math.cos(a) * sp;
-        let vy = Math.sin(a) * sp - 120;
-        if (dx !== 0 || dy !== 0) {
-          vx = vx * 0.35 + dx * sp;
-          vy = vy * 0.35 + dy * sp - 60;
-        }
-        const flight = 0.35 + Math.random() * 0.15;
-        this.particles.push({
-          x: e.x, y: e.y, vx, vy,
-          life: flight + 1.0, maxLife: flight + 1.0,
-          color: pal[(Math.random() * pal.length) | 0],
-          size: 2.5 + Math.random() * 3, shrink: false,
-          gravity: 540, coin: true, spin: Math.random() * Math.PI * 2,
-          flight, rest: 1.0, landed: false,
-        });
-      }
-      // weapon-specific flourish
-      if (style === "explosive") {
-        this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.85, radius: ringR * 1.5, color: "#fb923c", style: "explosive", dirX: dx, dirY: dy });
-        this.spawnParticles(e.x, e.y, "#fb923c", big ? 22 : 12, 330, 0.6);
-      } else if (style === "whip") {
-        this.effects.push({ type: "whip", x: e.x, y: e.y, t: 0, duration: 0.22, range: e.size * 3, radius: e.size * 3, color: "#7dd3fc", angle: dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : 0, arc: 0 });
-        this.spawnParticles(e.x, e.y, "#7dd3fc", 14, 280, 0.5);
-        this.spawnParticles(e.x, e.y, "#e0f2fe", 8, 200, 0.4);
-      } else if (style === "saber") {
-        this.spawnParticles(e.x, e.y, "#a5b4fc", 12, 260, 0.5);
-      } else if (style === "fire") {
-        this.spawnParticles(e.x, e.y, "#fb923c", 16, 240, 0.6);
-        this.spawnParticles(e.x, e.y, "#fde68a", 8, 160, 0.4);
-      } else if (style === "poison") {
-        this.spawnParticles(e.x, e.y, "#a3e635", 16, 240, 0.6);
-      }
+      this.spawnCoinBurstFX(e.x, e.y, e.size, big, med, ksrc?.weapon ?? "", ksrc?.dx ?? 0, ksrc?.dy ?? 0);
     }
 
     // body debris particles
@@ -4318,6 +4335,16 @@ export class GameEngine {
       p.deadTimer = RESPAWN_TIME;
       p.bowDrawing = false;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
+      // coin burst on every non-biohazard enemy death (deathmatch bots / PvP foe)
+      if (this.gameMode !== "biohazard") {
+        const killer =
+          attackerId !== undefined && attackerId >= 0
+            ? this.combatants.find((c) => c.id === attackerId)?.player ?? null
+            : null;
+        const kdx = killer ? p.x - killer.x : 0;
+        const kdy = killer ? p.y - killer.y : 0;
+        this.spawnCoinBurstFX(p.x, p.y, p.size, false, true, "", kdx, kdy);
+      }
       if (p === this.player) {
         // stop any continuous fire so no beam/flame lingers on the corpse
         this.firing = false;

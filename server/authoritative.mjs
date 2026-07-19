@@ -39,9 +39,23 @@ const STEP = 1 / TICK_HZ; // fixed simulation timestep (seconds)
 const RECONNECT_GRACE_MS = 15000;
 
 // ---------------------------------------------------------------- static files
-const server = http.createServer((req, res) => {
-  // Announcement / message-board API + admin page (handled before SPA fallback).
-  if (handleAnnouncementAuth(req, res)) return;
+// Serve real files from dist (e.g. public/ads.txt copied during build) before
+// falling back to the single-file build for SPA routes.
+const STATIC_TYPES = {
+  ".txt": "text/plain; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".css": "text/css",
+  ".js": "text/javascript",
+  ".map": "application/json",
+  ".xml": "application/xml",
+};
+
+function serveIndex(res) {
   fs.readFile(path.join(DIST, "index.html"), (err, data) => {
     if (err) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -51,6 +65,27 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(data);
   });
+}
+
+function serveStatic(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const rel = decodeURIComponent(url.pathname);
+  if (rel === "/" || rel === "") return serveIndex(res);
+  const safe = path.normalize(rel).replace(/^(\.\.[/\\])+/, "");
+  const file = path.join(DIST, safe);
+  if (!file.startsWith(DIST)) return serveIndex(res);
+  fs.readFile(file, (err, data) => {
+    if (err) return serveIndex(res);
+    const ext = path.extname(file).toLowerCase();
+    res.writeHead(200, { "Content-Type": STATIC_TYPES[ext] || "application/octet-stream" });
+    res.end(data);
+  });
+}
+
+const server = http.createServer((req, res) => {
+  // Announcement / message-board API + admin page (handled before static).
+  if (handleAnnouncementAuth(req, res)) return;
+  serveStatic(req, res);
 });
 
 // ---------------------------------------------------------------- authoritative rooms

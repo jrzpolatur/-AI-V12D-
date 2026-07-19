@@ -161,7 +161,7 @@ var guns_default = [
     iconShape: "akm",
     damage: 37,
     fireRate: 10,
-    bulletSpeed: 940,
+    bulletSpeed: 1240,
     bulletSize: 5,
     spread: 0.05,
     pellets: 1,
@@ -185,7 +185,7 @@ var guns_default = [
     iconShape: "fcar",
     damage: 46,
     fireRate: 9,
-    bulletSpeed: 1e3,
+    bulletSpeed: 1300,
     bulletSize: 6,
     spread: 0.045,
     pellets: 1,
@@ -197,7 +197,7 @@ var guns_default = [
     kind: "tracer",
     barrel: 28,
     magazine: 20,
-    reloadTime: 2.8,
+    reloadTime: 2.6,
     rangeTier: "\u4E2D"
   },
   {
@@ -310,7 +310,7 @@ var guns_default = [
     iconShape: "sa1216",
     damage: 22,
     fireRate: 5.5,
-    bulletSpeed: 820,
+    bulletSpeed: 810,
     bulletSize: 4.5,
     spread: 0.18,
     pellets: 8,
@@ -468,7 +468,7 @@ var guns_default = [
     iconShape: "shak50",
     damage: 42,
     fireRate: 7,
-    bulletSpeed: 900,
+    bulletSpeed: 1100,
     bulletSize: 6,
     spread: 0,
     pellets: 2,
@@ -495,7 +495,7 @@ var guns_default = [
     iconShape: "pistol",
     damage: 118,
     fireRate: 3.2,
-    bulletSpeed: 1e3,
+    bulletSpeed: 1600,
     bulletSize: 5.5,
     spread: 0.012,
     pellets: 1,
@@ -544,7 +544,7 @@ var guns_default = [
     iconShape: "gatling",
     damage: 24,
     fireRate: 19,
-    bulletSpeed: 1050,
+    bulletSpeed: 1550,
     bulletSize: 4.5,
     spread: 0.11,
     pellets: 1,
@@ -651,7 +651,7 @@ var guns_default = [
     iconShape: "lewis",
     damage: 30,
     fireRate: 9,
-    bulletSpeed: 900,
+    bulletSpeed: 1500,
     bulletSize: 6,
     spread: 0.06,
     pellets: 1,
@@ -2478,6 +2478,20 @@ var SoundManager = class _SoundManager {
     this.tone(330, 0.14, "triangle", 0.16, 440);
     setTimeout(() => this.tone(440, 0.18, "triangle", 0.16, 550), 120);
   }
+  /** Reload start: magazine eject + insert clack. */
+  reload() {
+    this.noiseBurst(0.05, 0.22, 1400, 1);
+    this.tone(150, 0.05, "square", 0.1, 90);
+    setTimeout(() => {
+      this.noiseBurst(0.05, 0.22, 1800, 1);
+      this.tone(220, 0.05, "square", 0.1, 130);
+    }, 130);
+  }
+  /** Reload done: sharp chambering click when the magazine is seated. */
+  reloadDone() {
+    this.noiseBurst(0.04, 0.18, 2200, 1.4);
+    this.tone(300, 0.05, "sine", 0.1, 380);
+  }
 };
 var sound = new SoundManager();
 
@@ -2897,6 +2911,7 @@ var GameEngine = class {
     const ws = this.weaponStates.get(g.id);
     if (g.magazine && ws && ws.reload <= 0 && ws.ammo < g.magazine) {
       ws.reload = g.reloadTime ?? 1.5;
+      sound.reload();
     }
   }
   restart() {
@@ -3829,6 +3844,7 @@ var GameEngine = class {
         if (s.reload <= 0) {
           s.reload = 0;
           s.ammo = g.magazine;
+          sound.reloadDone();
         }
       }
       if ((g.weaponClass === "beam" || g.weaponClass === "flamethrower" || g.weaponClass === "poison_mist") && s.heat > 0) {
@@ -3930,6 +3946,7 @@ var GameEngine = class {
       }
       if (g.magazine !== void 0 && ws.ammo <= 0 && ws.reload <= 0) {
         ws.reload = g.reloadTime ?? 1.5;
+        sound.reload();
       }
     }
     if (p.hp > 0 && p.hp < p.maxHp && this.time - p.lastHitTime > RUNTIME.breathingDelay) {
@@ -5613,17 +5630,14 @@ var GameEngine = class {
     e.poisonT = Math.max(e.poisonT ?? 0, 0.9);
     e.poisonDps = Math.min(260, (e.poisonDps ?? 0) + ramp);
   }
-  killEnemy(e) {
-    this.score += e.score;
-    this.kills += 1;
-    const big = e.type === "boss" || e.behavior === "abomination";
-    const med = e.type === "tank" || e.behavior === "brute" || e.behavior === "bloater";
-    const goldAmount = big ? 80 : med ? 18 : e.type === "shooter" || e.behavior === "spitter" ? 10 : 6;
-    this.gold += goldAmount;
-    const ksrc = e.lastSrc;
-    const style = killStyleOf(ksrc?.weapon ?? "");
-    let dx = ksrc?.dx ?? 0;
-    let dy = ksrc?.dy ?? 0;
+  /** Enhanced, weapon- & direction-aware coin burst FX (everywhere except
+   *  biohazard). Reused for enemy kills AND deathmatch/PvP combatant kills so
+   *  every non-biohazard enemy explodes into coins on death.
+   *  `weapon` selects the palette/flourish; `rawDx`/`rawDy` bias the spray. */
+  spawnCoinBurstFX(x, y, size, big, med, weapon, rawDx = 0, rawDy = 0) {
+    const style = killStyleOf(weapon);
+    let dx = rawDx;
+    let dy = rawDy;
     const dl = Math.hypot(dx, dy);
     if (dl > 1e-3) {
       dx /= dl;
@@ -5632,6 +5646,64 @@ var GameEngine = class {
       dx = 0;
       dy = 0;
     }
+    const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
+    const ringR = size * (big ? 4 : style === "explosive" ? 3.4 : 3);
+    this.effects.push({ type: "coinburst", x, y, t: 0, duration: big ? 0.72 : 0.55, radius: ringR, color: pal[0], style, dirX: dx, dirY: dy });
+    this.effects.push({ type: "shock", x, y, t: 0, duration: 0.42, radius: ringR * 0.82, color: pal[1] });
+    this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
+    const coinCount = big ? 64 : med ? 32 : 18;
+    for (let i = 0; i < coinCount; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 140 + Math.random() * 320;
+      let vx = Math.cos(a) * sp;
+      let vy = Math.sin(a) * sp - 120;
+      if (dx !== 0 || dy !== 0) {
+        vx = vx * 0.35 + dx * sp;
+        vy = vy * 0.35 + dy * sp - 60;
+      }
+      const flight = 0.35 + Math.random() * 0.15;
+      this.particles.push({
+        x,
+        y,
+        vx,
+        vy,
+        life: flight + 1,
+        maxLife: flight + 1,
+        color: pal[Math.random() * pal.length | 0],
+        size: 2.5 + Math.random() * 3,
+        shrink: false,
+        gravity: 540,
+        coin: true,
+        spin: Math.random() * Math.PI * 2,
+        flight,
+        rest: 1,
+        landed: false
+      });
+    }
+    if (style === "explosive") {
+      this.effects.push({ type: "coinburst", x, y, t: 0, duration: 0.85, radius: ringR * 1.5, color: "#fb923c", style: "explosive", dirX: dx, dirY: dy });
+      this.spawnParticles(x, y, "#fb923c", big ? 22 : 12, 330, 0.6);
+    } else if (style === "whip") {
+      this.effects.push({ type: "whip", x, y, t: 0, duration: 0.22, range: size * 3, radius: size * 3, color: "#7dd3fc", angle: dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : 0, arc: 0 });
+      this.spawnParticles(x, y, "#7dd3fc", 14, 280, 0.5);
+      this.spawnParticles(x, y, "#e0f2fe", 8, 200, 0.4);
+    } else if (style === "saber") {
+      this.spawnParticles(x, y, "#a5b4fc", 12, 260, 0.5);
+    } else if (style === "fire") {
+      this.spawnParticles(x, y, "#fb923c", 16, 240, 0.6);
+      this.spawnParticles(x, y, "#fde68a", 8, 160, 0.4);
+    } else if (style === "poison") {
+      this.spawnParticles(x, y, "#a3e635", 16, 240, 0.6);
+    }
+  }
+  killEnemy(e) {
+    this.score += e.score;
+    this.kills += 1;
+    const big = e.type === "boss" || e.behavior === "abomination";
+    const med = e.type === "tank" || e.behavior === "brute" || e.behavior === "bloater";
+    const goldAmount = big ? 80 : med ? 18 : e.type === "shooter" || e.behavior === "spitter" ? 10 : 6;
+    this.gold += goldAmount;
+    const ksrc = e.lastSrc;
     const bio = this.gameMode === "biohazard";
     if (bio) {
       this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.5, radius: e.size * 3, color: "#fbbf24" });
@@ -5661,55 +5733,7 @@ var GameEngine = class {
         });
       }
     } else {
-      const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
-      const ringR = e.size * (big ? 4 : style === "explosive" ? 3.4 : 3);
-      this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: big ? 0.72 : 0.55, radius: ringR, color: pal[0], style, dirX: dx, dirY: dy });
-      this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.42, radius: ringR * 0.82, color: pal[1] });
-      this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
-      const coinCount = big ? 64 : med ? 32 : 18;
-      for (let i = 0; i < coinCount; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const sp = 140 + Math.random() * 320;
-        let vx = Math.cos(a) * sp;
-        let vy = Math.sin(a) * sp - 120;
-        if (dx !== 0 || dy !== 0) {
-          vx = vx * 0.35 + dx * sp;
-          vy = vy * 0.35 + dy * sp - 60;
-        }
-        const flight = 0.35 + Math.random() * 0.15;
-        this.particles.push({
-          x: e.x,
-          y: e.y,
-          vx,
-          vy,
-          life: flight + 1,
-          maxLife: flight + 1,
-          color: pal[Math.random() * pal.length | 0],
-          size: 2.5 + Math.random() * 3,
-          shrink: false,
-          gravity: 540,
-          coin: true,
-          spin: Math.random() * Math.PI * 2,
-          flight,
-          rest: 1,
-          landed: false
-        });
-      }
-      if (style === "explosive") {
-        this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.85, radius: ringR * 1.5, color: "#fb923c", style: "explosive", dirX: dx, dirY: dy });
-        this.spawnParticles(e.x, e.y, "#fb923c", big ? 22 : 12, 330, 0.6);
-      } else if (style === "whip") {
-        this.effects.push({ type: "whip", x: e.x, y: e.y, t: 0, duration: 0.22, range: e.size * 3, radius: e.size * 3, color: "#7dd3fc", angle: dx !== 0 || dy !== 0 ? Math.atan2(dy, dx) : 0, arc: 0 });
-        this.spawnParticles(e.x, e.y, "#7dd3fc", 14, 280, 0.5);
-        this.spawnParticles(e.x, e.y, "#e0f2fe", 8, 200, 0.4);
-      } else if (style === "saber") {
-        this.spawnParticles(e.x, e.y, "#a5b4fc", 12, 260, 0.5);
-      } else if (style === "fire") {
-        this.spawnParticles(e.x, e.y, "#fb923c", 16, 240, 0.6);
-        this.spawnParticles(e.x, e.y, "#fde68a", 8, 160, 0.4);
-      } else if (style === "poison") {
-        this.spawnParticles(e.x, e.y, "#a3e635", 16, 240, 0.6);
-      }
+      this.spawnCoinBurstFX(e.x, e.y, e.size, big, med, ksrc?.weapon ?? "", ksrc?.dx ?? 0, ksrc?.dy ?? 0);
     }
     this.spawnParticles(e.x, e.y, e.glow, big ? 30 : 12, 220, 0.5);
     this.spawnParticles(e.x, e.y, e.color, big ? 20 : 6, 160, 0.4);
@@ -5872,6 +5896,12 @@ var GameEngine = class {
       p.deadTimer = RESPAWN_TIME;
       p.bowDrawing = false;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
+      if (this.gameMode !== "biohazard") {
+        const killer = attackerId !== void 0 && attackerId >= 0 ? this.combatants.find((c) => c.id === attackerId)?.player ?? null : null;
+        const kdx = killer ? p.x - killer.x : 0;
+        const kdy = killer ? p.y - killer.y : 0;
+        this.spawnCoinBurstFX(p.x, p.y, p.size, false, true, "", kdx, kdy);
+      }
       if (p === this.player) {
         this.firing = false;
         this.beamActive = false;
