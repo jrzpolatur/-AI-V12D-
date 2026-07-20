@@ -1388,6 +1388,7 @@ export function drawWeaponIcon(
     ctx.strokeStyle = color;
     ctx.lineWidth = lw;
     p();
+    ctx.stroke();
     ctx.restore();
   };
   /** Solid fill in a flat color. */
@@ -1405,482 +1406,694 @@ export function drawWeaponIcon(
 
   switch (iconShape) {
     case "pistol":
+      // slide & barrel
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-6, -2.2);
-        ctx.lineTo(5, -2.2);
+        ctx.lineTo(6, -2.2);
         ctx.lineTo(6.6, -1);
         ctx.lineTo(6.6, 0.2);
-        ctx.lineTo(-1, 0.2);
-        ctx.lineTo(-1, 1.4);
-        ctx.lineTo(-3.4, 1.4);
-        ctx.lineTo(-5.4, 7);
-        ctx.lineTo(-7.6, 7);
-        ctx.lineTo(-5.4, 0.4);
-        ctx.lineTo(-6.4, 0.4);
+        ctx.lineTo(-6.4, 0.2);
         ctx.closePath();
       });
+      // grip (dark textured brown)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-5.4, 0.4);
+        ctx.lineTo(-1.6, 0.4);
+        ctx.lineTo(-3.4, 6.8);
+        ctx.lineTo(-6.8, 6.8);
+        ctx.closePath();
+      }, "#4e3629");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-5.4, 0.4);
+        ctx.lineTo(-1.6, 0.4);
+        ctx.lineTo(-3.4, 6.8);
+        ctx.lineTo(-6.8, 6.8);
+        ctx.closePath();
+      }, "#2a1e17", 1.2);
+      // trigger guard & trigger
       stroke(() => {
         ctx.beginPath();
         ctx.moveTo(-1.6, 1.9);
         ctx.lineTo(-1.6, 4);
         ctx.lineTo(0.6, 4);
         ctx.lineTo(0.6, 1.9);
-      });
+      }, STEEL_L);
+      // golden laser sight under barrel
       fill(() => {
         ctx.beginPath();
-        ctx.moveTo(6.6, -1);
-        ctx.lineTo(7.5, -1);
-        ctx.lineTo(7.5, 0.2);
-        ctx.lineTo(6.6, 0.2);
-        ctx.closePath();
-      }, glow);
+        ctx.rect(1, 0.5, 4.5, 1.4);
+      }, "#fbbf24");
       break;
+
     case "mac11":
+      // compact boxy receiver
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-8.5, -2.2);
         ctx.lineTo(6, -2.2);
-        ctx.lineTo(6, -0.4);
-        ctx.lineTo(2, -0.4);
-        ctx.lineTo(2, 0.6);
-        ctx.lineTo(7, 0.6);
-        ctx.lineTo(7, 2.2);
-        ctx.lineTo(2, 2.2);
-        ctx.lineTo(2, 8);
-        ctx.lineTo(-1.5, 8);
-        ctx.lineTo(-1.5, 2.2);
-        ctx.lineTo(-8.5, 2.2);
+        ctx.lineTo(6, 1.8);
+        ctx.lineTo(-8.5, 1.8);
         ctx.closePath();
       });
-      hi(() => {
+      // grip
+      fill(() => {
         ctx.beginPath();
-        ctx.moveTo(-8, -1.6);
-        ctx.lineTo(5, -1.6);
-      });
+        ctx.rect(-1.5, 1.8, 3.5, 5.2);
+      }, "#22252c");
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(2.2, 2.6);
-        ctx.lineTo(2.2, 7);
-        ctx.lineTo(-1.3, 7);
-        ctx.lineTo(-1.3, 2.6);
-      });
+        ctx.rect(-1.5, 1.8, 3.5, 5.2);
+      }, glow, 1.2);
+      // straight magazine extending down
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-0.8, 7, 2, 4.5);
+      }, "#14161f");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.rect(-0.8, 7, 2, 4.5);
+      }, STEEL_L, 0.8);
+      // green front strap
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(5.5, 1.4);
+        ctx.quadraticCurveTo(5, 5, 2.5, 6.5);
+      }, "#4d7c0f", 1.8);
       break;
+
     case "mp5":
+      // receiver
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-8.5, -2.2);
-        ctx.lineTo(7, -2.2);
-        ctx.lineTo(7, -0.4);
-        ctx.lineTo(2, -0.4);
-        ctx.lineTo(2, 0.6);
-        ctx.lineTo(8, 0.6);
-        ctx.lineTo(8, 2.2);
-        ctx.lineTo(2, 2.2);
-        ctx.lineTo(2, 8.5);
-        ctx.lineTo(-1.5, 8.5);
-        ctx.lineTo(-1.5, 2.2);
-        ctx.lineTo(-8.5, 2.2);
+        ctx.lineTo(3, -2.2);
+        ctx.lineTo(3, 1.8);
+        ctx.lineTo(-8.5, 1.8);
         ctx.closePath();
       });
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(2.2, 2.6);
-        ctx.lineTo(2.2, 8);
-        ctx.lineTo(-1.3, 8);
-        ctx.lineTo(-1.3, 2.6);
-      });
-      break;
-    case "mortar":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-3, -2.4);
-        ctx.lineTo(8, -2.4);
-        ctx.lineTo(8, -0.8);
-        ctx.lineTo(1, -0.8);
-        ctx.lineTo(1, 0.8);
-        ctx.lineTo(8, 0.8);
-        ctx.lineTo(8, 2.4);
-        ctx.lineTo(-3, 2.4);
-        ctx.lineTo(-3, 1.4);
-        ctx.lineTo(-6, 1.4);
-        ctx.lineTo(-6, -1.4);
-        ctx.lineTo(-3, -1.4);
-        ctx.closePath();
-      });
-      break;
-    case "shotgun":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -1.6);
-        ctx.lineTo(8.5, -1.6);
-        ctx.lineTo(8.5, 0.4);
-        ctx.lineTo(-2, 0.4);
-        ctx.lineTo(-2, 1.4);
-        ctx.lineTo(2, 1.4);
-        ctx.lineTo(2, 2.4);
-        ctx.lineTo(-1, 2.4);
-        ctx.lineTo(-1, 6.5);
-        ctx.lineTo(-3.2, 6.5);
-        ctx.lineTo(-3.2, 2.4);
-        ctx.lineTo(-9, 2.4);
-        ctx.closePath();
-      });
-      hi(() => {
-        ctx.beginPath();
-        ctx.moveTo(-2, -1.1);
-        ctx.lineTo(8, -1.1);
-      });
-      // pump grip
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(2.5, 0.8);
-        ctx.lineTo(6, 0.8);
-        ctx.lineTo(6, 1.8);
-        ctx.lineTo(2.5, 1.8);
-      });
-      break;
-    case "rifle":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9.5, -1.6);
-        ctx.lineTo(8.5, -1.6);
-        ctx.lineTo(8.5, 0.4);
-        ctx.lineTo(2, 0.4);
-        ctx.lineTo(2, 1.4);
-        ctx.lineTo(0, 1.4);
-        ctx.lineTo(-1.5, 6);
-        ctx.lineTo(-4, 6);
-        ctx.lineTo(-2.5, 1.4);
-        ctx.lineTo(-9.5, 1.4);
-        ctx.closePath();
-      });
-      // stock
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(-6, 0.4);
-        ctx.lineTo(-9.5, 0.4);
-        ctx.lineTo(-9.5, 1.4);
-        ctx.lineTo(-5.5, 1.4);
-      });
-      // magazine
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(2.5, 1.8);
-        ctx.lineTo(4, 1.8);
-        ctx.lineTo(3.3, 5.5);
-        ctx.lineTo(1.8, 5.5);
-        ctx.closePath();
-      });
-      break;
-    case "sniper":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -1.4);
-        ctx.lineTo(9.5, -1.4);
-        ctx.lineTo(9.5, 0.6);
-        ctx.lineTo(2, 0.6);
-        ctx.lineTo(2, 1.6);
-        ctx.lineTo(-1, 1.6);
-        ctx.lineTo(-2.5, 6);
-        ctx.lineTo(-5, 6);
-        ctx.lineTo(-3.5, 1.6);
-        ctx.lineTo(-9, 1.6);
-        ctx.closePath();
-      });
-      // scope (accent)
+      // green ribbed handguard
       fill(() => {
         ctx.beginPath();
-        ctx.moveTo(-2.5, -4.4);
-        ctx.lineTo(5, -4.4);
-        ctx.lineTo(5.4, -2.4);
-        ctx.lineTo(-3, -2.4);
-        ctx.closePath();
-      }, rgba(glow, 0.85));
+        ctx.rect(3, -2.4, 4.5, 3.2);
+      }, "#3f6212");
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(0.6, -4.4);
-        ctx.lineTo(0.6, -2.4);
-        ctx.moveTo(2.4, -4.4);
-        ctx.lineTo(2.4, -2.4);
-      }, "#0b0c22", 0.8);
-      break;
-    case "rocket":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -3);
-        ctx.lineTo(5, -3);
-        ctx.lineTo(9.5, 0);
-        ctx.lineTo(5, 3);
-        ctx.lineTo(-9, 3);
-        ctx.lineTo(-9, 1.2);
-        ctx.lineTo(-11, 1.2);
-        ctx.lineTo(-11, -1.2);
-        ctx.lineTo(-9, -1.2);
-        ctx.closePath();
-      });
-      // open muzzle
-      inn(() => {
-        ctx.beginPath();
-        ctx.moveTo(5.4, -1.6);
-        ctx.lineTo(8.6, 0);
-        ctx.lineTo(5.4, 1.6);
-        ctx.closePath();
-      });
-      // rear grip
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, 0.5);
-        ctx.lineTo(-9, 4);
-        ctx.lineTo(-7, 4);
-        ctx.lineTo(-7, 0.5);
-      });
-      break;
-    case "akm":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9.5, -2.2);
-        ctx.lineTo(7, -2.2);
-        ctx.lineTo(7, -0.4);
-        ctx.lineTo(1, -0.4);
-        ctx.lineTo(1, 0.8);
-        ctx.lineTo(7, 0.8);
-        ctx.lineTo(7, 2.2);
-        ctx.lineTo(2.5, 2.2);
-        ctx.lineTo(2.5, 7.5);
-        ctx.lineTo(-0.5, 7.5);
-        ctx.lineTo(-0.5, 2.2);
-        ctx.lineTo(-9.5, 2.2);
-        ctx.closePath();
-      });
+        ctx.rect(3, -2.4, 4.5, 3.2);
+      }, "#1e293b", 1.2);
       // curved magazine
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(1.5, 1.8);
+        ctx.quadraticCurveTo(2.4, 4.5, 1.2, 7.2);
+        ctx.lineTo(-0.6, 7.2);
+        ctx.quadraticCurveTo(0.6, 4.5, -0.7, 1.8);
+        ctx.closePath();
+      }, "#14161f");
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(0.8, 2.6);
-        ctx.quadraticCurveTo(3.4, 4.5, 2.2, 7.2);
-        ctx.lineTo(-0.3, 7.2);
-        ctx.quadraticCurveTo(0.6, 4.6, -0.7, 2.6);
+        ctx.moveTo(1.5, 1.8);
+        ctx.quadraticCurveTo(2.4, 4.5, 1.2, 7.2);
+        ctx.lineTo(-0.6, 7.2);
+        ctx.quadraticCurveTo(0.6, 4.5, -0.7, 1.8);
+        ctx.closePath();
+      }, glow, 1.0);
+      // barrel & cocking handle
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(7.5, -0.8);
+        ctx.lineTo(9.5, -0.8);
+      }, STEEL_L, 1.5);
+      // ring sight
+      stroke(() => {
+        ctx.beginPath();
+        ctx.arc(-1, -3.2, 1, 0, Math.PI * 2);
+      }, STEEL_L, 1.0);
+      break;
+
+    case "mortar":
+      // base plate
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-8, 3.5, 5, 2.5);
+      }, "#1e293b");
+      // thick tube angled up
+      ctx.save();
+      ctx.rotate(-Math.PI / 6);
+      body(() => {
+        ctx.beginPath();
+        ctx.rect(-3, -2.2, 12, 4.4);
+      });
+      ctx.restore();
+      // bipod stand
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-1, 2.5);
+        ctx.lineTo(2.5, 6);
+        ctx.moveTo(2.5, 6);
+        ctx.lineTo(5.5, 2.5);
+      }, STEEL_L, 1.6);
+      // glowing screen on side
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-1, 0, 2.5, 2);
+      }, glow);
+      break;
+
+    case "shotgun":
+      // wooden stock (warm brown)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-10.5, -0.4);
+        ctx.lineTo(-4.5, -0.4);
+        ctx.lineTo(-4.5, 2.2);
+        ctx.lineTo(-7.5, 5.5);
+        ctx.lineTo(-10.5, 5.5);
+        ctx.closePath();
+      }, "#854d0e");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-10.5, -0.4);
+        ctx.lineTo(-4.5, -0.4);
+        ctx.lineTo(-4.5, 2.2);
+        ctx.lineTo(-7.5, 5.5);
+        ctx.lineTo(-10.5, 5.5);
+        ctx.closePath();
+      }, "#451a03", 1.2);
+      // steel receiver
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-4.5, -1.8);
+        ctx.lineTo(2.5, -1.8);
+        ctx.lineTo(2.5, 1.2);
+        ctx.lineTo(-4.5, 1.2);
         ctx.closePath();
       });
+      // wooden pump foregrip
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(3.5, 0.4, 4, 1.8);
+      }, "#a16207");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.rect(3.5, 0.4, 4, 1.8);
+      }, "#451a03", 1.0);
+      // long double barrel
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(2.5, -0.8);
+        ctx.lineTo(11.5, -0.8);
+        ctx.moveTo(2.5, -0.2);
+        ctx.lineTo(11.5, -0.2);
+      }, STEEL_X, 1.2);
+      // red shotgun shell carrier
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-2.5, -1, 1.2, 2.2);
+        ctx.rect(-0.8, -1, 1.2, 2.2);
+      }, "#ef4444");
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-2.5, 1.2, 1.2, 0.6);
+        ctx.rect(-0.8, 1.2, 1.2, 0.6);
+      }, "#fbbf24");
       break;
+
+    case "rifle":
+      // wooden stock (warm brown)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-10, -0.4);
+        ctx.lineTo(-4.5, -0.4);
+        ctx.lineTo(-4.5, 2.2);
+        ctx.lineTo(-7.5, 5.5);
+        ctx.lineTo(-10, 5.5);
+        ctx.closePath();
+      }, "#854d0e");
+      // steel receiver
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-4.5, -2);
+        ctx.lineTo(1.5, -2);
+        ctx.lineTo(1.5, 1.5);
+        ctx.lineTo(-4.5, 1.5);
+        ctx.closePath();
+      });
+      // curved steel magazine
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(0.5, 1.5);
+        ctx.quadraticCurveTo(2.4, 4.2, 1.2, 6.8);
+        ctx.lineTo(-0.6, 6.8);
+        ctx.quadraticCurveTo(0.6, 4.2, -0.7, 1.5);
+        ctx.closePath();
+      }, "#14161f");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(0.5, 1.5);
+        ctx.quadraticCurveTo(2.4, 4.2, 1.2, 6.8);
+        ctx.lineTo(-0.6, 6.8);
+        ctx.quadraticCurveTo(0.6, 4.2, -0.7, 1.5);
+        ctx.closePath();
+      }, glow, 1.0);
+      // wooden handguard
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(1.5, -2, 4.5, 2.6);
+      }, "#a16207");
+      // barrel & gas tube
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(6, -0.8);
+        ctx.lineTo(11.5, -0.8);
+      }, STEEL_L, 1.5);
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(6, -1.8);
+        ctx.lineTo(10, -1.8);
+      }, STEEL_D, 1.0);
+      break;
+
+    case "sniper":
+      // solid black stock & body
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-11, -1.4);
+        ctx.lineTo(4, -1.4);
+        ctx.lineTo(4, 1.4);
+        ctx.lineTo(-11, 1.4);
+        ctx.closePath();
+      });
+      // sleek stock extension
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-11, -0.5);
+        ctx.lineTo(-5.5, -0.5);
+        ctx.lineTo(-7.5, 5);
+        ctx.lineTo(-11, 5);
+        ctx.closePath();
+      }, "#14161f");
+      // massive scope (glowing lens)
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-3, -4.6, 6, 2.4);
+      }, "#22252c");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.rect(-3, -4.6, 6, 2.4);
+      }, glow, 1.0);
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(3, -3.4, 1.1, 0, Math.PI * 2);
+      }, "#22d3ee"); // cyan lens flare
+      // extremely long barrel with muzzle brake
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(4, -0.4);
+        ctx.lineTo(13.5, -0.4);
+      }, STEEL_X, 1.6);
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(13.5, -1, 1.6, 1.2);
+      }, glow);
+      break;
+
+    case "rocket":
+      // olive drab green launch tube
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-10, -2.8);
+        ctx.lineTo(6, -2.8);
+        ctx.lineTo(6, 2.8);
+        ctx.lineTo(-10, 2.8);
+        ctx.closePath();
+      });
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-10, -2.8, 16, 5.6);
+      }, "#3f6212"); // olive drab
+      // wooden heat shield
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-5, -3.2, 5.5, 6.4);
+      }, "#b45309"); // brown wood
+      // RPG warhead (glowing tip + stripes)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(6, -1.8);
+        ctx.lineTo(8.5, -3.5);
+        ctx.lineTo(12, 0);
+        ctx.lineTo(8.5, 3.5);
+        ctx.lineTo(6, 1.8);
+        ctx.closePath();
+      }, "#15803d"); // green rocket
+      // stripes
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(8.5, -3.5);
+        ctx.lineTo(8.5, 3.5);
+      }, "#fbbf24", 1.2);
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(10.2, -1.8);
+        ctx.lineTo(10.2, 1.8);
+      }, "#ef4444", 1.2);
+      break;
+
+    case "akm":
+      // reddish-brown wood stock
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(-11.5, -0.8);
+        ctx.lineTo(-5.5, -0.8);
+        ctx.lineTo(-5.5, 2.2);
+        ctx.lineTo(-8.5, 5.2);
+        ctx.lineTo(-11.5, 5.2);
+        ctx.closePath();
+      }, "#9a3412"); // reddish-brown wood
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-11.5, -0.8);
+        ctx.lineTo(-5.5, -0.8);
+        ctx.lineTo(-5.5, 2.2);
+        ctx.lineTo(-8.5, 5.2);
+        ctx.lineTo(-11.5, 5.2);
+        ctx.closePath();
+      }, "#431407", 1.2);
+      // receiver
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-5.5, -2.2);
+        ctx.lineTo(1.5, -2.2);
+        ctx.lineTo(1.5, 1.5);
+        ctx.lineTo(-5.5, 1.5);
+        ctx.closePath();
+      });
+      // highly curved magazine (banana mag)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(0.2, 1.5);
+        ctx.quadraticCurveTo(2.8, 4.4, 1.4, 7.5);
+        ctx.lineTo(-0.8, 7.5);
+        ctx.quadraticCurveTo(0.6, 4.4, -0.8, 1.5);
+        ctx.closePath();
+      }, "#27272a");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(0.2, 1.5);
+        ctx.quadraticCurveTo(2.8, 4.4, 1.4, 7.5);
+        ctx.lineTo(-0.8, 7.5);
+        ctx.quadraticCurveTo(0.6, 4.4, -0.8, 1.5);
+        ctx.closePath();
+      }, glow, 1.2);
+      // wooden handguard
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(1.5, -2, 4.5, 2.5);
+      }, "#9a3412");
+      // steel barrel & front sight
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(6, -0.8);
+        ctx.lineTo(12.5, -0.8);
+      }, STEEL_X, 1.4);
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(11, -0.8);
+        ctx.lineTo(11, -2.2);
+      }, STEEL_D, 1.0);
+      break;
+
     case "fcar":
+      // flat dark earth (tan) modern body
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-9.5, -2.6);
         ctx.lineTo(8.5, -2.6);
-        ctx.lineTo(8.5, -0.8);
-        ctx.lineTo(0, -0.8);
-        ctx.lineTo(0, 0.6);
-        ctx.lineTo(-2.5, 0.6);
-        ctx.lineTo(-4, 6.5);
-        ctx.lineTo(-6.5, 6.5);
-        ctx.lineTo(-5, 0.6);
-        ctx.lineTo(-9.5, 0.6);
-        ctx.closePath();
-      });
-      hi(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -2);
-        ctx.lineTo(8, -2);
-      });
-      // foregrip
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(4.5, -0.2);
-        ctx.lineTo(4.5, 2.6);
-        ctx.lineTo(6, 2.6);
-        ctx.lineTo(6, -0.2);
-      });
-      break;
-    case "pulse":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-8.5, -3);
-        ctx.lineTo(4, -3);
-        ctx.lineTo(8.5, 0);
-        ctx.lineTo(4, 3);
-        ctx.lineTo(-8.5, 3);
-        ctx.lineTo(-8.5, 1.2);
-        ctx.lineTo(-10.5, 1.2);
-        ctx.lineTo(-10.5, -1.2);
-        ctx.lineTo(-8.5, -1.2);
-        ctx.closePath();
-      });
-      // energy core (glow)
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(-3, 0, 2.1, 0, Math.PI * 2);
-        ctx.closePath();
-      }, rgba(glow, 0.9));
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(-1, -1.6);
-        ctx.lineTo(4, -1.6);
-      }, STEEL_L, 0.9);
-      break;
-    case "lightsaber":
-      // hilt
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-8, -2);
-        ctx.lineTo(2, -2);
-        ctx.lineTo(2, 2);
-        ctx.lineTo(-8, 2);
-        ctx.closePath();
-      });
-      // blade (glow)
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(2, -1);
-        ctx.lineTo(11, -1);
-        ctx.lineTo(11, 1);
-        ctx.lineTo(2, 1);
-        ctx.closePath();
-      }, rgba(glow, 0.9));
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(2, -0.4);
-        ctx.lineTo(11, -0.4);
-        ctx.lineTo(11, 0.4);
-        ctx.lineTo(2, 0.4);
-        ctx.closePath();
-      }, "#ffffff");
-      // emitter ring
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(1.6, -2.2);
-        ctx.lineTo(2.4, -2.2);
-        ctx.lineTo(2.4, 2.2);
-        ctx.lineTo(1.6, 2.2);
-        ctx.closePath();
-      }, glow);
-      break;
-    case "hammer":
-      // handle
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-8, -1.1);
-        ctx.lineTo(4, -1.1);
-        ctx.lineTo(4, 1.1);
-        ctx.lineTo(-8, 1.1);
-        ctx.closePath();
-      });
-      // head (accent block)
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(4, -5.2);
-        ctx.lineTo(10.5, -5.2);
-        ctx.lineTo(10.5, 5.2);
-        ctx.lineTo(4, 5.2);
-        ctx.closePath();
-      }, rgba(glow, 0.85));
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(7.2, -5.2);
-        ctx.lineTo(7.2, 5.2);
-      }, "#0b0c22", 0.9);
-      break;
-    case "flamethrower":
-      // tank
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -3);
-        ctx.lineTo(1, -3);
-        ctx.lineTo(1, 3);
-        ctx.lineTo(-9, 3);
-        ctx.closePath();
-      });
-      // nozzle
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(1, -1.4);
-        ctx.lineTo(8.5, -1.4);
-        ctx.lineTo(9.5, 0);
         ctx.lineTo(8.5, 1.4);
-        ctx.lineTo(1, 1.4);
+        ctx.lineTo(-9.5, 1.4);
         ctx.closePath();
       });
-      // flames (glow)
       fill(() => {
         ctx.beginPath();
-        ctx.moveTo(9.4, -1.6);
-        ctx.quadraticCurveTo(12, 0, 9.4, 1.6);
-        ctx.lineTo(9.4, 0.8);
-        ctx.quadraticCurveTo(11, 0, 9.4, -0.8);
-        ctx.closePath();
-      }, rgba(glow, 0.85));
+        ctx.rect(-9.5, -2.6, 18, 4);
+      }, "#d97706"); // tan/FDE base
+      // holographic scope (accent red dot)
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-2, -4.5, 4, 1.9);
+      }, "#1f2937");
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(0.5, -3.55, 0.6, 0, Math.PI * 2);
+      }, "#ef4444"); // red dot
+      // tan mag
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-1.5, 1.4, 2.5, 4.4);
+      }, "#b45309");
+      // tactical foregrip
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(3, 1.4, 1.8, 3.2);
+      }, "#111827");
       break;
+
+    case "pulse":
+      // futuristic pulse rifle chassis (white/grey)
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9.5, -3);
+        ctx.lineTo(6.5, -3);
+        ctx.lineTo(8.5, 0);
+        ctx.lineTo(6.5, 3);
+        ctx.lineTo(-9.5, 3);
+        ctx.closePath();
+      });
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-9.5, -3, 16, 6);
+      }, "#e2e8f0"); // white carbon chassis
+      // glowing blue energy core
+      const coreGrad = ctx.createRadialGradient(-0.5, 0, 0, -0.5, 0, 2.8);
+      coreGrad.addColorStop(0, "#ffffff");
+      coreGrad.addColorStop(0.4, rgba(glow, 0.95));
+      coreGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(-0.5, 0, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+      // neon circuit panel guides
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-7.5, -1.5);
+        ctx.lineTo(-3.5, -1.5);
+        ctx.lineTo(-2.5, 0);
+        ctx.lineTo(-3.5, 1.5);
+        ctx.lineTo(-7.5, 1.5);
+      }, glow, 1.1);
+      break;
+
+    case "lightsaber":
+      // chrome hilt with ribbed grip
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8.5, -1.6);
+        ctx.lineTo(2.5, -1.6);
+        ctx.lineTo(2.5, 1.6);
+        ctx.lineTo(-8.5, 1.6);
+        ctx.closePath();
+      });
+      // ribs
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(-6.5, -1.6);
+        ctx.lineTo(-6.5, 1.6);
+        ctx.moveTo(-4.5, -1.6);
+        ctx.lineTo(-4.5, 1.6);
+        ctx.moveTo(-2.5, -1.6);
+        ctx.lineTo(-2.5, 1.6);
+        ctx.moveTo(-0.5, -1.6);
+        ctx.lineTo(-0.5, 1.6);
+      }, "#111827", 1.4);
+      // glowing red switch button
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(1.2, -0.8, 0.65, 0, Math.PI * 2);
+      }, "#ef4444");
+      // colored laser blade (white core + wide neon bloom)
+      ctx.save();
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 12;
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(2.5, -1.4, 11, 2.8);
+      }, rgba(glow, 0.95));
+      ctx.restore();
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(2.5, -0.5, 11, 1);
+      }, "#ffffff");
+      break;
+
+    case "hammer":
+      // handle (textured brown)
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9.5, -1);
+        ctx.lineTo(3.5, -1);
+        ctx.lineTo(3.5, 1);
+        ctx.lineTo(-9.5, 1);
+        ctx.closePath();
+      });
+      // massive iron hammer head
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(3.5, -5.5);
+        ctx.lineTo(10.5, -5.5);
+        ctx.lineTo(10.5, 5.5);
+        ctx.lineTo(3.5, 5.5);
+        ctx.closePath();
+      }, "#3f4350");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(3.5, -5.5);
+        ctx.lineTo(10.5, -5.5);
+        ctx.lineTo(10.5, 5.5);
+        ctx.lineTo(3.5, 5.5);
+        ctx.closePath();
+      }, glow, 1.8);
+      // glowing volcanic magma cracks
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(4.5, -3);
+        ctx.lineTo(6.5, 0);
+        ctx.lineTo(5.5, 3.5);
+        ctx.moveTo(9.5, -4);
+        ctx.lineTo(7.8, -1.5);
+        ctx.lineTo(9, 2.5);
+      }, "#f97316", 1.25);
+      break;
+
+    case "flamethrower":
+      // brass fuel tank (yellow/orange)
+      fill(() => {
+        ctx.beginPath();
+        ctx.ellipse(-4, 3, 3, 4.4, 0, 0, Math.PI * 2);
+      }, "#ca8a04");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.ellipse(-4, 3, 3, 4.4, 0, 0, Math.PI * 2);
+      }, glow, 1.2);
+      // main chassis
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9.5, -3);
+        ctx.lineTo(6.5, -3);
+        ctx.lineTo(6.5, 1.2);
+        ctx.lineTo(-9.5, 1.2);
+        ctx.closePath();
+      });
+      // heavy nozzle
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(6.5, -0.9);
+        ctx.lineTo(9.5, -0.9);
+      }, STEEL_X, 1.8);
+      // mini pilot flame (glowing orange/yellow)
+      fill(() => {
+        ctx.beginPath();
+        ctx.moveTo(9.5, -0.9);
+        ctx.quadraticCurveTo(11.5, -1.8, 13.5, -0.9);
+        ctx.quadraticCurveTo(11.5, 0, 9.5, -0.9);
+        ctx.closePath();
+      }, "#f97316");
+      break;
+
     case "sa1216":
+      // receiver
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8.5, -2.4);
-        ctx.lineTo(6.5, -2.4);
-        ctx.lineTo(6.5, -0.6);
-        ctx.lineTo(0.5, -0.6);
-        ctx.lineTo(0.5, 0.8);
-        ctx.lineTo(6.5, 0.8);
-        ctx.lineTo(6.5, 2.4);
-        ctx.lineTo(2.5, 2.4);
-        ctx.lineTo(2.5, 7.5);
-        ctx.lineTo(-0.5, 7.5);
-        ctx.lineTo(-0.5, 2.4);
-        ctx.lineTo(-8.5, 2.4);
+        ctx.moveTo(-9, -2.4);
+        ctx.lineTo(1.5, -2.4);
+        ctx.lineTo(1.5, 1.2);
+        ctx.lineTo(-9, 1.2);
         ctx.closePath();
       });
-      // bullpup magazine (front)
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(3.5, 2.8);
-        ctx.lineTo(5, 2.8);
-        ctx.lineTo(4.4, 6.5);
-        ctx.lineTo(2.8, 6.5);
-        ctx.closePath();
-      });
-      break;
-    case "mgl32":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -2.2);
-        ctx.lineTo(7.5, -2.2);
-        ctx.lineTo(7.5, 2.2);
-        ctx.lineTo(-9, 2.2);
-        ctx.closePath();
-      });
-      // revolving cylinder (glow)
+      // rotary quad magazine (4 tubes)
       fill(() => {
         ctx.beginPath();
-        ctx.arc(0, 0.4, 3.6, 0, Math.PI * 2);
-        ctx.closePath();
-      }, rgba(glow, 0.85));
+        ctx.rect(1.5, 0.4, 6.2, 3.8);
+      }, "#27272a");
+      // quad highlights
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(0, -3.2);
-        ctx.lineTo(0, 4);
-        ctx.moveTo(-3.6, 0.4);
-        ctx.lineTo(3.6, 0.4);
-      }, "#0b0c22", 0.9);
+        ctx.moveTo(1.5, 1.4);
+        ctx.lineTo(7.7, 1.4);
+        ctx.moveTo(1.5, 2.3);
+        ctx.lineTo(7.7, 2.3);
+        ctx.moveTo(1.5, 3.2);
+        ctx.lineTo(7.7, 3.2);
+      }, glow, 1.0);
       break;
+
+    case "mgl32":
+      // receiver
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9.5, -2);
+        ctx.lineTo(9, -2);
+        ctx.lineTo(9, 2);
+        ctx.lineTo(-9.5, 2);
+        ctx.closePath();
+      });
+      // giant revolving cylinder
+      fill(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 3.5, 4.4, 0, 0, Math.PI * 2);
+      }, "#1c1917");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 3.5, 4.4, 0, 0, Math.PI * 2);
+      }, glow, 1.2);
+      // golden grenade chambers visible in slots
+      fill(() => {
+        ctx.beginPath();
+        ctx.arc(-1.6, -1.8, 1, 0, Math.PI * 2);
+        ctx.arc(-1.6, 1.8, 1, 0, Math.PI * 2);
+        ctx.arc(1.6, 0, 1, 0, Math.PI * 2);
+      }, "#eab308");
+      break;
+
     case "spear":
       // shaft
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -0.8);
-        ctx.lineTo(5, -0.8);
-        ctx.lineTo(5, 0.8);
-        ctx.lineTo(-9, 0.8);
+        ctx.moveTo(-12.5, -0.8);
+        ctx.lineTo(4.5, -0.8);
+        ctx.lineTo(4.5, 0.8);
+        ctx.lineTo(-12.5, 0.8);
         ctx.closePath();
       });
-      // head (glow)
+      // plasma spearhead (highly glowing)
+      ctx.save();
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 10;
       fill(() => {
         ctx.beginPath();
-        ctx.moveTo(4.6, -2.6);
-        ctx.lineTo(11, 0);
-        ctx.lineTo(4.6, 2.6);
-        ctx.lineTo(6, 0);
+        ctx.moveTo(4.5, -3.2);
+        ctx.lineTo(13.5, 0);
+        ctx.lineTo(4.5, 3.2);
+        ctx.lineTo(6.2, 0);
         ctx.closePath();
-      }, rgba(glow, 0.9));
+      }, rgba(glow, 0.95));
+      ctx.restore();
       break;
+
     case "drone":
+      // quadrotor frame
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-5, -1);
@@ -1891,254 +2104,233 @@ export function drawWeaponIcon(
         ctx.lineTo(-3, 4.5);
         ctx.closePath();
       });
-      // rotors
+      // rotor blades (spinning glow)
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(-7, -6.5);
-        ctx.lineTo(-2, -5);
-        ctx.moveTo(7, -6.5);
-        ctx.lineTo(2, -5);
-        ctx.moveTo(-7, -1);
-        ctx.lineTo(-4, -4);
-        ctx.moveTo(7, -1);
-        ctx.lineTo(4, -4);
-      });
-      // eye (glow)
+        ctx.ellipse(-4.5, -5.5, 3.5, 1, 0.2, 0, Math.PI * 2);
+        ctx.ellipse(4.5, -5.5, 3.5, 1, -0.2, 0, Math.PI * 2);
+        ctx.ellipse(-4.5, 4.5, 3.5, 1, -0.2, 0, Math.PI * 2);
+        ctx.ellipse(4.5, 4.5, 3.5, 1, 0.2, 0, Math.PI * 2);
+      }, "#cbd5e1", 0.8);
+      // glowing camera eye sensor
       fill(() => {
         ctx.beginPath();
-        ctx.arc(0, -0.5, 1.3, 0, Math.PI * 2);
-        ctx.closePath();
-      }, glow);
+        ctx.arc(0, -0.5, 1.5, 0, Math.PI * 2);
+      }, "#ef4444");
       break;
+
     case "recurve_bow":
-      // bow limbs
+      // golden recurve bow limbs
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(4, -8.5);
-        ctx.quadraticCurveTo(10.5, 0, 4, 8.5);
-      }, STEEL, 2.4);
+        ctx.moveTo(1, -9.5);
+        ctx.quadraticCurveTo(8.5, -4.5, 4, 0);
+        ctx.quadraticCurveTo(8.5, 4.5, 1, 9.5);
+      }, "#eab308", 2.2); // golden frame
+      // glowing cyan bowstring
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(2, 8.5);
-        ctx.quadraticCurveTo(8, 0, 2, -8.5);
-      }, glow, 1.4);
-      // string
+        ctx.moveTo(1, -9.5);
+        ctx.lineTo(1, 9.5);
+      }, glow, 0.95);
+      // glowing green arrow loaded
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(4, -8.5);
-        ctx.lineTo(4, 8.5);
-      }, STEEL_L, 0.8);
-      // arrow (glow)
+        ctx.moveTo(-11, 0);
+        ctx.lineTo(3, 0);
+      }, "#22c55e", 1.6);
       fill(() => {
         ctx.beginPath();
-        ctx.moveTo(-10, -0.9);
-        ctx.lineTo(2, -0.9);
-        ctx.lineTo(2, 0.9);
-        ctx.lineTo(-10, 0.9);
+        ctx.moveTo(3, -2.2);
+        ctx.lineTo(6.5, 0);
+        ctx.lineTo(3, 2.2);
         ctx.closePath();
-      }, rgba(glow, 0.9));
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(2, -2);
-        ctx.lineTo(5, 0);
-        ctx.lineTo(2, 2);
-        ctx.closePath();
-      }, glow);
+      }, "#22c55e");
       break;
+
     case "riot_shield":
+      // heavy tactical riot shield
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8, -7);
-        ctx.lineTo(4, -9);
-        ctx.lineTo(7.5, 0);
-        ctx.lineTo(4, 9);
-        ctx.lineTo(-8, 7);
-        ctx.lineTo(-9.2, 0);
+        ctx.moveTo(-8.5, -7.5);
+        ctx.lineTo(4.5, -9.5);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(4.5, 9.5);
+        ctx.lineTo(-8.5, 7.5);
         ctx.closePath();
       });
-      // rim accent + boss
+      // bulletproof viewport glass (translucent blue)
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-3, -6.5, 6, 2.6);
+      }, "rgba(34,211,238,0.72)");
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(-6.5, -6);
-        ctx.lineTo(3.4, -7.6);
-        ctx.lineTo(6, 0);
-        ctx.lineTo(3.4, 7.6);
-        ctx.lineTo(-6.5, 6);
-        ctx.lineTo(-7.4, 0);
-        ctx.closePath();
-      }, rgba(glow, 0.9), 1.2);
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(-1.5, 0, 2.2, 0, Math.PI * 2);
-        ctx.closePath();
-      }, rgba(glow, 0.9));
-      // grip
+        ctx.rect(-3, -6.5, 6, 2.6);
+      }, "#22d3ee", 0.95);
+      // glowing energy grid crosses on front
       stroke(() => {
         ctx.beginPath();
-        ctx.moveTo(-9.2, 0);
-        ctx.lineTo(-11.5, 1.5);
-      }, STEEL_L, 1.2);
-      break;
-    case "shak50":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -2.4);
-        ctx.lineTo(6.5, -2.4);
-        ctx.lineTo(6.5, -0.6);
-        ctx.lineTo(0.5, -0.6);
-        ctx.lineTo(0.5, 0.8);
-        ctx.lineTo(6.5, 0.8);
-        ctx.lineTo(6.5, 2.4);
-        ctx.lineTo(2.5, 2.4);
-        ctx.lineTo(2.5, 7.5);
-        ctx.lineTo(-0.5, 7.5);
-        ctx.lineTo(-0.5, 2.4);
-        ctx.lineTo(-9, 2.4);
-        ctx.closePath();
-      });
-      // box magazine (glow)
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(-1.5, 2.8);
-        ctx.lineTo(2.2, 2.8);
-        ctx.lineTo(2.2, 8.5);
-        ctx.lineTo(-1.5, 8.5);
-        ctx.closePath();
-      }, rgba(glow, 0.85));
-      // bipod
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(5, 2.8);
-        ctx.lineTo(7, 7.5);
-        ctx.moveTo(5, 2.8);
-        ctx.lineTo(3.5, 7.5);
-      });
-      break;
-    case "gatling":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-8, -2.4);
-        ctx.lineTo(6, -2.4);
-        ctx.lineTo(6, -0.6);
-        ctx.lineTo(-1, -0.6);
-        ctx.lineTo(-1, 0.8);
-        ctx.lineTo(6, 0.8);
-        ctx.lineTo(6, 2.4);
-        ctx.lineTo(2.5, 2.4);
-        ctx.lineTo(2.5, 7);
-        ctx.lineTo(-0.5, 7);
-        ctx.lineTo(-0.5, 2.4);
-        ctx.lineTo(-8, 2.4);
-        ctx.closePath();
-      });
-      // barrel cluster (glow)
-      fill(() => {
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * Math.PI * 2;
-          const x = 2 + Math.cos(a) * 2.6;
-          const y = Math.sin(a) * 2.6;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-      }, rgba(glow, 0.85));
-      break;
-    case "poison_mist":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-8, -2.2);
-        ctx.lineTo(6, -2.2);
-        ctx.lineTo(6, 0.4);
-        ctx.lineTo(-2, 0.4);
-        ctx.lineTo(-2, 1.4);
-        ctx.lineTo(2, 1.4);
-        ctx.lineTo(2, 2.2);
-        ctx.lineTo(-1, 2.2);
-        ctx.lineTo(-1, 6.5);
-        ctx.lineTo(-3, 6.5);
-        ctx.lineTo(-3, 2.2);
-        ctx.lineTo(-8, 2.2);
-        ctx.closePath();
-      });
-      // poison cloud (glow)
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(6, -1.2, 2.6, 0, Math.PI * 2);
-        ctx.arc(8.6, 0.4, 2.2, 0, Math.PI * 2);
-        ctx.arc(6, 1.8, 2.4, 0, Math.PI * 2);
-        ctx.closePath();
-      }, rgba(glow, 0.85));
-      break;
-    case "lewis":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-9, -2.4);
-        ctx.lineTo(8, -2.4);
-        ctx.lineTo(8, -0.4);
-        ctx.lineTo(-2, -0.4);
-        ctx.lineTo(-2, 1);
-        ctx.lineTo(3, 1);
-        ctx.lineTo(3, 2.4);
-        ctx.lineTo(-1, 2.4);
+        ctx.moveTo(-6, -1);
+        ctx.lineTo(6, -1);
+        ctx.moveTo(-6, 2);
+        ctx.lineTo(6, 2);
+        ctx.moveTo(-1, -4);
         ctx.lineTo(-1, 6);
-        ctx.lineTo(-3, 6);
-        ctx.lineTo(-3, 2.4);
+      }, glow, 1.25);
+      break;
+
+    case "shak50":
+      // olive drab heavy chassis
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9.5, -3.2);
+        ctx.lineTo(6.5, -3.2);
+        ctx.lineTo(6.5, 1);
+        ctx.lineTo(-9.5, 1);
+        ctx.closePath();
+      });
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-9.5, -3.2, 16, 4.2);
+      }, "#3f4935"); // military green
+      // carry handle
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-4, -5.2, 7, 2);
+      }, "#1c1917");
+      // massive bullpup box magazine behind grip
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-8, 1, 3.2, 5.2);
+      }, "#1c1917");
+      break;
+
+    case "gatling":
+      // minigun triple rotating barrel bundle
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(2.5, -1.8);
+        ctx.lineTo(12.5, -1.8);
+        ctx.moveTo(2.5, -0.6);
+        ctx.lineTo(12.5, -0.6);
+        ctx.moveTo(2.5, 0.6);
+        ctx.lineTo(12.5, 0.6);
+      }, STEEL_X, 1.3);
+      // heavy ammunition box
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9, -2.4);
+        ctx.lineTo(2.5, -2.4);
+        ctx.lineTo(2.5, 2.4);
         ctx.lineTo(-9, 2.4);
         ctx.closePath();
       });
+      // brass bullet feeding belt (details)
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-2.5, 2.4, 1.4, 4.8);
+        ctx.rect(-0.5, 2.4, 1.4, 4.8);
+      }, "#ca8a04");
+      break;
+
+    case "poison_mist":
+      // transparent chemical tank containing bubbling toxic liquid
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-4.5, -6.5, 7, 5);
+      }, "rgba(34,197,94,0.18)");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.rect(-4.5, -6.5, 7, 5);
+      }, glow, 1.3);
+      // green toxic fluid level
+      fill(() => {
+        ctx.beginPath();
+        ctx.rect(-4.5, -3.5, 7, 2);
+      }, "#22c55e");
+      // gun chassis below
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-8.5, -1.5);
+        ctx.lineTo(6.5, -1.5);
+        ctx.lineTo(6.5, 2.5);
+        ctx.lineTo(-8.5, 2.5);
+        ctx.closePath();
+      });
+      break;
+
+    case "lewis":
+      // coolant shroud (large cylinder around barrel)
+      stroke(() => {
+        ctx.beginPath();
+        ctx.moveTo(3.5, -1);
+        ctx.lineTo(11.5, -1);
+      }, STEEL_X, 2.8);
       // pan magazine on top
       fill(() => {
         ctx.beginPath();
-        ctx.arc(0, -4.6, 3.2, 0, Math.PI * 2);
-      }, rgba(glow, 0.85));
+        ctx.ellipse(0, -4.6, 3.8, 1.8, 0, 0, Math.PI * 2);
+      }, "#3a4254");
+      stroke(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, -4.6, 3.8, 1.8, 0, 0, Math.PI * 2);
+      }, glow, 1.15);
+      // chassis receiver
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-9, -2.4);
+        ctx.lineTo(3.5, -2.4);
+        ctx.lineTo(3.5, 2.4);
+        ctx.lineTo(-9, 2.4);
+        ctx.closePath();
+      });
       break;
+
     case "plasma_rifle":
+      // futuristic body
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-8, -2.2);
         ctx.lineTo(7, -2.2);
-        ctx.lineTo(7, -0.4);
-        ctx.lineTo(-2, -0.4);
-        ctx.lineTo(-2, 1);
-        ctx.lineTo(3, 1);
-        ctx.lineTo(3, 2.2);
-        ctx.lineTo(-1, 2.2);
-        ctx.lineTo(-1, 6);
-        ctx.lineTo(-3, 6);
-        ctx.lineTo(-3, 2.2);
+        ctx.lineTo(7, 2.2);
         ctx.lineTo(-8, 2.2);
         ctx.closePath();
       });
-      // glowing plasma muzzle
+      // exposed glowing plasma coils (pink/cyan)
       fill(() => {
         ctx.beginPath();
-        ctx.arc(11, -1.2, 2.6, 0, Math.PI * 2);
-      }, rgba(glow, 0.9));
+        ctx.rect(-2.5, -1.2, 1.2, 2.4);
+        ctx.rect(-0.2, -1.2, 1.2, 2.4);
+        ctx.rect(2.1, -1.2, 1.2, 2.4);
+      }, glow);
       break;
+
     case "lightning_whip":
-      // handle
+      // handle hilt
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8, -1.1);
-        ctx.lineTo(1, -1.1);
-        ctx.lineTo(1, 1.1);
-        ctx.lineTo(-8, 1.1);
+        ctx.moveTo(-8.5, -1.6);
+        ctx.lineTo(1, -1.6);
+        ctx.lineTo(1, 1.6);
+        ctx.lineTo(-8.5, 1.6);
         ctx.closePath();
       });
-      // energy whip (glow) — jagged bolt
+      // crackling energy bolt whip cord
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       stroke(() => {
         ctx.beginPath();
         ctx.moveTo(1, 0);
-        ctx.lineTo(4, -3);
-        ctx.lineTo(7, 2);
-        ctx.lineTo(9.5, -2.5);
-        ctx.lineTo(11.5, 1);
-      }, rgba(glow, 0.9), 1.6);
+        ctx.lineTo(3.5, -3.2);
+        ctx.lineTo(6.5, 2.5);
+        ctx.lineTo(9, -2.5);
+        ctx.lineTo(11, 2.5);
+        ctx.lineTo(13.5, 0.2);
+      }, glow, 1.85);
       ctx.restore();
       break;
+
     default:
       body(() => {
         ctx.beginPath();
