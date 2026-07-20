@@ -1136,11 +1136,9 @@ export class GameEngine {
     if (this.gameMode === "deathmatch") {
       this.isDM = true;
       this.dmKillLimit = this.mode === "local" ? 15 : 8;
-      // neutralise bases so they're never targeted / drawn
-      this.base.hp = Infinity;
-      this.base.maxHp = Infinity;
-      this.enemyBase.hp = Infinity;
-      this.enemyBase.maxHp = Infinity;
+      // neutralise bases so they're never targeted / drawn / shown in UI
+      this.base = null as any;
+      this.enemyBase = null as any;
       // four spawn anchors so nobody starts on top of another
       this.dmSpawns = [
         { x: this.worldW * 0.5, y: this.worldH - 200 },
@@ -1226,7 +1224,7 @@ export class GameEngine {
           skill: this.mode === "host" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
           guns: this.mode === "host" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "host" ? this.gunIndex : (this.foe.gunIndex ?? 0),
-          weaponStates: this.mode === "host" ? this.weaponStates : new Map(),
+          weaponStates: this.mode === "host" ? this.weaponStates : this.foeWeaponStates,
           gadgets: this.mode === "host" ? this.gadgets : this.foeGadgets,
           selectedGadget: this.mode === "host" ? this.selectedGadget : -1,
           skillCd: this.mode === "host" ? this.skillCd : 0,
@@ -1245,7 +1243,7 @@ export class GameEngine {
           skill: this.mode === "guest" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
           guns: this.mode === "guest" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "guest" ? this.gunIndex : (this.foe.gunIndex ?? 0),
-          weaponStates: this.mode === "guest" ? this.weaponStates : new Map(),
+          weaponStates: this.mode === "guest" ? this.weaponStates : this.foeWeaponStates,
           gadgets: this.mode === "guest" ? this.gadgets : this.foeGadgets,
           selectedGadget: this.mode === "guest" ? this.selectedGadget : -1,
           skillCd: this.mode === "guest" ? this.skillCd : 0,

@@ -243,6 +243,11 @@ wss.on("connection", (ws) => {
       if (data.t === "hello") {
         const peer = room.peers.get(ws.pid);
         if (peer) peer.loadout = data.loadout;
+        
+        // forward loadout to the other peer so they can initialize foe state
+        const other = ws.pid === 1 ? room.peers.get(2) : room.peers.get(1);
+        if (other && other.ws) send(other.ws, { t: "msg", data });
+
         // once both loadouts are known, boot the authoritative simulation
         startEngine(room);
       } else if (data.t === "inp") {
