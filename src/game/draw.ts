@@ -1362,51 +1362,31 @@ export function drawWeaponIcon(
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  // metallic body gradient (vertical), crisp accent outline + neon glow
-  const grad = ctx.createLinearGradient(0, -9, 0, 9);
-  grad.addColorStop(0, STEEL_X);
-  grad.addColorStop(0.45, STEEL);
-  grad.addColorStop(1, STEEL_D);
-
-  /** Draw the main steel body with a glow outline. */
+  /** Draw the main white body with a glow outline. */
   const body = (p: () => void) => {
     ctx.save();
-    ctx.shadowColor = rgba(glow, 0.65);
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = grad;
+    ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = glow;
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 1.6;
     p();
     ctx.fill();
-    ctx.shadowBlur = 0;
     ctx.stroke();
     ctx.restore();
   };
-  /** Accent stroke (default = weapon glow). */
-  const stroke = (p: () => void, color = glow, lw = 1.1) => {
+
+  /** Erase details from the white body, leaving transparent cutouts. */
+  const cutout = (p: () => void, lw = 1.1) => {
     ctx.save();
-    ctx.strokeStyle = color;
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.fillStyle = "rgba(0,0,0,1)";
     ctx.lineWidth = lw;
     p();
-    ctx.stroke();
     ctx.restore();
   };
-  /** Solid fill in a flat color. */
-  const fill = (p: () => void, color: string) => {
-    ctx.save();
-    ctx.fillStyle = color;
-    p();
-    ctx.fill();
-    ctx.restore();
-  };
-  /** Light highlight line. */
-  const hi = (p: () => void) => stroke(p, STEEL_L, 0.9);
-  /** Dark recess / detail fill. */
-  const inn = (p: () => void) => fill(p, "#14161f");
 
   switch (iconShape) {
     case "pistol":
-      // slide & barrel
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-6, -2.2);
@@ -1414,42 +1394,42 @@ export function drawWeaponIcon(
         ctx.lineTo(6.6, -1);
         ctx.lineTo(6.6, 0.2);
         ctx.lineTo(-6.4, 0.2);
+        ctx.lineTo(-6.4, -2.2);
+        ctx.closePath();
+
+        // Grip
+        ctx.moveTo(-5.4, 0.2);
+        ctx.lineTo(-1.6, 0.2);
+        ctx.lineTo(-3.4, 6.8);
+        ctx.lineTo(-6.8, 6.8);
         ctx.closePath();
       });
-      // grip (dark textured brown)
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.moveTo(-5.4, 0.4);
-        ctx.lineTo(-1.6, 0.4);
-        ctx.lineTo(-3.4, 6.8);
-        ctx.lineTo(-6.8, 6.8);
-        ctx.closePath();
-      }, "#4e3629");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(-5.4, 0.4);
-        ctx.lineTo(-1.6, 0.4);
-        ctx.lineTo(-3.4, 6.8);
-        ctx.lineTo(-6.8, 6.8);
-        ctx.closePath();
-      }, "#2a1e17", 1.2);
-      // trigger guard & trigger
-      stroke(() => {
-        ctx.beginPath();
+        // Trigger guard
         ctx.moveTo(-1.6, 1.9);
         ctx.lineTo(-1.6, 4);
         ctx.lineTo(0.6, 4);
         ctx.lineTo(0.6, 1.9);
-      }, STEEL_L);
-      // golden laser sight under barrel
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(1, 0.5, 4.5, 1.4);
-      }, "#fbbf24");
+        ctx.closePath();
+        ctx.fill();
+
+        // Slide serrations
+        ctx.moveTo(-5.2, -1.6);
+        ctx.lineTo(-5.2, -0.4);
+        ctx.moveTo(-4.2, -1.6);
+        ctx.lineTo(-4.2, -0.4);
+        ctx.moveTo(-3.2, -1.6);
+        ctx.lineTo(-3.2, -0.4);
+        ctx.stroke();
+
+        // Laser sight chamber line
+        ctx.rect(1.2, 0.5, 4.2, 1.2);
+        ctx.fill();
+      });
       break;
 
     case "mac11":
-      // compact boxy receiver
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-8.5, -2.2);
@@ -1457,35 +1437,27 @@ export function drawWeaponIcon(
         ctx.lineTo(6, 1.8);
         ctx.lineTo(-8.5, 1.8);
         ctx.closePath();
+
+        // Grip
+        ctx.rect(-1.5, 1.8, 3.5, 5.2);
+        // Magazine
+        ctx.rect(-0.8, 7, 2, 4.5);
       });
-      // grip
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(-1.5, 1.8, 3.5, 5.2);
-      }, "#22252c");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.rect(-1.5, 1.8, 3.5, 5.2);
-      }, glow, 1.2);
-      // straight magazine extending down
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(-0.8, 7, 2, 4.5);
-      }, "#14161f");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.rect(-0.8, 7, 2, 4.5);
-      }, STEEL_L, 0.8);
-      // green front strap
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(5.5, 1.4);
-        ctx.quadraticCurveTo(5, 5, 2.5, 6.5);
-      }, "#4d7c0f", 1.8);
+        // Trigger guard hole
+        ctx.rect(-1.2, 2.2, 2.4, 2.4);
+        ctx.fill();
+        // Separator lines
+        ctx.moveTo(-1.5, 1.8);
+        ctx.lineTo(2, 1.8);
+        ctx.moveTo(-0.8, 7);
+        ctx.lineTo(1.2, 7);
+        ctx.stroke();
+      });
       break;
 
     case "mp5":
-      // receiver
       body(() => {
         ctx.beginPath();
         ctx.moveTo(-8.5, -2.2);
@@ -1493,53 +1465,40 @@ export function drawWeaponIcon(
         ctx.lineTo(3, 1.8);
         ctx.lineTo(-8.5, 1.8);
         ctx.closePath();
+
+        // Ribbed handguard
+        ctx.rect(3, -2.4, 4.5, 3.2);
+        // Curved magazine
+        ctx.moveTo(1.5, 1.8);
+        ctx.quadraticCurveTo(2.4, 4.5, 1.2, 7.2);
+        ctx.lineTo(-0.6, 7.2);
+        ctx.quadraticCurveTo(0.6, 4.5, -0.7, 1.8);
+        ctx.closePath();
       });
-      // green ribbed handguard
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(3, -2.4, 4.5, 3.2);
-      }, "#3f6212");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.rect(3, -2.4, 4.5, 3.2);
-      }, "#1e293b", 1.2);
-      // curved magazine
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(1.5, 1.8);
-        ctx.quadraticCurveTo(2.4, 4.5, 1.2, 7.2);
-        ctx.lineTo(-0.6, 7.2);
-        ctx.quadraticCurveTo(0.6, 4.5, -0.7, 1.8);
-        ctx.closePath();
-      }, "#14161f");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(1.5, 1.8);
-        ctx.quadraticCurveTo(2.4, 4.5, 1.2, 7.2);
-        ctx.lineTo(-0.6, 7.2);
-        ctx.quadraticCurveTo(0.6, 4.5, -0.7, 1.8);
-        ctx.closePath();
-      }, glow, 1.0);
-      // barrel & cocking handle
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(7.5, -0.8);
-        ctx.lineTo(9.5, -0.8);
-      }, STEEL_L, 1.5);
-      // ring sight
-      stroke(() => {
-        ctx.beginPath();
-        ctx.arc(-1, -3.2, 1, 0, Math.PI * 2);
-      }, STEEL_L, 1.0);
+        // Trigger guard hole
+        ctx.rect(-1.2, 2.2, 2.4, 2.6);
+        ctx.fill();
+        // Ribbed lines on handguard
+        ctx.moveTo(4, -2.4);
+        ctx.lineTo(4, 0.8);
+        ctx.moveTo(5, -2.4);
+        ctx.lineTo(5, 0.8);
+        ctx.moveTo(6, -2.4);
+        ctx.lineTo(6, 0.8);
+        ctx.stroke();
+      });
       break;
 
     case "mortar":
-      // base plate
-      fill(() => {
+      body(() => {
         ctx.beginPath();
+        // Base plate
         ctx.rect(-8, 3.5, 5, 2.5);
-      }, "#1e293b");
-      // thick tube angled up
+        // Swivel stem
+        ctx.rect(-3.5, 1.5, 3, 3.5);
+      });
       ctx.save();
       ctx.rotate(-Math.PI / 6);
       body(() => {
@@ -1547,324 +1506,242 @@ export function drawWeaponIcon(
         ctx.rect(-3, -2.2, 12, 4.4);
       });
       ctx.restore();
-      // bipod stand
-      stroke(() => {
+      body(() => {
         ctx.beginPath();
+        // Bipod legs
         ctx.moveTo(-1, 2.5);
         ctx.lineTo(2.5, 6);
-        ctx.moveTo(2.5, 6);
         ctx.lineTo(5.5, 2.5);
-      }, STEEL_L, 1.6);
-      // glowing screen on side
-      fill(() => {
+      });
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(-1, 0, 2.5, 2);
-      }, glow);
+        // Center tripod gap
+        ctx.moveTo(-0.2, 2.8);
+        ctx.lineTo(2.5, 5.5);
+        ctx.lineTo(4.8, 2.8);
+        ctx.closePath();
+        ctx.fill();
+      });
       break;
 
     case "shotgun":
-      // wooden stock (warm brown)
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(-10.5, -0.4);
-        ctx.lineTo(-4.5, -0.4);
-        ctx.lineTo(-4.5, 2.2);
-        ctx.lineTo(-7.5, 5.5);
-        ctx.lineTo(-10.5, 5.5);
-        ctx.closePath();
-      }, "#854d0e");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(-10.5, -0.4);
-        ctx.lineTo(-4.5, -0.4);
-        ctx.lineTo(-4.5, 2.2);
-        ctx.lineTo(-7.5, 5.5);
-        ctx.lineTo(-10.5, 5.5);
-        ctx.closePath();
-      }, "#451a03", 1.2);
-      // steel receiver
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-4.5, -1.8);
-        ctx.lineTo(2.5, -1.8);
-        ctx.lineTo(2.5, 1.2);
-        ctx.lineTo(-4.5, 1.2);
+        // Wooden stock
+        ctx.moveTo(-10.5, -0.4);
+        ctx.lineTo(-4.5, -0.4);
+        ctx.lineTo(-4.5, 2.2);
+        ctx.lineTo(-7.5, 5.5);
+        ctx.lineTo(-10.5, 5.5);
         ctx.closePath();
+
+        // Receiver
+        ctx.rect(-4.5, -1.8, 7, 3);
+        // Pump foregrip
+        ctx.rect(3.5, 0.4, 4, 1.8);
+        // Long double barrel
+        ctx.rect(2.5, -1.2, 9, 1.8);
       });
-      // wooden pump foregrip
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(3.5, 0.4, 4, 1.8);
-      }, "#a16207");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.rect(3.5, 0.4, 4, 1.8);
-      }, "#451a03", 1.0);
-      // long double barrel
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(2.5, -0.8);
-        ctx.lineTo(11.5, -0.8);
-        ctx.moveTo(2.5, -0.2);
-        ctx.lineTo(11.5, -0.2);
-      }, STEEL_X, 1.2);
-      // red shotgun shell carrier
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(-2.5, -1, 1.2, 2.2);
-        ctx.rect(-0.8, -1, 1.2, 2.2);
-      }, "#ef4444");
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(-2.5, 1.2, 1.2, 0.6);
-        ctx.rect(-0.8, 1.2, 1.2, 0.6);
-      }, "#fbbf24");
+        // Trigger guard
+        ctx.rect(-2.8, 1.2, 2, 2);
+        ctx.fill();
+        // Barrel separation line
+        ctx.moveTo(2.5, -0.3);
+        ctx.lineTo(11.5, -0.3);
+        // Pump grooves
+        ctx.moveTo(4.5, 0.4);
+        ctx.lineTo(4.5, 2.2);
+        ctx.moveTo(5.5, 0.4);
+        ctx.lineTo(5.5, 2.2);
+        ctx.moveTo(6.5, 0.4);
+        ctx.lineTo(6.5, 2.2);
+        ctx.stroke();
+      });
       break;
 
     case "rifle":
-      // wooden stock (warm brown)
-      fill(() => {
+      body(() => {
         ctx.beginPath();
+        // Stock
         ctx.moveTo(-10, -0.4);
         ctx.lineTo(-4.5, -0.4);
         ctx.lineTo(-4.5, 2.2);
         ctx.lineTo(-7.5, 5.5);
         ctx.lineTo(-10, 5.5);
         ctx.closePath();
-      }, "#854d0e");
-      // steel receiver
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-4.5, -2);
-        ctx.lineTo(1.5, -2);
-        ctx.lineTo(1.5, 1.5);
-        ctx.lineTo(-4.5, 1.5);
-        ctx.closePath();
-      });
-      // curved steel magazine
-      fill(() => {
-        ctx.beginPath();
+
+        // Receiver
+        ctx.rect(-4.5, -2, 6, 3.5);
+        // Curved magazine
         ctx.moveTo(0.5, 1.5);
         ctx.quadraticCurveTo(2.4, 4.2, 1.2, 6.8);
         ctx.lineTo(-0.6, 6.8);
         ctx.quadraticCurveTo(0.6, 4.2, -0.7, 1.5);
         ctx.closePath();
-      }, "#14161f");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(0.5, 1.5);
-        ctx.quadraticCurveTo(2.4, 4.2, 1.2, 6.8);
-        ctx.lineTo(-0.6, 6.8);
-        ctx.quadraticCurveTo(0.6, 4.2, -0.7, 1.5);
-        ctx.closePath();
-      }, glow, 1.0);
-      // wooden handguard
-      fill(() => {
-        ctx.beginPath();
+
+        // Handguard & barrel
         ctx.rect(1.5, -2, 4.5, 2.6);
-      }, "#a16207");
-      // barrel & gas tube
-      stroke(() => {
+        ctx.rect(6, -0.8, 5.5, 1.2);
+      });
+      cutout(() => {
         ctx.beginPath();
-        ctx.moveTo(6, -0.8);
-        ctx.lineTo(11.5, -0.8);
-      }, STEEL_L, 1.5);
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(6, -1.8);
-        ctx.lineTo(10, -1.8);
-      }, STEEL_D, 1.0);
+        // Trigger guard
+        ctx.rect(-2, 1.5, 1.8, 1.8);
+        ctx.fill();
+        // Stock thumbhole
+        ctx.arc(-7.5, 2.5, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        // Magazine grooves
+        ctx.moveTo(0.2, 3);
+        ctx.lineTo(1.1, 3);
+        ctx.moveTo(-0.1, 4.5);
+        ctx.lineTo(0.8, 4.5);
+        ctx.stroke();
+      });
       break;
 
     case "sniper":
-      // solid black stock & body
       body(() => {
         ctx.beginPath();
+        // Stock
         ctx.moveTo(-11, -1.4);
         ctx.lineTo(4, -1.4);
         ctx.lineTo(4, 1.4);
         ctx.lineTo(-11, 1.4);
         ctx.closePath();
-      });
-      // sleek stock extension
-      fill(() => {
-        ctx.beginPath();
+        // Buttstock lower
         ctx.moveTo(-11, -0.5);
         ctx.lineTo(-5.5, -0.5);
         ctx.lineTo(-7.5, 5);
         ctx.lineTo(-11, 5);
         ctx.closePath();
-      }, "#14161f");
-      // massive scope (glowing lens)
-      fill(() => {
-        ctx.beginPath();
+
+        // Scope
         ctx.rect(-3, -4.6, 6, 2.4);
-      }, "#22252c");
-      stroke(() => {
+        // Barrel
+        ctx.rect(4, -0.8, 9.5, 1.2);
+      });
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(-3, -4.6, 6, 2.4);
-      }, glow, 1.0);
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(3, -3.4, 1.1, 0, Math.PI * 2);
-      }, "#22d3ee"); // cyan lens flare
-      // extremely long barrel with muzzle brake
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(4, -0.4);
-        ctx.lineTo(13.5, -0.4);
-      }, STEEL_X, 1.6);
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(13.5, -1, 1.6, 1.2);
-      }, glow);
+        // Trigger guard
+        ctx.rect(-1, 1.4, 2, 2);
+        // Thumbhole in stock
+        ctx.ellipse(-7.5, 2.2, 1.8, 0.8, 0, 0, Math.PI * 2);
+        // Scope mounts (erase center)
+        ctx.rect(-1.2, -2.2, 2.4, 1);
+        ctx.fill();
+        // Scope lens division
+        ctx.moveTo(-3, -3.4);
+        ctx.lineTo(3, -3.4);
+        ctx.stroke();
+      });
       break;
 
     case "rocket":
-      // olive drab green launch tube
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-10, -2.8);
-        ctx.lineTo(6, -2.8);
-        ctx.lineTo(6, 2.8);
-        ctx.lineTo(-10, 2.8);
-        ctx.closePath();
-      });
-      fill(() => {
-        ctx.beginPath();
+        // Launch tube
         ctx.rect(-10, -2.8, 16, 5.6);
-      }, "#3f6212"); // olive drab
-      // wooden heat shield
-      fill(() => {
-        ctx.beginPath();
+        // Shield
         ctx.rect(-5, -3.2, 5.5, 6.4);
-      }, "#b45309"); // brown wood
-      // RPG warhead (glowing tip + stripes)
-      fill(() => {
-        ctx.beginPath();
+        // Warhead
         ctx.moveTo(6, -1.8);
         ctx.lineTo(8.5, -3.5);
         ctx.lineTo(12, 0);
         ctx.lineTo(8.5, 3.5);
         ctx.lineTo(6, 1.8);
         ctx.closePath();
-      }, "#15803d"); // green rocket
-      // stripes
-      stroke(() => {
+      });
+      cutout(() => {
         ctx.beginPath();
+        // Shield banding lines
+        ctx.moveTo(-4, -3.2);
+        ctx.lineTo(-4, 3.2);
+        ctx.moveTo(-1, -3.2);
+        ctx.lineTo(-1, 3.2);
+        // Rocket warhead separator lines
+        ctx.moveTo(6, -1.8);
+        ctx.lineTo(6, 1.8);
         ctx.moveTo(8.5, -3.5);
         ctx.lineTo(8.5, 3.5);
-      }, "#fbbf24", 1.2);
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(10.2, -1.8);
-        ctx.lineTo(10.2, 1.8);
-      }, "#ef4444", 1.2);
+        ctx.stroke();
+      });
       break;
 
     case "akm":
-      // reddish-brown wood stock
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(-11.5, -0.8);
-        ctx.lineTo(-5.5, -0.8);
-        ctx.lineTo(-5.5, 2.2);
-        ctx.lineTo(-8.5, 5.2);
-        ctx.lineTo(-11.5, 5.2);
-        ctx.closePath();
-      }, "#9a3412"); // reddish-brown wood
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(-11.5, -0.8);
-        ctx.lineTo(-5.5, -0.8);
-        ctx.lineTo(-5.5, 2.2);
-        ctx.lineTo(-8.5, 5.2);
-        ctx.lineTo(-11.5, 5.2);
-        ctx.closePath();
-      }, "#431407", 1.2);
-      // receiver
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-5.5, -2.2);
-        ctx.lineTo(1.5, -2.2);
-        ctx.lineTo(1.5, 1.5);
-        ctx.lineTo(-5.5, 1.5);
+        // Reddish-brown wood stock
+        ctx.moveTo(-11.5, -0.8);
+        ctx.lineTo(-5.5, -0.8);
+        ctx.lineTo(-5.5, 2.2);
+        ctx.lineTo(-8.5, 5.2);
+        ctx.lineTo(-11.5, 5.2);
         ctx.closePath();
-      });
-      // highly curved magazine (banana mag)
-      fill(() => {
-        ctx.beginPath();
+
+        // Receiver
+        ctx.rect(-5.5, -2.2, 7, 3.7);
+        // Banana mag
         ctx.moveTo(0.2, 1.5);
         ctx.quadraticCurveTo(2.8, 4.4, 1.4, 7.5);
         ctx.lineTo(-0.8, 7.5);
         ctx.quadraticCurveTo(0.6, 4.4, -0.8, 1.5);
         ctx.closePath();
-      }, "#27272a");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(0.2, 1.5);
-        ctx.quadraticCurveTo(2.8, 4.4, 1.4, 7.5);
-        ctx.lineTo(-0.8, 7.5);
-        ctx.quadraticCurveTo(0.6, 4.4, -0.8, 1.5);
-        ctx.closePath();
-      }, glow, 1.2);
-      // wooden handguard
-      fill(() => {
-        ctx.beginPath();
+
+        // Handguard
         ctx.rect(1.5, -2, 4.5, 2.5);
-      }, "#9a3412");
-      // steel barrel & front sight
-      stroke(() => {
+        // Barrel
+        ctx.rect(6, -1, 6.5, 0.8);
+      });
+      cutout(() => {
         ctx.beginPath();
-        ctx.moveTo(6, -0.8);
-        ctx.lineTo(12.5, -0.8);
-      }, STEEL_X, 1.4);
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(11, -0.8);
-        ctx.lineTo(11, -2.2);
-      }, STEEL_D, 1.0);
+        // Trigger guard
+        ctx.rect(-2.4, 1.5, 1.8, 1.8);
+        ctx.fill();
+        // Stock separation gap
+        ctx.moveTo(-5.5, -0.8);
+        ctx.lineTo(-5.5, 2.2);
+        // Banana mag slots
+        ctx.moveTo(0.1, 3.2);
+        ctx.lineTo(1.2, 3.2);
+        ctx.moveTo(-0.1, 4.8);
+        ctx.lineTo(0.8, 4.8);
+        ctx.stroke();
+      });
       break;
 
     case "fcar":
-      // flat dark earth (tan) modern body
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9.5, -2.6);
-        ctx.lineTo(8.5, -2.6);
-        ctx.lineTo(8.5, 1.4);
-        ctx.lineTo(-9.5, 1.4);
-        ctx.closePath();
-      });
-      fill(() => {
-        ctx.beginPath();
+        // Upper & lower receiver
         ctx.rect(-9.5, -2.6, 18, 4);
-      }, "#d97706"); // tan/FDE base
-      // holographic scope (accent red dot)
-      fill(() => {
-        ctx.beginPath();
+        // Holographic scope
         ctx.rect(-2, -4.5, 4, 1.9);
-      }, "#1f2937");
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(0.5, -3.55, 0.6, 0, Math.PI * 2);
-      }, "#ef4444"); // red dot
-      // tan mag
-      fill(() => {
-        ctx.beginPath();
+        // Tan mag
         ctx.rect(-1.5, 1.4, 2.5, 4.4);
-      }, "#b45309");
-      // tactical foregrip
-      fill(() => {
-        ctx.beginPath();
+        // Tactical foregrip
         ctx.rect(3, 1.4, 1.8, 3.2);
-      }, "#111827");
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Trigger guard
+        ctx.rect(0, 1.4, 1.8, 2.0);
+        // Holographic lens window
+        ctx.rect(-1, -3.9, 2, 1.1);
+        ctx.fill();
+        // Mag separators
+        ctx.moveTo(-1.5, 1.4);
+        ctx.lineTo(1, 1.4);
+        ctx.stroke();
+      });
       break;
 
     case "pulse":
-      // futuristic pulse rifle chassis (white/grey)
       body(() => {
         ctx.beginPath();
+        // Sleek chassis
         ctx.moveTo(-9.5, -3);
         ctx.lineTo(6.5, -3);
         ctx.lineTo(8.5, 0);
@@ -1872,43 +1749,35 @@ export function drawWeaponIcon(
         ctx.lineTo(-9.5, 3);
         ctx.closePath();
       });
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(-9.5, -3, 16, 6);
-      }, "#e2e8f0"); // white carbon chassis
-      // glowing blue energy core
-      const coreGrad = ctx.createRadialGradient(-0.5, 0, 0, -0.5, 0, 2.8);
-      coreGrad.addColorStop(0, "#ffffff");
-      coreGrad.addColorStop(0.4, rgba(glow, 0.95));
-      coreGrad.addColorStop(1, "transparent");
-      ctx.fillStyle = coreGrad;
-      ctx.beginPath();
-      ctx.arc(-0.5, 0, 2.8, 0, Math.PI * 2);
-      ctx.fill();
-      // neon circuit panel guides
-      stroke(() => {
-        ctx.beginPath();
+        // Giant circular core cutout
+        ctx.arc(-0.5, 0, 2.4, 0, Math.PI * 2);
+        // Trigger guard
+        ctx.rect(-6, 0.8, 2, 2.2);
+        ctx.fill();
+        // Circuit lines
         ctx.moveTo(-7.5, -1.5);
         ctx.lineTo(-3.5, -1.5);
-        ctx.lineTo(-2.5, 0);
+        ctx.moveTo(-7.5, 1.5);
         ctx.lineTo(-3.5, 1.5);
-        ctx.lineTo(-7.5, 1.5);
-      }, glow, 1.1);
+        ctx.stroke();
+      });
       break;
 
     case "lightsaber":
-      // chrome hilt with ribbed grip
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8.5, -1.6);
-        ctx.lineTo(2.5, -1.6);
-        ctx.lineTo(2.5, 1.6);
-        ctx.lineTo(-8.5, 1.6);
-        ctx.closePath();
+        // Chrome hilt
+        ctx.rect(-8.5, -1.6, 11, 3.2);
+        // Emitter base ring
+        ctx.rect(1.5, -2.2, 1, 4.4);
+        // Blade
+        ctx.rect(2.5, -1.2, 11, 2.4);
       });
-      // ribs
-      stroke(() => {
+      cutout(() => {
         ctx.beginPath();
+        // Hilt ribs (vertical grooves)
         ctx.moveTo(-6.5, -1.6);
         ctx.lineTo(-6.5, 1.6);
         ctx.moveTo(-4.5, -1.6);
@@ -1917,185 +1786,137 @@ export function drawWeaponIcon(
         ctx.lineTo(-2.5, 1.6);
         ctx.moveTo(-0.5, -1.6);
         ctx.lineTo(-0.5, 1.6);
-      }, "#111827", 1.4);
-      // glowing red switch button
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(1.2, -0.8, 0.65, 0, Math.PI * 2);
-      }, "#ef4444");
-      // colored laser blade (white core + wide neon bloom)
-      ctx.save();
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 12;
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(2.5, -1.4, 11, 2.8);
-      }, rgba(glow, 0.95));
-      ctx.restore();
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(2.5, -0.5, 11, 1);
-      }, "#ffffff");
+        ctx.stroke();
+      });
       break;
 
     case "hammer":
-      // handle (textured brown)
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9.5, -1);
-        ctx.lineTo(3.5, -1);
-        ctx.lineTo(3.5, 1);
-        ctx.lineTo(-9.5, 1);
-        ctx.closePath();
+        // Handle
+        ctx.rect(-9.5, -1, 13, 2);
+        // Massive head
+        ctx.rect(3.5, -5.5, 7, 11);
       });
-      // massive iron hammer head
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.moveTo(3.5, -5.5);
-        ctx.lineTo(10.5, -5.5);
-        ctx.lineTo(10.5, 5.5);
-        ctx.lineTo(3.5, 5.5);
-        ctx.closePath();
-      }, "#3f4350");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(3.5, -5.5);
-        ctx.lineTo(10.5, -5.5);
-        ctx.lineTo(10.5, 5.5);
-        ctx.lineTo(3.5, 5.5);
-        ctx.closePath();
-      }, glow, 1.8);
-      // glowing volcanic magma cracks
-      stroke(() => {
-        ctx.beginPath();
+        // Volcanic lava crack paths
         ctx.moveTo(4.5, -3);
         ctx.lineTo(6.5, 0);
         ctx.lineTo(5.5, 3.5);
         ctx.moveTo(9.5, -4);
         ctx.lineTo(7.8, -1.5);
         ctx.lineTo(9, 2.5);
-      }, "#f97316", 1.25);
+        // Handle wrap lines
+        ctx.moveTo(-7.5, -1);
+        ctx.lineTo(-6.5, 1);
+        ctx.moveTo(-5.5, -1);
+        ctx.lineTo(-4.5, 1);
+        ctx.moveTo(-3.5, -1);
+        ctx.lineTo(-2.5, 1);
+        ctx.stroke();
+      });
       break;
 
     case "flamethrower":
-      // brass fuel tank (yellow/orange)
-      fill(() => {
-        ctx.beginPath();
-        ctx.ellipse(-4, 3, 3, 4.4, 0, 0, Math.PI * 2);
-      }, "#ca8a04");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.ellipse(-4, 3, 3, 4.4, 0, 0, Math.PI * 2);
-      }, glow, 1.2);
-      // main chassis
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9.5, -3);
-        ctx.lineTo(6.5, -3);
-        ctx.lineTo(6.5, 1.2);
-        ctx.lineTo(-9.5, 1.2);
-        ctx.closePath();
+        // Brass fuel tank
+        ctx.ellipse(-4, 3, 3, 4.4, 0, 0, Math.PI * 2);
+        // Main body
+        ctx.rect(-9.5, -3, 16, 4.2);
+        // Nozzle
+        ctx.rect(6.5, -1.8, 3, 1.8);
       });
-      // heavy nozzle
-      stroke(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.moveTo(6.5, -0.9);
-        ctx.lineTo(9.5, -0.9);
-      }, STEEL_X, 1.8);
-      // mini pilot flame (glowing orange/yellow)
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(9.5, -0.9);
-        ctx.quadraticCurveTo(11.5, -1.8, 13.5, -0.9);
-        ctx.quadraticCurveTo(11.5, 0, 9.5, -0.9);
-        ctx.closePath();
-      }, "#f97316");
+        // Tank connecting band lines
+        ctx.moveTo(-6.5, 1);
+        ctx.lineTo(-1.5, 1);
+        // Chassis cooling slots
+        ctx.rect(-8, -1.8, 1.5, 1.5);
+        ctx.rect(-5, -1.8, 1.5, 1.5);
+        ctx.rect(-2, -1.8, 1.5, 1.5);
+        ctx.fill();
+      });
       break;
 
     case "sa1216":
-      // receiver
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -2.4);
-        ctx.lineTo(1.5, -2.4);
-        ctx.lineTo(1.5, 1.2);
-        ctx.lineTo(-9, 1.2);
-        ctx.closePath();
-      });
-      // rotary quad magazine (4 tubes)
-      fill(() => {
-        ctx.beginPath();
+        // Upper receiver
+        ctx.rect(-9, -2.4, 10.5, 3.6);
+        // Quad magazine rotating cylinders
         ctx.rect(1.5, 0.4, 6.2, 3.8);
-      }, "#27272a");
-      // quad highlights
-      stroke(() => {
+      });
+      cutout(() => {
         ctx.beginPath();
+        // Trigger guard
+        ctx.rect(-4, 1.2, 2, 2);
+        ctx.fill();
+        // Quad tube division lines
         ctx.moveTo(1.5, 1.4);
         ctx.lineTo(7.7, 1.4);
         ctx.moveTo(1.5, 2.3);
         ctx.lineTo(7.7, 2.3);
         ctx.moveTo(1.5, 3.2);
         ctx.lineTo(7.7, 3.2);
-      }, glow, 1.0);
+        ctx.stroke();
+      });
       break;
 
     case "mgl32":
-      // receiver
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9.5, -2);
-        ctx.lineTo(9, -2);
-        ctx.lineTo(9, 2);
-        ctx.lineTo(-9.5, 2);
+        // Launcher frame
+        ctx.rect(-9.5, -2, 18.5, 4);
+        // Swivel Stock
+        ctx.moveTo(-9.5, -1);
+        ctx.lineTo(-13, 3.5);
+        ctx.lineTo(-9.5, 3.5);
         ctx.closePath();
+
+        // Giant revolving cylinder
+        ctx.ellipse(0, 0, 3.5, 4.4, 0, 0, Math.PI * 2);
       });
-      // giant revolving cylinder
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.ellipse(0, 0, 3.5, 4.4, 0, 0, Math.PI * 2);
-      }, "#1c1917");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 3.5, 4.4, 0, 0, Math.PI * 2);
-      }, glow, 1.2);
-      // golden grenade chambers visible in slots
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(-1.6, -1.8, 1, 0, Math.PI * 2);
-        ctx.arc(-1.6, 1.8, 1, 0, Math.PI * 2);
-        ctx.arc(1.6, 0, 1, 0, Math.PI * 2);
-      }, "#eab308");
+        // Cylinder chambers slots (3-4 oval holes)
+        ctx.ellipse(-1.5, -1.8, 0.6, 1.2, -Math.PI/6, 0, Math.PI * 2);
+        ctx.ellipse(-1.5, 1.8, 0.6, 1.2, Math.PI/6, 0, Math.PI * 2);
+        ctx.ellipse(1.5, 0, 0.6, 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Trigger guard
+        ctx.rect(-5, 2, 1.8, 1.8);
+        ctx.fill();
+      });
       break;
 
     case "spear":
-      // shaft
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-12.5, -0.8);
-        ctx.lineTo(4.5, -0.8);
-        ctx.lineTo(4.5, 0.8);
-        ctx.lineTo(-12.5, 0.8);
-        ctx.closePath();
-      });
-      // plasma spearhead (highly glowing)
-      ctx.save();
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 10;
-      fill(() => {
-        ctx.beginPath();
+        // Shaft
+        ctx.rect(-12.5, -0.8, 17, 1.6);
+        // Spearhead
         ctx.moveTo(4.5, -3.2);
         ctx.lineTo(13.5, 0);
         ctx.lineTo(4.5, 3.2);
         ctx.lineTo(6.2, 0);
         ctx.closePath();
-      }, rgba(glow, 0.95));
-      ctx.restore();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Fuller groove in spearhead center
+        ctx.moveTo(5.5, 0);
+        ctx.lineTo(11, 0);
+        ctx.stroke();
+      });
       break;
 
     case "drone":
-      // quadrotor frame
       body(() => {
         ctx.beginPath();
+        // Quadrotor frame
         ctx.moveTo(-5, -1);
         ctx.lineTo(-3, -5.5);
         ctx.lineTo(3, -5.5);
@@ -2103,55 +1924,56 @@ export function drawWeaponIcon(
         ctx.lineTo(3, 4.5);
         ctx.lineTo(-3, 4.5);
         ctx.closePath();
+
+        // Rotor caps
+        ctx.rect(-5.2, -6.2, 1.4, 1.4);
+        ctx.rect(3.8, -6.2, 1.4, 1.4);
+        ctx.rect(-5.2, 3.8, 1.4, 1.4);
+        ctx.rect(3.8, 3.8, 1.4, 1.4);
       });
-      // rotor blades (spinning glow)
-      stroke(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.ellipse(-4.5, -5.5, 3.5, 1, 0.2, 0, Math.PI * 2);
-        ctx.ellipse(4.5, -5.5, 3.5, 1, -0.2, 0, Math.PI * 2);
-        ctx.ellipse(-4.5, 4.5, 3.5, 1, -0.2, 0, Math.PI * 2);
-        ctx.ellipse(4.5, 4.5, 3.5, 1, 0.2, 0, Math.PI * 2);
-      }, "#cbd5e1", 0.8);
-      // glowing camera eye sensor
-      fill(() => {
-        ctx.beginPath();
-        ctx.arc(0, -0.5, 1.5, 0, Math.PI * 2);
-      }, "#ef4444");
+        // Frame gaps (make it lightweight skeleton)
+        ctx.rect(-2.2, -3.8, 4.4, 2.2);
+        ctx.rect(-2.2, 0.8, 4.4, 2.2);
+        // Center camera eye hole
+        ctx.arc(0, -1, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
       break;
 
     case "recurve_bow":
-      // golden recurve bow limbs
-      stroke(() => {
+      body(() => {
         ctx.beginPath();
+        // Golden limbs
         ctx.moveTo(1, -9.5);
         ctx.quadraticCurveTo(8.5, -4.5, 4, 0);
         ctx.quadraticCurveTo(8.5, 4.5, 1, 9.5);
-      }, "#eab308", 2.2); // golden frame
-      // glowing cyan bowstring
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(1, -9.5);
-        ctx.lineTo(1, 9.5);
-      }, glow, 0.95);
-      // glowing green arrow loaded
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(-11, 0);
-        ctx.lineTo(3, 0);
-      }, "#22c55e", 1.6);
-      fill(() => {
-        ctx.beginPath();
-        ctx.moveTo(3, -2.2);
-        ctx.lineTo(6.5, 0);
-        ctx.lineTo(3, 2.2);
+        ctx.lineTo(2.2, 8.5);
+        ctx.quadraticCurveTo(7.2, 4.5, 4.8, 0);
+        ctx.quadraticCurveTo(7.2, -4.5, 2.2, -8.5);
         ctx.closePath();
-      }, "#22c55e");
+
+        // Arrow
+        ctx.rect(-11, -0.6, 16.5, 1.2);
+        ctx.moveTo(5.5, -2);
+        ctx.lineTo(9.5, 0);
+        ctx.lineTo(5.5, 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Gap near string
+        ctx.moveTo(1, -8.5);
+        ctx.lineTo(1, 8.5);
+        ctx.stroke();
+      });
       break;
 
     case "riot_shield":
-      // heavy tactical riot shield
       body(() => {
         ctx.beginPath();
+        // Heavy shield
         ctx.moveTo(-8.5, -7.5);
         ctx.lineTo(4.5, -9.5);
         ctx.lineTo(8, 0);
@@ -2159,176 +1981,187 @@ export function drawWeaponIcon(
         ctx.lineTo(-8.5, 7.5);
         ctx.closePath();
       });
-      // bulletproof viewport glass (translucent blue)
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
+        // Viewport window
         ctx.rect(-3, -6.5, 6, 2.6);
-      }, "rgba(34,211,238,0.72)");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.rect(-3, -6.5, 6, 2.6);
-      }, "#22d3ee", 0.95);
-      // glowing energy grid crosses on front
-      stroke(() => {
-        ctx.beginPath();
+        ctx.fill();
+        // Energy cross lines
         ctx.moveTo(-6, -1);
         ctx.lineTo(6, -1);
         ctx.moveTo(-6, 2);
         ctx.lineTo(6, 2);
         ctx.moveTo(-1, -4);
         ctx.lineTo(-1, 6);
-      }, glow, 1.25);
+        ctx.stroke();
+      });
       break;
 
-    case "shak50":
-      // olive drab heavy chassis
+    case "shak50": // Shak-50 from reference image (Image 1)
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9.5, -3.2);
-        ctx.lineTo(6.5, -3.2);
-        ctx.lineTo(6.5, 1);
-        ctx.lineTo(-9.5, 1);
+        // Chassis & stock
+        ctx.moveTo(-9.5, -2.8);
+        ctx.lineTo(6.5, -2.8);
+        ctx.lineTo(6.5, -0.5);
+        ctx.lineTo(9.5, -0.5); // barrel extension
+        ctx.lineTo(9.5, 0.5);
+        ctx.lineTo(6.5, 0.5);
+        ctx.lineTo(6.5, 2.4);
+        ctx.lineTo(3.2, 2.4);
+        ctx.lineTo(2.2, 7.5); // pistol grip
+        ctx.lineTo(-0.2, 7.5);
+        ctx.lineTo(-0.2, 2.4);
+        // bullpup magazine behind grip
+        ctx.lineTo(-4.5, 2.4);
+        ctx.lineTo(-5.2, 7.5);
+        ctx.lineTo(-8.2, 7.5);
+        ctx.lineTo(-7.5, 2.4);
+        ctx.lineTo(-9.5, 2.4);
         ctx.closePath();
+
+        // Carry handle
+        ctx.rect(-3.5, -5.2, 7.5, 2.4);
       });
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(-9.5, -3.2, 16, 4.2);
-      }, "#3f4935"); // military green
-      // carry handle
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(-4, -5.2, 7, 2);
-      }, "#1c1917");
-      // massive bullpup box magazine behind grip
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(-8, 1, 3.2, 5.2);
-      }, "#1c1917");
+        // Carry handle slot
+        ctx.rect(-2.5, -4.5, 5.5, 1.7);
+        // Trigger guard hole
+        ctx.arc(1.5, 2.5, 1.0, 0, Math.PI * 2);
+        // Thumbhole in stock
+        ctx.moveTo(-5.5, -0.5);
+        ctx.lineTo(-8.5, -0.5);
+        ctx.lineTo(-8.5, 1.8);
+        ctx.lineTo(-5.5, 1.8);
+        ctx.closePath();
+        // Handguard vents (3 small circles)
+        ctx.arc(1.8, -1.2, 0.4, 0, Math.PI * 2);
+        ctx.arc(3.4, -1.2, 0.4, 0, Math.PI * 2);
+        ctx.arc(5.0, -1.2, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Muzzle brake holes (2 vertical slots)
+        ctx.moveTo(8.0, -0.5);
+        ctx.lineTo(8.0, 0.5);
+        ctx.moveTo(8.8, -0.5);
+        ctx.lineTo(8.8, 0.5);
+        ctx.stroke();
+      });
       break;
 
     case "gatling":
-      // minigun triple rotating barrel bundle
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(2.5, -1.8);
-        ctx.lineTo(12.5, -1.8);
-        ctx.moveTo(2.5, -0.6);
-        ctx.lineTo(12.5, -0.6);
-        ctx.moveTo(2.5, 0.6);
-        ctx.lineTo(12.5, 0.6);
-      }, STEEL_X, 1.3);
-      // heavy ammunition box
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -2.4);
-        ctx.lineTo(2.5, -2.4);
-        ctx.lineTo(2.5, 2.4);
-        ctx.lineTo(-9, 2.4);
-        ctx.closePath();
+        // Barrels
+        ctx.rect(2.5, -1.8, 10, 0.8);
+        ctx.rect(2.5, -0.6, 10, 0.8);
+        ctx.rect(2.5, 0.6, 10, 0.8);
+        // Receiver
+        ctx.rect(-9, -2.4, 11.5, 4.8);
+        // Bullet ammo belt
+        ctx.rect(-2.5, 2.4, 3.5, 4.8);
       });
-      // brass bullet feeding belt (details)
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
-        ctx.rect(-2.5, 2.4, 1.4, 4.8);
-        ctx.rect(-0.5, 2.4, 1.4, 4.8);
-      }, "#ca8a04");
+        // Bullet links
+        ctx.moveTo(-1.5, 2.4);
+        ctx.lineTo(-1.5, 7.2);
+        ctx.moveTo(-0.5, 2.4);
+        ctx.lineTo(-0.5, 7.2);
+        ctx.stroke();
+      });
       break;
 
     case "poison_mist":
-      // transparent chemical tank containing bubbling toxic liquid
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(-4.5, -6.5, 7, 5);
-      }, "rgba(34,197,94,0.18)");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.rect(-4.5, -6.5, 7, 5);
-      }, glow, 1.3);
-      // green toxic fluid level
-      fill(() => {
-        ctx.beginPath();
-        ctx.rect(-4.5, -3.5, 7, 2);
-      }, "#22c55e");
-      // gun chassis below
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8.5, -1.5);
-        ctx.lineTo(6.5, -1.5);
-        ctx.lineTo(6.5, 2.5);
-        ctx.lineTo(-8.5, 2.5);
-        ctx.closePath();
+        // Canister on top
+        ctx.rect(-4.5, -6.5, 7, 5);
+        // Chassis below
+        ctx.rect(-8.5, -1.5, 15, 4);
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Liquid level line
+        ctx.moveTo(-4.5, -3.5);
+        ctx.lineTo(2.5, -3.5);
+        // Canister lid line
+        ctx.moveTo(-4.5, -5.5);
+        ctx.lineTo(2.5, -5.5);
+        // Trigger guard
+        ctx.rect(-2, 2.5, 1.8, 1.8);
+        ctx.fill();
+        ctx.stroke();
       });
       break;
 
     case "lewis":
-      // coolant shroud (large cylinder around barrel)
-      stroke(() => {
-        ctx.beginPath();
-        ctx.moveTo(3.5, -1);
-        ctx.lineTo(11.5, -1);
-      }, STEEL_X, 2.8);
-      // pan magazine on top
-      fill(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, -4.6, 3.8, 1.8, 0, 0, Math.PI * 2);
-      }, "#3a4254");
-      stroke(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, -4.6, 3.8, 1.8, 0, 0, Math.PI * 2);
-      }, glow, 1.15);
-      // chassis receiver
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-9, -2.4);
-        ctx.lineTo(3.5, -2.4);
-        ctx.lineTo(3.5, 2.4);
-        ctx.lineTo(-9, 2.4);
-        ctx.closePath();
+        // Coolant barrel shroud
+        ctx.rect(3.5, -2, 8, 3.2);
+        // Pan magazine
+        ctx.ellipse(0, -4.6, 3.8, 1.8, 0, 0, Math.PI * 2);
+        // Receiver
+        ctx.rect(-9, -2.4, 12.5, 4.8);
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Trigger guard
+        ctx.rect(-4.5, 2.4, 1.8, 2);
+        ctx.fill();
+        // Pan magazine radial slots
+        ctx.moveTo(-2, -4.6);
+        ctx.lineTo(2, -4.6);
+        ctx.moveTo(0, -5.8);
+        ctx.lineTo(0, -3.4);
+        ctx.stroke();
       });
       break;
 
     case "plasma_rifle":
-      // futuristic body
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8, -2.2);
-        ctx.lineTo(7, -2.2);
-        ctx.lineTo(7, 2.2);
-        ctx.lineTo(-8, 2.2);
-        ctx.closePath();
+        // Body
+        ctx.rect(-8, -2.2, 15, 4.4);
       });
-      // exposed glowing plasma coils (pink/cyan)
-      fill(() => {
+      cutout(() => {
         ctx.beginPath();
+        // Battery cells (3 vertical rectangular slots)
         ctx.rect(-2.5, -1.2, 1.2, 2.4);
         ctx.rect(-0.2, -1.2, 1.2, 2.4);
         ctx.rect(2.1, -1.2, 1.2, 2.4);
-      }, glow);
+        // Trigger guard
+        ctx.rect(-6, 2.2, 1.8, 1.8);
+        ctx.fill();
+      });
       break;
 
     case "lightning_whip":
-      // handle hilt
       body(() => {
         ctx.beginPath();
-        ctx.moveTo(-8.5, -1.6);
-        ctx.lineTo(1, -1.6);
-        ctx.lineTo(1, 1.6);
-        ctx.lineTo(-8.5, 1.6);
-        ctx.closePath();
-      });
-      // crackling energy bolt whip cord
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      stroke(() => {
-        ctx.beginPath();
+        // Handle
+        ctx.rect(-8.5, -1.6, 9.5, 3.2);
+        // Whip bolt segments
         ctx.moveTo(1, 0);
         ctx.lineTo(3.5, -3.2);
         ctx.lineTo(6.5, 2.5);
         ctx.lineTo(9, -2.5);
         ctx.lineTo(11, 2.5);
         ctx.lineTo(13.5, 0.2);
-      }, glow, 1.85);
-      ctx.restore();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Handle ribs
+        ctx.moveTo(-6.5, -1.6);
+        ctx.lineTo(-6.5, 1.6);
+        ctx.moveTo(-4.5, -1.6);
+        ctx.lineTo(-4.5, 1.6);
+        ctx.moveTo(-2.5, -1.6);
+        ctx.lineTo(-2.5, 1.6);
+        ctx.stroke();
+      });
       break;
 
     default:
@@ -2341,9 +2174,6 @@ export function drawWeaponIcon(
   ctx.restore();
 }
 
-// ---------------------------------------------------------------------------
-// Gadget icon rendering — vector silhouettes for deployable items.
-// ---------------------------------------------------------------------------
 export function drawGadgetIcon(
   ctx: CanvasRenderingContext2D,
   gadget: GadgetDef,
@@ -2353,118 +2183,340 @@ export function drawGadgetIcon(
 ) {
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(s / 16, s / 16);
+  const sc = s / 16;
+  ctx.scale(sc, sc);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   const G = gadget.color;
-  ctx.fillStyle = rgba(G, 0.18);
-  ctx.strokeStyle = G;
-  ctx.lineWidth = 1.6;
 
-  const sil = (fn: () => void) => {
-    ctx.beginPath();
-    fn();
+  /** Draw the main white body with a colored glow outline. */
+  const body = (p: () => void) => {
+    ctx.save();
+    ctx.shadowColor = rgba(G, 0.65);
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = G;
+    ctx.lineWidth = 1.8;
+    p();
     ctx.fill();
     ctx.stroke();
+    ctx.restore();
+  };
+
+  /** Erase details from the white body, leaving transparent cutouts. */
+  const cutout = (p: () => void, lw = 1.1) => {
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.fillStyle = "rgba(0,0,0,1)";
+    ctx.lineWidth = lw;
+    p();
+    ctx.restore();
   };
 
   switch (gadget.iconShape) {
     case "turret_mg":
-      sil(() => {
-        // tripod base
+      body(() => {
+        ctx.beginPath();
+        // Tripod base
         ctx.moveTo(-6, 7);
-        ctx.lineTo(0, 1);
-        ctx.lineTo(6, 7);
-        // barrel
-        ctx.moveTo(0, 1);
-        ctx.lineTo(0, -8);
-        ctx.lineTo(4, -8);
-        ctx.lineTo(4, -4);
-        ctx.lineTo(0, -4);
-      });
-      break;
-    case "turret_cannon":
-      sil(() => {
-        ctx.moveTo(-7, 7);
         ctx.lineTo(0, 2);
-        ctx.lineTo(7, 7);
-        ctx.moveTo(0, 2);
-        ctx.lineTo(0, -7);
-        ctx.lineTo(6, -7);
-        ctx.lineTo(6, -2);
-        ctx.lineTo(0, -2);
+        ctx.lineTo(6, 7);
+        ctx.lineTo(1.5, 3.5);
+        ctx.lineTo(0, 2);
+        ctx.lineTo(-1.5, 3.5);
+        ctx.closePath();
+
+        // Receiver
+        ctx.rect(-3.5, -4, 7, 6);
+        // Barrel sleeve
+        ctx.rect(-1.2, -10, 2.4, 6);
       });
-      break;
-    case "mine_explosive":
-      sil(() => {
-        ctx.arc(0, 2, 6, 0, Math.PI * 2);
-        ctx.moveTo(-3, -4);
-        ctx.lineTo(0, -8);
-        ctx.lineTo(3, -4);
-      });
-      break;
-    case "mine_poison":
-      sil(() => {
-        ctx.arc(0, 2, 6, 0, Math.PI * 2);
-        ctx.moveTo(0, -8);
-        ctx.lineTo(0, -2);
-      });
-      break;
-    case "mine_fire":
-      sil(() => {
-        ctx.arc(0, 2, 6, 0, Math.PI * 2);
-        ctx.moveTo(-3, -4);
-        ctx.lineTo(0, -9);
-        ctx.lineTo(2, -5);
-        ctx.lineTo(-1, -3);
-      });
-      break;
-    case "glue_grenade":
-      sil(() => {
-        ctx.arc(0, 0, 6, 0, Math.PI * 2);
-        ctx.moveTo(0, -6);
-        ctx.lineTo(0, -9);
-        ctx.lineTo(3, -9);
-      });
-      break;
-    case "fire_grenade":
-      sil(() => {
-        ctx.arc(0, 0, 6, 0, Math.PI * 2);
-        // flame tongue
-        ctx.moveTo(-2, -5);
-        ctx.quadraticCurveTo(0, -11, 3, -5);
-        ctx.lineTo(0, -6);
-      });
-      break;
-    case "healing_station":
-      sil(() => {
-        // cross
-        ctx.moveTo(-2, -7);
-        ctx.lineTo(2, -7);
+      cutout(() => {
+        ctx.beginPath();
+        // Cooling slots on barrel sleeve
+        ctx.rect(-0.4, -9.2, 0.8, 1.8);
+        ctx.rect(-0.4, -6.8, 0.8, 1.8);
+        ctx.fill();
+        // Vent lines on receiver
+        ctx.moveTo(-2, -2);
         ctx.lineTo(2, -2);
-        ctx.lineTo(7, -2);
-        ctx.lineTo(7, 2);
-        ctx.lineTo(2, 2);
-        ctx.lineTo(2, 7);
-        ctx.lineTo(-2, 7);
-        ctx.lineTo(-2, 2);
-        ctx.lineTo(-7, 2);
-        ctx.lineTo(-7, -2);
-        ctx.lineTo(-2, -2);
+        ctx.moveTo(-2, 0);
+        ctx.lineTo(2, 0);
+        ctx.stroke();
       });
       break;
-    case "poison_grenade":
-      sil(() => {
-        ctx.arc(0, 0, 6, 0, Math.PI * 2);
-        // toxic droplets rising
-        ctx.moveTo(-2, -5);
-        ctx.lineTo(0, -9);
-        ctx.lineTo(2, -5);
+
+    case "turret_cannon":
+      body(() => {
+        ctx.beginPath();
+        // Heavy base
+        ctx.rect(-8, 4.5, 16, 3);
+        // Swivel neck
+        ctx.rect(-3, 1.5, 6, 3);
+        // Cannon turret dome
+        ctx.arc(0, -1, 5.5, Math.PI, 0);
+        // Massive barrel
+        ctx.rect(-1.6, -11, 3.2, 7.5);
+        // Muzzle brake
+        ctx.rect(-2.6, -12.5, 5.2, 1.5);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Hatch lines
+        ctx.arc(0, -1, 3.5, Math.PI, 0);
+        ctx.stroke();
+        // Barrel vents
+        ctx.rect(-1.8, -12, 1, 0.8);
+        ctx.rect(0.8, -12, 1, 0.8);
+        ctx.fill();
       });
       break;
+
+    case "mine_explosive":
+      body(() => {
+        ctx.beginPath();
+        // Flat base
+        ctx.ellipse(0, 3.5, 9, 3.8, 0, 0, Math.PI * 2);
+        // Dome top
+        ctx.ellipse(0, 1.5, 6, 2.6, 0, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Concentric dome lines
+        ctx.ellipse(0, 1.5, 4, 1.7, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        // Center sensor light
+        ctx.arc(0, 1.5, 1, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+
+    case "mine_poison": // Gas Mine (图2毒气地雷): flat cylinder, segmented radial dome, tag with skull
+      body(() => {
+        ctx.beginPath();
+        // Flat base
+        ctx.ellipse(0, 3.2, 9.5, 4.2, 0, 0, Math.PI * 2);
+        // Dome top
+        ctx.ellipse(0, 1.2, 7, 3, 0, 0, Math.PI * 2);
+        // Safety pin ring on left
+        ctx.arc(-8.2, 4.5, 1.6, 0, Math.PI * 2);
+        // Round tag hanging down
+        ctx.arc(-10.2, 7.2, 1.8, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Center cap
+        ctx.ellipse(0, 1.2, 2.5, 1.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Radial segments (8 division lines)
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          ctx.moveTo(Math.cos(angle) * 2.5, 1.2 + Math.sin(angle) * 1.1);
+          ctx.lineTo(Math.cos(angle) * 7, 1.2 + Math.sin(angle) * 3);
+        }
+        ctx.stroke();
+
+        // Ring hole
+        ctx.arc(-8.2, 4.5, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Skull detail on the tag (head and jaw)
+        ctx.arc(-10.2, 6.8, 0.6, 0, Math.PI * 2);
+        ctx.rect(-10.5, 7.2, 0.6, 0.5);
+        ctx.fill();
+      });
+      // Draw eyes on skull
+      cutout(() => {
+        ctx.beginPath();
+        ctx.arc(-10.4, 6.8, 0.15, 0, Math.PI * 2);
+        ctx.arc(-10.0, 6.8, 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+
+    case "mine_fire": // Fire Mine (图3火焰地雷): flat cylinder, smooth top, tag with fire flame
+      body(() => {
+        ctx.beginPath();
+        // Flat base
+        ctx.ellipse(0, 3.2, 9.5, 4.2, 0, 0, Math.PI * 2);
+        // Metallic dome
+        ctx.ellipse(0, 1.2, 7.5, 3.2, 0, 0, Math.PI * 2);
+        // Safety pin ring on left
+        ctx.arc(-8.2, 4.5, 1.6, 0, Math.PI * 2);
+        // Round tag hanging down
+        ctx.arc(-10.2, 7.2, 1.8, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Inner smooth dome outline
+        ctx.ellipse(0, 1.2, 5, 2.1, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Ring hole
+        ctx.arc(-8.2, 4.5, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Flame shape cutout on tag
+        ctx.moveTo(-10.2, 8.2);
+        ctx.quadraticCurveTo(-11.2, 7.2, -10.2, 6.4);
+        ctx.quadraticCurveTo(-9.8, 7.2, -10.2, 8.2);
+        ctx.fill();
+      });
+      break;
+
+    case "glue_grenade":
+      body(() => {
+        ctx.beginPath();
+        // Spherical bumpy body
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          const r = 5.2 + (i % 2 === 0 ? 1.2 : 0);
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        // Pin & trigger cap
+        ctx.rect(-1.2, -8, 2.4, 3);
+        ctx.arc(2, -7.5, 1.5, 0, Math.PI * 2);
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Pin hole
+        ctx.arc(2, -7.5, 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        // Inner sticky grid lines
+        ctx.moveTo(-3, -2);
+        ctx.lineTo(3, 2);
+        ctx.moveTo(-3, 2);
+        ctx.lineTo(3, -2);
+        ctx.stroke();
+      });
+      break;
+
+    case "fire_grenade": // Molotov Cocktail (图5燃烧瓶): bottle with burning cloth rag
+      body(() => {
+        ctx.beginPath();
+        // Bottle base
+        ctx.moveTo(-3.2, 1.5);
+        ctx.lineTo(3.2, 1.5);
+        ctx.lineTo(3.2, 7.5);
+        ctx.quadraticCurveTo(3.2, 9, 1.8, 9);
+        ctx.lineTo(-1.8, 9);
+        ctx.quadraticCurveTo(-3.2, 9, -3.2, 7.5);
+        ctx.closePath();
+
+        // Neck
+        ctx.rect(-1.2, -4.5, 2.4, 6);
+        // Rim lip
+        ctx.rect(-1.6, -5.2, 3.2, 1.2);
+
+        // Cloth rag hanging out of neck
+        ctx.moveTo(-1, -4.5);
+        ctx.lineTo(-4.5, -7.5);
+        ctx.lineTo(-2.5, -9);
+        ctx.lineTo(0.5, -5.5);
+        ctx.closePath();
+
+        // Flame shape at tip of rag
+        ctx.moveTo(-3.5, -8.2);
+        ctx.quadraticCurveTo(-6.5, -12, -2.5, -13);
+        ctx.quadraticCurveTo(-1.5, -11, -2.5, -9.5);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Horizontal liquid level inside bottle
+        ctx.moveTo(-3, 4.5);
+        ctx.lineTo(3, 4.5);
+        // Bottle label box
+        ctx.rect(-2, 5.2, 4, 2.2);
+        ctx.stroke();
+      });
+      break;
+
+    case "healing_station":
+      body(() => {
+        ctx.beginPath();
+        // Medical station console box
+        ctx.moveTo(-7.5, 7.5);
+        ctx.lineTo(7.5, 7.5);
+        ctx.lineTo(6.5, -2);
+        ctx.quadraticCurveTo(5, -6.5, 0, -6.5);
+        ctx.quadraticCurveTo(-5, -6.5, -6.5, -2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Large medical cross cutout
+        ctx.rect(-1.4, -3.5, 2.8, 7);
+        ctx.rect(-3.5, -1.4, 7, 2.8);
+        ctx.fill();
+        // Indicators
+        ctx.rect(-4, 4.5, 2, 1);
+        ctx.rect(2, 4.5, 2, 1);
+        ctx.fill();
+      });
+      break;
+
+    case "poison_grenade": // Gas Grenade (图4毒气手雷): chemical canister, pin ring, skull warning tag
+      body(() => {
+        ctx.beginPath();
+        // Canister body
+        ctx.moveTo(-3.5, -3);
+        ctx.lineTo(3.5, -3);
+        ctx.lineTo(3.5, 7.5);
+        ctx.quadraticCurveTo(3.5, 8.5, 2.5, 8.5);
+        ctx.lineTo(-2.5, 8.5);
+        ctx.quadraticCurveTo(-3.5, 8.5, -3.5, 7.5);
+        ctx.closePath();
+
+        // Neck cap
+        ctx.rect(-2, -4.5, 4, 1.5);
+        // Safety lever spoon on right
+        ctx.moveTo(1.2, -4);
+        ctx.lineTo(4.8, -3.5);
+        ctx.lineTo(4.8, 4.5);
+        ctx.lineTo(2.8, 4.8);
+        ctx.closePath();
+
+        // Pin ring on left
+        ctx.arc(-3.5, -5.5, 2, 0, Math.PI * 2);
+        // Round warning tag hanging down
+        ctx.arc(-6.5, -2.5, 1.8, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // Ring hole
+        ctx.arc(-3.5, -5.5, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Skull warning icon on tag
+        ctx.arc(-6.5, -2.9, 0.6, 0, Math.PI * 2);
+        ctx.rect(-6.8, -2.5, 0.6, 0.5);
+        ctx.fill();
+
+        // Canister ridges / warning lines
+        ctx.rect(-2, -1, 4, 1.2);
+        ctx.rect(-2, 2.2, 4, 1.2);
+        ctx.rect(-2, 5.4, 4, 1.2);
+        ctx.fill();
+      });
+      break;
+
     default:
-      sil(() => {
+      body(() => {
+        ctx.beginPath();
         ctx.arc(0, 0, 7, 0, Math.PI * 2);
+        ctx.closePath();
       });
   }
   ctx.restore();

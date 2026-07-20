@@ -131,9 +131,9 @@ function WeaponIcon({
   }, [iconShape, glow, size]);
   return (
     <div
-      className="flex items-center justify-center rounded-xl p-2.5 bg-black/60 border border-white/10 transition-transform duration-200"
+      className="flex items-center justify-center rounded-xl p-2.5 bg-white/[0.04] border border-white/[0.06] transition-transform duration-200"
       style={{
-        boxShadow: `0 0 15px ${glow}20, inset 0 0 8px ${glow}10`,
+        boxShadow: `0 0 15px ${glow}10, inset 0 0 8px ${glow}05`,
       }}
     >
       <canvas ref={ref} style={{ width: size, height: size, filter: `drop-shadow(0 0 3px ${glow}88)` }} />
