@@ -1142,8 +1142,10 @@ export class GameEngine {
       this.isDM = true;
       this.dmKillLimit = this.mode === "local" ? 15 : 8;
       // neutralise bases so they're never targeted / drawn / shown in UI
-      this.base = null as any;
-      this.enemyBase = null as any;
+      this.base.hp = Infinity;
+      this.base.maxHp = Infinity;
+      this.enemyBase.hp = Infinity;
+      this.enemyBase.maxHp = Infinity;
       // four spawn anchors so nobody starts on top of another
       this.dmSpawns = [
         { x: this.worldW * 0.5, y: this.worldH - 200 },
@@ -5406,13 +5408,13 @@ export class GameEngine {
     if (this.foe)
       this.simulatePeer(this.foe, fB, this.foeGuns, this.foeGadgets, this.foeGadgetCd, dt);
     this.simulateWorld(dt);
-    if (this.gameMode !== "biohazard" && !this.gameOver) {
-    // In PvP the match ends when EITHER base is destroyed — the base owner
-    // loses. The previous check only tested `this.base` (pid 1 / creator), so
-    // if the joiner's (pid 2) base fell the game would never end.
-    if (this.base.hp <= 0) this.endGame("基地失守，你输了！");
-    else if (this.enemyBase.hp <= 0) this.endGame("敌方基地已摧毁，你赢了！");
-  }
+    if (this.gameMode !== "biohazard" && !this.isDM && !this.gameOver) {
+      // In PvP the match ends when EITHER base is destroyed — the base owner
+      // loses. The previous check only tested `this.base` (pid 1 / creator), so
+      // if the joiner's (pid 2) base fell the game would never end.
+      if (this.base.hp <= 0) this.endGame("基地失守，你输了！");
+      else if (this.enemyBase.hp <= 0) this.endGame("敌方基地已摧毁，你赢了！");
+    }
   }
 
   /** Server: begin the match once both peers are present. */
@@ -6650,18 +6652,20 @@ export class GameEngine {
 
     // blobs at base positions (in world space, but we draw in screen space)
     // own base glows blue, opponent's glows red — for both host and guest
-    const myBase = this.mode === "guest" ? this.enemyBase : this.base;
-    const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
-    const blobs: [number, number, string][] = [
-      [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
-      [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"],
-    ];
-    for (const [bx, by, col] of blobs) {
-      const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
-      rg.addColorStop(0, rgba(col, 0.18));
-      rg.addColorStop(1, rgba(col, 0));
-      ctx.fillStyle = rg;
-      ctx.fillRect(0, 0, this.W, this.H);
+    if (!this.isDM && this.gameMode !== "biohazard") {
+      const myBase = this.mode === "guest" ? this.enemyBase : this.base;
+      const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
+      const blobs: [number, number, string][] = [
+        [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
+        [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"],
+      ];
+      for (const [bx, by, col] of blobs) {
+        const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
+        rg.addColorStop(0, rgba(col, 0.18));
+        rg.addColorStop(1, rgba(col, 0));
+        ctx.fillStyle = rg;
+        ctx.fillRect(0, 0, this.W, this.H);
+      }
     }
 
     // floor — cyber city blits a cached, world-sized neon backdrop (one

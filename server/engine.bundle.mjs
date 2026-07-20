@@ -3104,8 +3104,10 @@ var GameEngine = class {
     if (this.gameMode === "deathmatch") {
       this.isDM = true;
       this.dmKillLimit = this.mode === "local" ? 15 : 8;
-      this.base = null;
-      this.enemyBase = null;
+      this.base.hp = Infinity;
+      this.base.maxHp = Infinity;
+      this.enemyBase.hp = Infinity;
+      this.enemyBase.maxHp = Infinity;
       this.dmSpawns = [
         { x: this.worldW * 0.5, y: this.worldH - 200 },
         { x: this.worldW * 0.15, y: this.worldH * 0.2 },
@@ -3193,7 +3195,7 @@ var GameEngine = class {
           player: this.mode === "host" ? this.player : this.foe,
           character: this.mode === "host" ? this.character : this.foeChar,
           outfit: this.mode === "host" ? this.outfit : this.foeOutfit,
-          skill: this.mode === "host" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          skill: this.mode === "host" ? this.skill : getSkill(this.peerLoadout?.skillId ?? "dash"),
           guns: this.mode === "host" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "host" ? this.gunIndex : this.foe.gunIndex ?? 0,
           weaponStates: this.mode === "host" ? this.weaponStates : this.foeWeaponStates,
@@ -3218,7 +3220,7 @@ var GameEngine = class {
           player: this.mode === "guest" ? this.player : this.foe,
           character: this.mode === "guest" ? this.character : this.foeChar,
           outfit: this.mode === "guest" ? this.outfit : this.foeOutfit,
-          skill: this.mode === "guest" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          skill: this.mode === "guest" ? this.skill : getSkill(this.peerLoadout?.skillId ?? "dash"),
           guns: this.mode === "guest" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "guest" ? this.gunIndex : this.foe.gunIndex ?? 0,
           weaponStates: this.mode === "guest" ? this.weaponStates : this.foeWeaponStates,
@@ -6834,7 +6836,7 @@ var GameEngine = class {
     if (this.foe)
       this.simulatePeer(this.foe, fB, this.foeGuns, this.foeGadgets, this.foeGadgetCd, dt);
     this.simulateWorld(dt);
-    if (this.gameMode !== "biohazard" && !this.gameOver) {
+    if (this.gameMode !== "biohazard" && !this.isDM && !this.gameOver) {
       if (this.base.hp <= 0) this.endGame("\u57FA\u5730\u5931\u5B88\uFF0C\u4F60\u8F93\u4E86\uFF01");
       else if (this.enemyBase.hp <= 0) this.endGame("\u654C\u65B9\u57FA\u5730\u5DF2\u6467\u6BC1\uFF0C\u4F60\u8D62\u4E86\uFF01");
     }
@@ -7923,18 +7925,20 @@ var GameEngine = class {
     g.addColorStop(1, theme.bgBottom);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, this.W, this.H);
-    const myBase = this.mode === "guest" ? this.enemyBase : this.base;
-    const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
-    const blobs = [
-      [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
-      [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"]
-    ];
-    for (const [bx, by, col] of blobs) {
-      const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
-      rg.addColorStop(0, rgba(col, 0.18));
-      rg.addColorStop(1, rgba(col, 0));
-      ctx.fillStyle = rg;
-      ctx.fillRect(0, 0, this.W, this.H);
+    if (!this.isDM && this.gameMode !== "biohazard") {
+      const myBase = this.mode === "guest" ? this.enemyBase : this.base;
+      const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
+      const blobs = [
+        [foeBase.x - this.camX, foeBase.y - this.camY, "#dc2626"],
+        [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"]
+      ];
+      for (const [bx, by, col] of blobs) {
+        const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
+        rg.addColorStop(0, rgba(col, 0.18));
+        rg.addColorStop(1, rgba(col, 0));
+        ctx.fillStyle = rg;
+        ctx.fillRect(0, 0, this.W, this.H);
+      }
     }
     if (theme.style === "city") {
       ctx.save();

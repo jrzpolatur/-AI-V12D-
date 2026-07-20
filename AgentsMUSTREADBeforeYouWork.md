@@ -54,4 +54,33 @@
 3. **不要滥用 try-catch，但要小心隐式崩溃**：服务端的 `stepServer` 是在定时器中高频触发的，一旦某个属性 `undefined` 导致抛错，错误会被 Node.js 吞掉，从而表现为“画面静止”或“拉扯”，不会有明显的崩溃日志。排查时多想一步对象是否可能为空。
 4. **加入顺序敏感性**：如果 Bug 描述里带有“加入游戏的先后顺序有关”，死盯着 `pid = 1`（creator） 和 `pid = 2`（joiner） 的分发，以及相关的 `this.player / this.foe` 绑定逻辑。
 
-祝你好运！愿代码不出 Bug。
+---
+
+## 5. 核心代码模块与行数速查地图（Agent 必看表）
+
+方便未来的 AI Agent 快速定位与修改相应模块：
+
+### 核心引擎与逻辑 (`src/game/engine.ts`)
+* **基地 (Base) 与场景初始化** (`lines ~1020 - 1060`)：`this.base` 和 `this.enemyBase` 的属性设置。注意：在死斗模式或生化模式下，**决不能将 base 设为 null**，而应设置 `hp = Infinity`，否则会引发全盘 `TypeError` 导致黑屏或卡同步。
+* **死斗模式 (Deathmatch) 逻辑** (`lines ~1140 - 1263`)：4 人的生成、AI Bot 建立与死斗 kill Limit 初始化。
+* **模拟与上下文切换 (`simulatePeer`)** (`lines ~2160 - 2200`)：多端在同一个 Engine 实例上模拟 1号/2号 玩家时的变量切换与恢复逻辑。修改时千万注意不可残留状态污染！
+* **玩家移动与按键物理 (`updatePlayer`)** (`lines ~2200 - 2400`)：处理推力、障碍物碰撞、技能冷却等。
+* **子弹、射击与伤害结算 (`updateBullets`)** (`lines ~3380 - 3465`)：包含枪械、子弹碰撞、爆炸判定与 `ownerId` 的穿透。
+* **手雷与部署物 (Turret/Mine) 逻辑** (`lines ~3467 - 3700`)：部署物的血量、寻找最近目标逻辑与 owner 绑定。
+* **燃烧场与毒气场 (`updateEffects`)** (`lines ~4200 - 4250`)：持续性地面伤害，已支持透传 `fx.ownerId` 以正确归属击杀得分。
+* **伤害与击杀计分板 (`damagePlayerEntity` / `addScoreFeed`)** (`lines ~4530 - 4660` 与 `lines ~680 - 710`)：控制 `scoreFeed` 与 `killFeed` 的数据推送。
+* **服务端权威 Tick 与世界推进 (`simulateWorld` / `stepServer`)** (`lines ~5364 - 5420`)：30Hz 推进逻辑与基地/死斗胜负判定。
+* **网络快照与状态同步 (`getSnapshot` / `applySnapshot`)** (`lines ~5210 - 5280` 与 `lines ~5560 - 5640`)：生成与应用 Snapshot。注意 `applySnapshot` 必须正常无报错运行，才能使 `this.peerReady = true`，解除“等待对手同步”蒙层。
+* **Canvas 渲染与绘图 (`draw` / `drawBackground`)** (`lines ~6560 - 6700`)：处理场景背景、基地光圈渲染（生化/死斗跳过基地绘制）。
+
+### 权威 WebSocket 服务端 (`server/authoritative.mjs`)
+* **静态 HTTP 与 API 服务** (`lines ~40 - 98`)：包含静态资源响应与 `/api/online` 在线人数接口。
+* **房间匹配与队列 (`find` / `create` / `join`)** (`lines ~100 - 235`)：负责把等待玩家两两匹配并分配固定 pid (1 与 2)。
+* **`hello` 数据包处理与引擎启动 (`startEngine`)** (`lines ~240 - 255`)：当双方 Loadout 都到达后唤醒 Node 端的 `GameEngine` 线程。
+* **30Hz 循环步进器 (`startTick`)** (`lines ~140 - 180`)：高精度累加器触发 `stepServer` 并广播快照。
+
+### UI 界面与交互 (`src/components/GameScreen.tsx`)
+* **Canvas 游戏循环挂载** (`lines ~170 - 240`)：创建 `GameEngine` 实例并绑定 `requestAnimationFrame`。
+* **“等待双方同步”蒙层 (`hud.connecting`)** (`lines ~608 - 622`)：当 `this.peerReady` 为 false 时弹出的加载动画。
+* **击杀与得分 Feed UI (Battlefield 风格)** (`lines ~670 - 740`)：显示 `淘汰 玩家名 $250` 以及 `淘汰数 X +250`。
+
