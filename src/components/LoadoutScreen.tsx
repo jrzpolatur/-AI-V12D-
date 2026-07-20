@@ -400,10 +400,9 @@ export default function LoadoutScreen({
     }
     return ["turret_mg", "turret_cannon", "mine_explosive"];
   });
-  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch">(() => {
+  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch" | "cashout">(() => {
     const m = localStorage.getItem("dm_loadout.gameMode");
-    // sanitise a stale "defense" value from before the mode was removed
-    return m === "biohazard" || m === "deathmatch" ? m : "biohazard";
+    return m === "biohazard" || m === "deathmatch" || m === "cashout" ? (m as never) : "biohazard";
   });
 
   // remember the last picked loadout so quitting & re-entering doesn't force a
@@ -689,6 +688,15 @@ export default function LoadoutScreen({
                   <span className="text-xl">🤖</span>
                   <span className="text-xs font-semibold">人机对战</span>
                   <span className="text-[10px] text-slate-400">离线 PvP · 先杀 15 人胜</span>
+                </PickCard>
+                <PickCard
+                  active={gameMode === "cashout"}
+                  accent="#fbbf24"
+                  onClick={() => setGameMode("cashout")}
+                >
+                  <span className="text-xl">💰</span>
+                  <span className="text-xs font-semibold">排位提现</span>
+                  <span className="text-[10px] text-slate-400">3v3v3v3 提现争夺战</span>
                 </PickCard>
               </Section>
             )}

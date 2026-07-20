@@ -297,6 +297,61 @@ export default function GameScreen({
               <span className="font-bold text-lime-300">{hud.kills}</span>
             </div>
           </div>
+        ) : hud.mode === "cashout" ? (
+          <div className="flex flex-col items-start gap-1.5 bg-black/55 p-3 rounded-xl border border-white/10 backdrop-blur min-w-[200px] pointer-events-auto">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-yellow-300">
+              <span>💰</span>
+              <span>排位提现 · 队伍资产</span>
+            </div>
+            
+            <div className="w-full flex flex-col gap-1 mt-1">
+              {[0, 1, 2, 3]
+                .map((tid) => ({
+                  id: tid,
+                  name: ["我方小队", "太阳小队", "闪电小队", "暗影小队"][tid],
+                  color: ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"][tid],
+                  cash: hud.teamCash ? (hud.teamCash[tid] ?? 0) : 0,
+                }))
+                .sort((a, b) => b.cash - a.cash)
+                .map((t, idx) => (
+                  <div key={t.id} className="flex items-center justify-between text-xs font-semibold">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-500 font-mono">#{idx + 1}</span>
+                      <span style={{ color: t.color }}>{t.name}</span>
+                    </div>
+                    <span className="font-mono text-yellow-300">${t.cash.toLocaleString()}</span>
+                  </div>
+                ))}
+            </div>
+
+            {hud.combatantsData && (
+              <div className="w-full border-t border-white/10 mt-2 pt-2 flex flex-col gap-1">
+                <span className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">队友状态 (按 F 复活)</span>
+                {hud.combatantsData
+                  .filter(c => c.teamId === 0 && c.id !== 0)
+                  .map(c => {
+                    const hpPct = Math.max(0, Math.min(100, (c.hp / c.maxHp) * 100));
+                    return (
+                      <div key={c.id} className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-300 font-semibold">{c.name}</span>
+                        {c.dead ? (
+                          <span className="text-rose-400 font-bold animate-pulse">
+                            💀 倒地 (CD {c.coins}🪙)
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <div className="w-12 h-1 bg-black/55 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${hpPct}%` }} />
+                            </div>
+                            <span className="text-slate-400 font-mono text-[8px]">{c.hp}/{c.maxHp}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col items-start gap-1">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-sky-200/90">
@@ -337,14 +392,34 @@ export default function GameScreen({
           </div>
         )}
 
-        {/* Center: wave + enemies — hidden in deathmatch */}
-        {hud.mode !== "deathmatch" && (
+        {/* Center: wave + enemies / cashout match timer */}
+        {hud.mode === "biohazard" && (
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-2 rounded-lg bg-black/40 px-3 py-1 backdrop-blur">
               <span className="text-xs text-slate-400">波次</span>
               <span className="text-lg font-bold text-white">{hud.wave}</span>
               <span className="ml-2 text-xs text-slate-400">敌人</span>
               <span className="text-lg font-bold text-rose-300">{hud.enemiesLeft}</span>
+            </div>
+          </div>
+        )}
+        {hud.mode === "cashout" && hud.cashoutTimeLeft !== undefined && (
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-3 rounded-xl bg-black/55 px-4 py-2 border border-white/10 backdrop-blur pointer-events-auto">
+              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">剩余时间</span>
+              {hud.isOvertime ? (
+                <span className="text-xl font-black text-amber-400 animate-pulse tracking-wide font-mono">
+                  🚨 加时赛 {Math.ceil(Math.max(0, 60 - Math.abs(hud.cashoutTimeLeft)))}s
+                </span>
+              ) : (
+                <span className="text-xl font-black text-white font-mono tracking-wider">
+                  {(() => {
+                    const m = Math.floor(hud.cashoutTimeLeft / 60);
+                    const s = Math.floor(hud.cashoutTimeLeft % 60);
+                    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+                  })()}
+                </span>
+              )}
             </div>
           </div>
         )}

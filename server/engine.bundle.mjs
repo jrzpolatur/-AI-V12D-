@@ -2320,6 +2320,266 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
 }
+function drawGadgetIcon(ctx, gadget, cx, cy, s) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  const sc = s / 16;
+  ctx.scale(sc, sc);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  const G = gadget.color;
+  const body = (p) => {
+    ctx.save();
+    ctx.shadowColor = rgba(G, 0.65);
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = G;
+    ctx.lineWidth = 1.8;
+    p();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  };
+  const cutout = (p, lw = 1.1) => {
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.fillStyle = "rgba(0,0,0,1)";
+    ctx.lineWidth = lw;
+    p();
+    ctx.restore();
+  };
+  switch (gadget.iconShape) {
+    case "turret_mg":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-6, 7);
+        ctx.lineTo(0, 2);
+        ctx.lineTo(6, 7);
+        ctx.lineTo(1.5, 3.5);
+        ctx.lineTo(0, 2);
+        ctx.lineTo(-1.5, 3.5);
+        ctx.closePath();
+        ctx.rect(-3.5, -4, 7, 6);
+        ctx.rect(-1.2, -10, 2.4, 6);
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.rect(-0.4, -9.2, 0.8, 1.8);
+        ctx.rect(-0.4, -6.8, 0.8, 1.8);
+        ctx.fill();
+        ctx.moveTo(-2, -2);
+        ctx.lineTo(2, -2);
+        ctx.moveTo(-2, 0);
+        ctx.lineTo(2, 0);
+        ctx.stroke();
+      });
+      break;
+    case "turret_cannon":
+      body(() => {
+        ctx.beginPath();
+        ctx.rect(-8, 4.5, 16, 3);
+        ctx.rect(-3, 1.5, 6, 3);
+        ctx.arc(0, -1, 5.5, Math.PI, 0);
+        ctx.rect(-1.6, -11, 3.2, 7.5);
+        ctx.rect(-2.6, -12.5, 5.2, 1.5);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.arc(0, -1, 3.5, Math.PI, 0);
+        ctx.stroke();
+        ctx.rect(-1.8, -12, 1, 0.8);
+        ctx.rect(0.8, -12, 1, 0.8);
+        ctx.fill();
+      });
+      break;
+    case "mine_explosive":
+      body(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 3.5, 9, 3.8, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 1.5, 6, 2.6, 0, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 1.5, 4, 1.7, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.arc(0, 1.5, 1, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+    case "mine_poison":
+      body(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 3.2, 9.5, 4.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 1.2, 7, 3, 0, 0, Math.PI * 2);
+        ctx.arc(-8.2, 4.5, 1.6, 0, Math.PI * 2);
+        ctx.arc(-10.2, 7.2, 1.8, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 1.2, 2.5, 1.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+        for (let i = 0; i < 8; i++) {
+          const angle = i / 8 * Math.PI * 2;
+          ctx.moveTo(Math.cos(angle) * 2.5, 1.2 + Math.sin(angle) * 1.1);
+          ctx.lineTo(Math.cos(angle) * 7, 1.2 + Math.sin(angle) * 3);
+        }
+        ctx.stroke();
+        ctx.arc(-8.2, 4.5, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.arc(-10.2, 6.8, 0.6, 0, Math.PI * 2);
+        ctx.rect(-10.5, 7.2, 0.6, 0.5);
+        ctx.fill();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.arc(-10.4, 6.8, 0.15, 0, Math.PI * 2);
+        ctx.arc(-10, 6.8, 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+    case "mine_fire":
+      body(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 3.2, 9.5, 4.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 1.2, 7.5, 3.2, 0, 0, Math.PI * 2);
+        ctx.arc(-8.2, 4.5, 1.6, 0, Math.PI * 2);
+        ctx.arc(-10.2, 7.2, 1.8, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.ellipse(0, 1.2, 5, 2.1, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.arc(-8.2, 4.5, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.moveTo(-10.2, 8.2);
+        ctx.quadraticCurveTo(-11.2, 7.2, -10.2, 6.4);
+        ctx.quadraticCurveTo(-9.8, 7.2, -10.2, 8.2);
+        ctx.fill();
+      });
+      break;
+    case "glue_grenade":
+      body(() => {
+        ctx.beginPath();
+        for (let i = 0; i < 12; i++) {
+          const a = i / 12 * Math.PI * 2;
+          const r = 5.2 + (i % 2 === 0 ? 1.2 : 0);
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.rect(-1.2, -8, 2.4, 3);
+        ctx.arc(2, -7.5, 1.5, 0, Math.PI * 2);
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.arc(2, -7.5, 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.moveTo(-3, -2);
+        ctx.lineTo(3, 2);
+        ctx.moveTo(-3, 2);
+        ctx.lineTo(3, -2);
+        ctx.stroke();
+      });
+      break;
+    case "fire_grenade":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-3.2, 1.5);
+        ctx.lineTo(3.2, 1.5);
+        ctx.lineTo(3.2, 7.5);
+        ctx.quadraticCurveTo(3.2, 9, 1.8, 9);
+        ctx.lineTo(-1.8, 9);
+        ctx.quadraticCurveTo(-3.2, 9, -3.2, 7.5);
+        ctx.closePath();
+        ctx.rect(-1.2, -4.5, 2.4, 6);
+        ctx.rect(-1.6, -5.2, 3.2, 1.2);
+        ctx.moveTo(-1, -4.5);
+        ctx.lineTo(-4.5, -7.5);
+        ctx.lineTo(-2.5, -9);
+        ctx.lineTo(0.5, -5.5);
+        ctx.closePath();
+        ctx.moveTo(-3.5, -8.2);
+        ctx.quadraticCurveTo(-6.5, -12, -2.5, -13);
+        ctx.quadraticCurveTo(-1.5, -11, -2.5, -9.5);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.moveTo(-3, 4.5);
+        ctx.lineTo(3, 4.5);
+        ctx.rect(-2, 5.2, 4, 2.2);
+        ctx.stroke();
+      });
+      break;
+    case "healing_station":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-7.5, 7.5);
+        ctx.lineTo(7.5, 7.5);
+        ctx.lineTo(6.5, -2);
+        ctx.quadraticCurveTo(5, -6.5, 0, -6.5);
+        ctx.quadraticCurveTo(-5, -6.5, -6.5, -2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.rect(-1.4, -3.5, 2.8, 7);
+        ctx.rect(-3.5, -1.4, 7, 2.8);
+        ctx.fill();
+        ctx.rect(-4, 4.5, 2, 1);
+        ctx.rect(2, 4.5, 2, 1);
+        ctx.fill();
+      });
+      break;
+    case "poison_grenade":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-3.5, -3);
+        ctx.lineTo(3.5, -3);
+        ctx.lineTo(3.5, 7.5);
+        ctx.quadraticCurveTo(3.5, 8.5, 2.5, 8.5);
+        ctx.lineTo(-2.5, 8.5);
+        ctx.quadraticCurveTo(-3.5, 8.5, -3.5, 7.5);
+        ctx.closePath();
+        ctx.rect(-2, -4.5, 4, 1.5);
+        ctx.moveTo(1.2, -4);
+        ctx.lineTo(4.8, -3.5);
+        ctx.lineTo(4.8, 4.5);
+        ctx.lineTo(2.8, 4.8);
+        ctx.closePath();
+        ctx.arc(-3.5, -5.5, 2, 0, Math.PI * 2);
+        ctx.arc(-6.5, -2.5, 1.8, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.arc(-3.5, -5.5, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.arc(-6.5, -2.9, 0.6, 0, Math.PI * 2);
+        ctx.rect(-6.8, -2.5, 0.6, 0.5);
+        ctx.fill();
+        ctx.rect(-2, -1, 4, 1.2);
+        ctx.rect(-2, 2.2, 4, 1.2);
+        ctx.rect(-2, 5.4, 4, 1.2);
+        ctx.fill();
+      });
+      break;
+    default:
+      body(() => {
+        ctx.beginPath();
+        ctx.arc(0, 0, 7, 0, Math.PI * 2);
+        ctx.closePath();
+      });
+  }
+  ctx.restore();
+}
 
 // src/game/sound.ts
 var SoundManager = class _SoundManager {
@@ -2657,6 +2917,20 @@ var GameEngine = class {
   net = null;
   /** single-player sub-mode */
   gameMode = "biohazard";
+  // ---- Ranked Cashout state variables ----
+  vaults = [];
+  cashBoxes = [];
+  cashoutStations = [];
+  teamCash = [0, 0, 0, 0];
+  // cash assets for Team 0, 1, 2, 3
+  cashBoxCount = 0;
+  // how many cash boxes have spawned overall
+  cashoutTimeLeft = 480;
+  // 8 minutes time limit
+  isOvertime = false;
+  vaultSeq = 1;
+  boxSeq = 1;
+  stationSeq = 1;
   selfPid = 0;
   peerPid = 0;
   peerName = "";
@@ -3123,7 +3397,82 @@ var GameEngine = class {
     }
     this.player.shieldHp = this.gun.shieldMaxHp ?? 0;
     this.applyRuntime();
-    if (this.gameMode === "deathmatch") {
+    if (this.gameMode === "cashout") {
+      this.isDM = true;
+      this.base.hp = Infinity;
+      this.base.maxHp = Infinity;
+      this.enemyBase.hp = Infinity;
+      this.enemyBase.maxHp = Infinity;
+      this.dmSpawns = [];
+      for (let i = 0; i < 12; i++) {
+        const angle = i / 12 * Math.PI * 2;
+        const dist = 350 + Math.random() * 180;
+        this.dmSpawns.push({
+          x: this.worldW * 0.5 + Math.cos(angle) * dist,
+          y: this.worldH * 0.5 + Math.sin(angle) * dist
+        });
+      }
+      const human = {
+        id: 0,
+        isBot: false,
+        name: "\u4F60",
+        color: "#38bdf8",
+        player: this.player,
+        character: this.character,
+        outfit: this.outfit,
+        skill: this.skill,
+        guns: this.guns,
+        gunIndex: this.gunIndex,
+        weaponStates: this.weaponStates,
+        gadgets: this.gadgets,
+        selectedGadget: this.selectedGadget,
+        skillCd: this.skillCd,
+        dashCharges: this.dashCharges,
+        dashRecharge: this.dashRecharge,
+        gadgetCd: this.gadgetCd,
+        lastGadget: this.lastGadget,
+        kills: 0,
+        score: 0,
+        wander: 0,
+        strafeDir: 1,
+        strafeTimer: 0,
+        teamId: 0,
+        coins: 2,
+        deadTimer: 0,
+        respawnTimer: 0
+      };
+      this.combatants = [human];
+      this.player.cid = 0;
+      const teamColors = ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"];
+      const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+      const picks = this.rollBotLoadouts(11);
+      for (let i = 1; i < 12; i++) {
+        const teamId = Math.floor(i / 3);
+        const memberIndex = i % 3;
+        const name = teamId === 0 ? `\u961F\u53CB${memberIndex}` : `${teamNames[teamId]}\xB7\u6210\u5458${memberIndex + 1}`;
+        const color = teamColors[teamId];
+        const sp = this.dmSpawns[i];
+        const bot = this.makeBot(i, picks[i - 1], name, color, sp.x, sp.y);
+        bot.teamId = teamId;
+        bot.coins = 2;
+        bot.deadTimer = 0;
+        bot.respawnTimer = 0;
+        this.combatants.push(bot);
+      }
+      this.vaults = [];
+      this.cashBoxes = [];
+      this.cashoutStations = [];
+      this.teamCash = [0, 0, 0, 0];
+      this.cashBoxCount = 0;
+      this.cashoutTimeLeft = 480;
+      this.isOvertime = false;
+      this.spawnVault();
+      this.spawnVault();
+      this.spawnCashoutStation();
+      this.spawnCashoutStation();
+      this.banner = { text: "\u6392\u4F4D\u63D0\u73B0 \xB7 \u593A\u53D6\u73B0\u91D1\u76D2\u8FDB\u884C\u63D0\u73B0\uFF01", t: 2.8 };
+      this.activeId = 0;
+    } else if (this.gameMode === "deathmatch") {
       this.isDM = true;
       this.dmKillLimit = this.mode === "local" ? 15 : 8;
       this.base.hp = Infinity;
@@ -3733,7 +4082,7 @@ var GameEngine = class {
       return;
     }
     if (this.gameOver || this.paused) return;
-    if (KEYS_MOVE.has(e.code)) this.keys.add(e.code);
+    if (KEYS_MOVE.has(e.code) || e.code === "KeyF") this.keys.add(e.code);
     if (this.mode === "guest") {
       if (e.code === "KeyQ" || e.code === "Space") {
         this.pendSkill = true;
@@ -4158,6 +4507,23 @@ var GameEngine = class {
     if (this.touchMode) {
       const tgt = this.findAimTarget(p);
       if (tgt) p.angle = Math.atan2(tgt.y - p.y, tgt.x - p.x);
+    }
+    const carriedBox = this.gameMode === "cashout" ? this.cashBoxes.find((b) => b.carriedByCid === this.activeId) : null;
+    if (carriedBox) {
+      if (this.firing) {
+        carriedBox.carriedByCid = null;
+        carriedBox.throwTimer = 0.8;
+        carriedBox.thrownByCid = this.activeId;
+        carriedBox.vx = Math.cos(p.angle) * 480;
+        carriedBox.vy = Math.sin(p.angle) * 480;
+        carriedBox.x = p.x + Math.cos(p.angle) * (p.size + 15);
+        carriedBox.y = p.y + Math.sin(p.angle) * (p.size + 15);
+        this.spawnParticles(carriedBox.x, carriedBox.y, "#fbbf24", 8, 80, 0.3);
+      }
+      this.firing = false;
+      this.beamActive = false;
+      this.flameActive = false;
+      return;
     }
     p.fireTimer -= dt;
     const ws = this.weaponStates.get(g.id);
@@ -6849,7 +7215,10 @@ var GameEngine = class {
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.tickRespawns(dt);
-    if (this.matchLive) this.updateWaves(dt);
+    if (this.gameMode === "cashout") {
+      this.updateCashoutMode(dt);
+    }
+    if (this.matchLive && this.gameMode !== "cashout") this.updateWaves(dt);
     if (this.mode !== "local" && this.matchLive && !this.gameOver && this.time >= MATCH_DURATION) {
       this.endGame("\u65F6\u95F4\u5230\uFF01");
     }
@@ -7925,6 +8294,18 @@ var GameEngine = class {
       baseMaxHp: this.base ? this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp : 0,
       enemyBaseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)) : 0,
       enemyBaseMaxHp: this.base ? this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp : 0,
+      teamCash: this.gameMode === "cashout" ? this.teamCash : void 0,
+      cashoutTimeLeft: this.gameMode === "cashout" ? this.cashoutTimeLeft : void 0,
+      isOvertime: this.gameMode === "cashout" ? this.isOvertime : void 0,
+      combatantsData: this.gameMode === "cashout" ? this.combatants.map((c) => ({
+        id: c.id,
+        name: c.name,
+        hp: c.player.hp,
+        maxHp: c.player.maxHp,
+        teamId: c.teamId ?? 0,
+        coins: c.coins ?? 0,
+        dead: !!(c.player.deadTimer && c.player.deadTimer > 0)
+      })) : void 0,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
@@ -7977,7 +8358,10 @@ var GameEngine = class {
     ctx.translate(-this.camX, -this.camY);
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    if (this.gameMode !== "biohazard" && !this.isDM) {
+    if (this.gameMode === "cashout") {
+      this.drawCashoutElements(ctx);
+    }
+    if (this.gameMode !== "biohazard" && this.gameMode !== "cashout" && !this.isDM) {
       this.drawBase(ctx, this.enemyBase, false);
       this.drawBase(ctx, this.base, true);
     }
@@ -7994,6 +8378,19 @@ var GameEngine = class {
       for (const c of this.combatants) {
         const q = c.player;
         if (q.deadTimer && q.deadTimer > 0) continue;
+        const hasBox = this.gameMode === "cashout" ? this.cashBoxes.find((b) => b.carriedByCid === c.id) : null;
+        if (hasBox) {
+          ctx.save();
+          ctx.translate(q.x, q.y - q.size - 10);
+          ctx.fillStyle = "#fbbf24";
+          ctx.strokeStyle = "#d97706";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.rect(-6, -4, 12, 8);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
         this.drawNetCharacter(
           ctx,
           q.x,
@@ -8492,58 +8889,15 @@ var GameEngine = class {
         ctx.setLineDash([]);
       }
       if (d.kind === "turret_mg") {
-        ctx.fillStyle = "#334155";
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.rotate(d.angle);
-        ctx.fillStyle = d.color;
-        roundRect(ctx, 0, -3, d.size + 6, 6, 2);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = rgba(d.color, 0.8);
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.rotate(d.angle + Math.PI / 2);
+        drawGadgetIcon(ctx, { iconShape: "turret_mg", color: d.color }, 0, 0, d.size * 2);
       } else if (d.kind === "turret_cannon") {
-        ctx.fillStyle = "#3b3366";
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.rotate(d.angle);
-        ctx.fillStyle = d.color;
-        roundRect(ctx, 0, -5, d.size + 8, 10, 3);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.stroke();
-        ctx.fillStyle = rgba(d.color, 0.8);
-        ctx.beginPath();
-        ctx.arc(0, 0, 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.rotate(d.angle + Math.PI / 2);
+        drawGadgetIcon(ctx, { iconShape: "turret_cannon", color: d.color }, 0, 0, d.size * 2);
       } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
         const blink = d.armed <= 0 ? Math.floor(this.time * 4) % 2 === 0 ? 1 : 0.4 : 0.5;
-        ctx.fillStyle = rgba(d.color, blink);
-        ctx.strokeStyle = shade(d.color, -0.3);
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = shade(d.color, -0.2);
-        ctx.beginPath();
-        ctx.moveTo(-4, -6);
-        ctx.lineTo(0, -12);
-        ctx.lineTo(4, -6);
-        ctx.closePath();
-        ctx.fill();
+        const colorWithBlink = rgba(d.color, blink);
+        drawGadgetIcon(ctx, { iconShape: d.kind, color: colorWithBlink }, 0, 0, d.size * 2.2);
         if (d.armed <= 0) {
           ctx.strokeStyle = rgba(d.color, 0.3);
           ctx.lineWidth = 1.5;
@@ -8567,22 +8921,7 @@ var GameEngine = class {
         ctx.beginPath();
         ctx.arc(0, 0, d.size * 2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "#15803d";
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = "#bbf7d0";
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(-d.size * 0.5, 0);
-        ctx.lineTo(d.size * 0.5, 0);
-        ctx.moveTo(0, -d.size * 0.5);
-        ctx.lineTo(0, d.size * 0.5);
-        ctx.stroke();
+        drawGadgetIcon(ctx, { iconShape: "healing_station", color: d.color }, 0, 0, d.size * 2);
       }
       ctx.restore();
       if ((d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "healing_station") && d.hp < d.maxHp) {
@@ -8774,30 +9113,9 @@ var GameEngine = class {
     for (const gr of this.grenades) {
       ctx.save();
       ctx.translate(gr.x, gr.y);
-      const fire = gr.kind === "fire";
-      const glue = gr.kind === "glue";
-      const poison = gr.kind === "poison";
-      ctx.fillStyle = fire ? "#7f1d1d" : glue ? "#0e7490" : poison ? "#3f6212" : "#1f2937";
-      ctx.strokeStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#fbbf24";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#f97316";
-      ctx.fillRect(-2, -9, 4, 4);
-      if (fire) {
-        ctx.fillStyle = "#fde68a";
-        ctx.beginPath();
-        ctx.moveTo(-1.5, -9);
-        ctx.quadraticCurveTo(0, -13, 1.5, -9);
-        ctx.fill();
-      } else if (poison) {
-        ctx.fillStyle = "#bef264";
-        ctx.beginPath();
-        ctx.arc(0, -11, 1.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const color = gr.kind === "fire" ? "#f97316" : gr.kind === "glue" ? "#06b6d4" : gr.kind === "poison" ? "#22c55e" : "#fbbf24";
+      ctx.rotate(this.time * 6);
+      drawGadgetIcon(ctx, { iconShape: gr.kind + "_grenade", color }, 0, 0, 15);
       ctx.restore();
     }
   }
@@ -9606,6 +9924,21 @@ var GameEngine = class {
       ctx.fillStyle = rgba("#a855f7", 0.1);
       ctx.fillRect(0, 0, this.W, this.H);
     }
+    if (this.gameMode === "cashout" && this.humanInteractProgress > 0) {
+      const cx = this.W / 2;
+      const cy = this.H / 2 + 55;
+      ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(cx - 70, cy - 8, 140, 16);
+      ctx.strokeRect(cx - 70, cy - 8, 140, 16);
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillRect(cx - 68, cy - 6, 136 * this.humanInteractProgress, 12);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(this.humanInteractLabel, cx, cy - 14);
+    }
     const p = this.player;
     const hpFrac = p.hp / p.maxHp;
     if (hpFrac < 0.35 && !this.gameOver) {
@@ -9628,6 +9961,410 @@ var GameEngine = class {
       const pulse = 0.2 + Math.sin(this.time * 5) * 0.1;
       ctx.fillStyle = rgba("#ef4444", pulse * (0.3 - bf));
       ctx.fillRect(0, 0, this.W, this.H);
+    }
+  }
+  // ---- Ranked Cashout mode helper methods ----
+  humanInteractProgress = 0;
+  humanInteractLabel = "";
+  spawnVault() {
+    if (this.vaults.length >= 2) return;
+    const padding = 200;
+    const x = padding + Math.random() * (this.worldW - padding * 2);
+    const y = padding + Math.random() * (this.worldH - padding * 2);
+    const id = this.vaultSeq++;
+    this.vaults.push({
+      id,
+      x,
+      y,
+      size: 16,
+      state: "preheat",
+      timer: 15,
+      unlockingTeamId: null
+    });
+  }
+  spawnCashoutStation() {
+    if (this.cashoutStations.length >= 2) return;
+    const padding = 200;
+    const x = padding + Math.random() * (this.worldW - padding * 2);
+    const y = padding + Math.random() * (this.worldH - padding * 2);
+    const id = this.stationSeq++;
+    this.cashoutStations.push({
+      id,
+      x,
+      y,
+      size: 20,
+      state: "idle",
+      cash: 0,
+      timer: 0,
+      ownerTeamId: null,
+      stealerCid: null,
+      stealTimer: 0,
+      boxCount: 0,
+      challengerTeamId: null
+    });
+  }
+  unlockVault(v) {
+    const id = this.boxSeq++;
+    this.cashBoxCount++;
+    let value = 1e4;
+    if (this.cashBoxCount > 4) value = 22e3;
+    else if (this.cashBoxCount > 2) value = 15e3;
+    this.cashBoxes.push({
+      id,
+      x: v.x,
+      y: v.y,
+      vx: 0,
+      vy: 0,
+      size: 10,
+      value,
+      carriedByCid: null,
+      throwTimer: 0,
+      thrownByCid: null
+    });
+    if (v.unlockingTeamId !== null) {
+      this.teamCash[v.unlockingTeamId] += 1e3;
+      const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+      this.addScoreFeed(v.unlockingTeamId === 0 ? "\u6211\u65B9\u89E3\u9501\u4FDD\u9669\u7BB1\uFF01" : `${teamNames[v.unlockingTeamId]} \u89E3\u9501\u4E86\u4FDD\u9669\u7BB1\uFF01`, 1e3);
+      this.banner = { text: v.unlockingTeamId === 0 ? "\u5DF2\u83B7\u5F97\u4FDD\u9669\u7BB1\u73B0\u91D1\u76D2\uFF01" : "\u8B66\u544A\uFF1A\u654C\u65B9\u89E3\u9501\u4E86\u4FDD\u9669\u7BB1\uFF01", t: 2 };
+    }
+    this.vaults = this.vaults.filter((val) => val.id !== v.id);
+  }
+  endCashoutMatch() {
+    this.gameOver = true;
+    this.running = false;
+    const rank = [0, 1, 2, 3].sort((a, b) => this.teamCash[b] - this.teamCash[a]);
+    const isWin = rank[0] === 0 || rank[1] === 0;
+    const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+    const results = rank.map((tid, idx) => `${idx + 1}. ${teamNames[tid]} ($${this.teamCash[tid]})`).join("\n");
+    const endMsg = isWin ? `\u606D\u559C\u83B7\u80DC\u664B\u7EA7\uFF01
+
+\u5BF9\u5C40\u6392\u540D\u7ED3\u7B97\uFF1A
+${results}` : `\u6DD8\u6C70\uFF01\u672A\u80FD\u8FDB\u5165\u524D\u4E8C\u3002
+
+\u5BF9\u5C40\u6392\u540D\u7ED3\u7B97\uFF1A
+${results}`;
+    this.endGame(endMsg);
+  }
+  collideBoxWithWalls(box) {
+    const r = box.size;
+    for (const w of this.walls) {
+      if (w.hp <= 0) continue;
+      if (box.x + r > w.x && box.x - r < w.x + w.w && box.y + r > w.y && box.y - r < w.y + w.h) {
+        if (Math.abs(box.vx) > Math.abs(box.vy)) {
+          box.vx *= -0.5;
+          if (box.vx > 0) box.x = w.x + w.w + r;
+          else box.x = w.x - r;
+        } else {
+          box.vy *= -0.5;
+          if (box.vy > 0) box.y = w.y + w.h + r;
+          else box.y = w.y - r;
+        }
+      }
+    }
+  }
+  isInteracting(c, tx, ty, dist) {
+    const d = Math.hypot(c.player.x - tx, c.player.y - ty);
+    if (d > dist) return false;
+    if (c.id === 0) return this.keys.has("KeyF");
+    return true;
+  }
+  reviveCombatant(c, safeSpawn = false) {
+    c.player.hp = c.player.maxHp;
+    c.player.deadTimer = 0;
+    c.respawnTimer = 0;
+    if (safeSpawn) {
+      const padding = 200;
+      let rx = padding + Math.random() * (this.worldW - padding * 2);
+      let ry = padding + Math.random() * (this.worldH - padding * 2);
+      c.player.x = rx;
+      c.player.y = ry;
+    }
+    this.spawnParticles(c.player.x, c.player.y, "#22c55e", 20, 150, 0.5);
+  }
+  updateCashoutMode(dt) {
+    if (this.gameOver) return;
+    this.cashoutTimeLeft -= dt;
+    if (this.cashoutTimeLeft <= 0) {
+      this.cashoutTimeLeft = 0;
+      const activeCashout = this.cashoutStations.some((st) => st.state === "cashout" || st.state === "stealing");
+      if (activeCashout && !this.isOvertime) {
+        this.isOvertime = true;
+        this.banner = { text: "\u52A0\u65F6\u8D5B\u5F00\u59CB\uFF01(\u6700\u591A 1 \u5206\u949F)", t: 3 };
+      }
+      if (this.isOvertime) {
+        if (Math.abs(this.cashoutTimeLeft) >= 60 || !activeCashout) {
+          this.endCashoutMatch();
+        }
+      } else {
+        this.endCashoutMatch();
+      }
+    }
+    for (const v of this.vaults) {
+      if (v.state === "preheat") {
+        v.timer -= dt;
+        if (v.timer <= 0) {
+          v.state = "idle";
+          v.timer = 0;
+          this.addScoreFeed("\u4FDD\u9669\u7BB1\u5DF2\u5C31\u7EEA", 0);
+        }
+      }
+    }
+    for (const box of this.cashBoxes) {
+      if (box.carriedByCid !== null) {
+        const carrier = this.combatants.find((c) => c.id === box.carriedByCid);
+        if (carrier && carrier.player.hp > 0) {
+          box.x = carrier.player.x;
+          box.y = carrier.player.y - 15;
+          box.vx = 0;
+          box.vy = 0;
+        } else {
+          box.carriedByCid = null;
+          box.throwTimer = 1;
+        }
+      } else {
+        if (box.throwTimer > 0) {
+          box.throwTimer -= dt;
+        }
+        box.x += box.vx * dt;
+        box.y += box.vy * dt;
+        box.vx *= Math.pow(0.1, dt);
+        box.vy *= Math.pow(0.1, dt);
+        const margin = box.size;
+        if (box.x < margin) {
+          box.x = margin;
+          box.vx *= -0.5;
+        }
+        if (box.x > this.worldW - margin) {
+          box.x = this.worldW - margin;
+          box.vx *= -0.5;
+        }
+        if (box.y < margin) {
+          box.y = margin;
+          box.vy *= -0.5;
+        }
+        if (box.y > this.worldH - margin) {
+          box.y = this.worldH - margin;
+          box.vy *= -0.5;
+        }
+        this.collideBoxWithWalls(box);
+        const speed = Math.hypot(box.vx, box.vy);
+        if (speed > 120) {
+          for (const c of this.combatants) {
+            if (c.player.hp > 0 && c.id !== box.thrownByCid) {
+              const d = Math.hypot(c.player.x - box.x, c.player.y - box.y);
+              if (d < c.player.size + box.size) {
+                this.damagePlayerEntity(c.player, 50, void 0, 0, 0, box.thrownByCid ?? void 0);
+                box.vx = 0;
+                box.vy = 0;
+                box.thrownByCid = null;
+                this.spawnParticles(box.x, box.y, "#fbbf24", 15, 100, 0.4);
+                break;
+              }
+            }
+          }
+        } else {
+          for (const c of this.combatants) {
+            if (c.player.hp > 0 && box.throwTimer <= 0) {
+              const d = Math.hypot(c.player.x - box.x, c.player.y - box.y);
+              if (d < c.player.size + box.size + 10) {
+                box.carriedByCid = c.id;
+                box.vx = 0;
+                box.vy = 0;
+                box.throwTimer = 0;
+                box.thrownByCid = null;
+                c.selectedGadget = -1;
+                this.addScoreFeed(c.id === 0 ? "\u4F60\u62FE\u53D6\u4E86\u73B0\u91D1\u76D2" : `${c.name} \u62FE\u53D6\u4E86\u73B0\u91D1\u76D2`, 0);
+                break;
+              }
+            }
+          }
+        }
+        for (const st of this.cashoutStations) {
+          const d = Math.hypot(st.x - box.x, st.y - box.y);
+          if (d < st.size + box.size + 15) {
+            const inserterCid = box.thrownByCid !== null ? box.thrownByCid : 0;
+            const inserterTeam = this.combatants.find((c) => c.id === inserterCid)?.teamId ?? 0;
+            this.cashBoxes = this.cashBoxes.filter((b) => b.id !== box.id);
+            const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+            const instantReward = Math.round(box.value * 0.2);
+            this.teamCash[inserterTeam] += instantReward;
+            st.cash += box.value;
+            st.timer = 120;
+            st.ownerTeamId = inserterTeam;
+            st.boxCount++;
+            st.state = "cashout";
+            this.addScoreFeed(`${teamNames[inserterTeam]} \u585E\u5165\u73B0\u91D1\u76D2\uFF0C\u5373\u65F6\u83B7\u5F97 $${instantReward}`, instantReward);
+            this.banner = { text: inserterTeam === 0 ? "\u63D0\u73B0\u5DF2\u542F\u52A8\uFF01\u4FDD\u62A4\u63D0\u73B0\u7AD9\uFF01" : "\u8B66\u544A\uFF1A\u654C\u65B9\u542F\u52A8\u4E86\u63D0\u73B0\u7AD9\uFF01", t: 2.5 };
+            if (st.boxCount === 2) {
+              st.challengerTeamId = inserterTeam;
+              this.addScoreFeed(`\u{1F6A8} ${teamNames[inserterTeam]} \u89E6\u53D1\u4E86\u53CC\u91CD\u5371\u673A\uFF01`, 0);
+              this.banner = { text: "\u53CC\u91CD\u5371\u673A\uFF01\u6700\u7EC8\u7ED3\u7B97\u82E5\u4E0D\u5C5E\u4E8E\u8BE5\u961F\uFF0C\u5C06\u6263\u9664 50% \u8D44\u4EA7\uFF01", t: 3.5 };
+            }
+            break;
+          }
+        }
+      }
+    }
+    for (let i = this.cashoutStations.length - 1; i >= 0; i--) {
+      const st = this.cashoutStations[i];
+      if (st.state === "cashout" || st.state === "stealing") {
+        st.timer -= dt;
+        if (st.state === "stealing" && st.stealerCid !== null) {
+          const stealer = this.combatants.find((c) => c.id === st.stealerCid);
+          if (stealer && stealer.player.hp > 0 && this.isInteracting(stealer, st.x, st.y, 60)) {
+            st.stealTimer += dt;
+            if (st.stealTimer >= 7) {
+              const oldOwner = st.ownerTeamId;
+              st.ownerTeamId = stealer.teamId ?? 0;
+              st.state = "cashout";
+              st.stealerCid = null;
+              st.stealTimer = 0;
+              this.teamCash[st.ownerTeamId] += 1e3;
+              const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+              this.addScoreFeed(st.ownerTeamId === 0 ? "\u63D0\u73B0\u7AD9\u5DF2\u88AB\u6211\u65B9\u5077\u53D6\uFF01" : `\u63D0\u73B0\u7AD9\u5DF2\u88AB ${teamNames[st.ownerTeamId]} \u5077\u53D6\uFF01`, 1e3);
+              this.banner = { text: st.ownerTeamId === 0 ? "\u63D0\u73B0\u7AD9\u5DF2\u5F52\u6211\u65B9\u6240\u6709\uFF01" : "\u8B66\u544A\uFF1A\u63D0\u73B0\u7AD9\u5DF2\u88AB\u654C\u65B9\u5077\u53D6\uFF01", t: 2 };
+            }
+          } else {
+            st.state = "cashout";
+            st.stealerCid = null;
+            st.stealTimer = 0;
+          }
+        }
+        if (st.timer <= 0) {
+          st.state = "settled";
+          const winningTeam = st.ownerTeamId ?? 0;
+          const cashReward = st.cash;
+          this.teamCash[winningTeam] += cashReward;
+          if (st.challengerTeamId !== null && st.challengerTeamId !== winningTeam) {
+            const penalisedTeam = st.challengerTeamId;
+            const lostCash = Math.round(this.teamCash[penalisedTeam] * 0.5);
+            this.teamCash[penalisedTeam] -= lostCash;
+            const teamNames2 = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+            this.addScoreFeed(`${teamNames2[penalisedTeam]} \u53CC\u91CD\u5371\u673A\u6311\u6218\u5931\u8D25\uFF01\u6263\u9664\u8D44\u4EA7 $${lostCash}`, 0);
+          }
+          const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+          this.addScoreFeed(`${teamNames[winningTeam]} \u63D0\u73B0\u7ED3\u7B97\u5B8C\u6210\uFF01\u83B7\u5F97 $${cashReward}`, cashReward);
+          this.spawnCoinBurstFX(st.x, st.y, st.size * 2, false, false, "", 0, -50);
+          this.cashoutStations = this.cashoutStations.filter((s) => s.id !== st.id);
+          this.spawnVault();
+          this.spawnCashoutStation();
+        }
+      }
+    }
+    this.humanInteractProgress = 0;
+    this.humanInteractLabel = "";
+    for (const c of this.combatants) {
+      if (c.player.hp <= 0) {
+        if (c.deadTimer && c.deadTimer > 0) {
+          c.deadTimer -= dt;
+          if (c.deadTimer <= 0) {
+            c.deadTimer = 0;
+            if (c.coins && c.coins > 0) {
+              c.coins--;
+              this.reviveCombatant(c);
+              this.addScoreFeed(c.id === 0 ? "\u4F60\u5DF2\u81EA\u4E3B\u590D\u6D3B" : `${c.name} \u5DF2\u4F7F\u7528\u590D\u6D3B\u5E01\u590D\u6D3B`, 0);
+            }
+          }
+        }
+        continue;
+      }
+      const wantsInteract = c.id === 0 ? this.keys.has("KeyF") : true;
+      let revivingTeammate = false;
+      for (const t of this.combatants) {
+        if (t.teamId === c.teamId && t.id !== c.id && t.player.hp <= 0) {
+          const d = Math.hypot(t.player.x - c.player.x, t.player.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            t.deadTimer = (t.deadTimer ?? 0) - dt;
+            if (!t.deadTimer || t.deadTimer > 4) t.deadTimer = 4;
+            t.deadTimer -= dt * 2;
+            if (c.id === 0) {
+              this.humanInteractProgress = Math.max(0, Math.min(1, 1 - t.deadTimer / 4));
+              this.humanInteractLabel = `\u6B63\u5728\u590D\u6D3B\u961F\u53CB: ${t.name}`;
+            }
+            if (t.deadTimer <= 0) {
+              this.reviveCombatant(t);
+              this.addScoreFeed(c.id === 0 ? `\u4F60\u590D\u6D3B\u4E86\u961F\u53CB: ${t.name}` : `${c.name} \u590D\u6D3B\u4E86\u961F\u53CB: ${t.name}`, 0);
+            }
+            revivingTeammate = true;
+            break;
+          }
+        }
+      }
+      if (revivingTeammate) continue;
+      for (const v of this.vaults) {
+        if (v.state === "idle" || v.state === "unlocking" && v.unlockingTeamId === c.teamId) {
+          const d = Math.hypot(v.x - c.player.x, v.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            v.state = "unlocking";
+            v.unlockingTeamId = c.teamId ?? 0;
+            v.timer += dt;
+            if (c.id === 0) {
+              this.humanInteractProgress = Math.max(0, Math.min(1, v.timer / 20));
+              this.humanInteractLabel = "\u6B63\u5728\u89E3\u9501\u4FDD\u9669\u7BB1...";
+            }
+            if (v.timer >= 20) {
+              this.unlockVault(v);
+            }
+            break;
+          }
+        } else if (v.state === "unlocking" && v.unlockingTeamId !== c.teamId) {
+          const d = Math.hypot(v.x - c.player.x, v.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            v.unlockingTeamId = c.teamId ?? 0;
+            v.timer = 0.5;
+            this.addScoreFeed(c.id === 0 ? "\u4F60\u6B63\u5728\u63A5\u7BA1\u4FDD\u9669\u7BB1\uFF01" : `${c.name} \u6B63\u5728\u63A5\u7BA1\u4FDD\u9669\u7BB1\uFF01`, 0);
+            break;
+          }
+        }
+      }
+      for (const st of this.cashoutStations) {
+        if ((st.state === "cashout" || st.state === "stealing") && st.ownerTeamId !== c.teamId) {
+          const d = Math.hypot(st.x - c.player.x, st.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            st.state = "stealing";
+            st.stealerCid = c.id;
+            if (c.id === 0) {
+              this.humanInteractProgress = Math.max(0, Math.min(1, st.stealTimer / 7));
+              this.humanInteractLabel = "\u6B63\u5728\u5077\u53D6\u63D0\u73B0\u7AD9...";
+            }
+            break;
+          }
+        }
+      }
+    }
+    const activeTeams = [0, 1, 2, 3];
+    for (const teamId of activeTeams) {
+      const members = this.combatants.filter((c) => c.teamId === teamId);
+      const allDead = members.every((c) => c.player.hp <= 0);
+      if (allDead) {
+        const anyWipeActive = members.some((c) => (c.respawnTimer ?? 0) > 0);
+        if (!anyWipeActive) {
+          const currentCash = this.teamCash[teamId];
+          const lostAmount = Math.round(currentCash * 0.15);
+          this.teamCash[teamId] -= lostAmount;
+          const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+          this.addScoreFeed(teamId === 0 ? `\u6211\u65B9\u961F\u4F0D\u56E2\u706D\uFF01\u6263\u9664 $${lostAmount}` : `${teamNames[teamId]} \u56E2\u706D\uFF01\u6263\u9664 $${lostAmount}`, 0);
+          for (const m of members) {
+            m.respawnTimer = 25;
+            m.player.deadTimer = 25;
+          }
+        } else {
+          for (const m of members) {
+            if (m.respawnTimer && m.respawnTimer > 0) {
+              m.respawnTimer -= dt;
+              m.player.deadTimer = m.respawnTimer;
+              if (m.respawnTimer <= 0) {
+                m.respawnTimer = 0;
+                m.player.deadTimer = 0;
+                this.reviveCombatant(m, true);
+                if (m.id === 0) {
+                  this.addScoreFeed("\u961F\u4F0D\u5F3A\u5236\u590D\u6D3B\u5DF2\u5B8C\u6210", 0);
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 };

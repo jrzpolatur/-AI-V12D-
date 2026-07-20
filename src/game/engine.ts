@@ -1,6 +1,6 @@
 import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getSkill, SCENES, CHARACTERS, OUTFITS, SKILLS } from "./content";
 import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef, OutfitDef } from "./types";
-import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK } from "./draw";
+import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK, drawGadgetIcon } from "./draw";
 import { sound } from "./sound";
 import { RUNTIME } from "./runtimeConfig";
 import type { NetMode, InputFrame, Snapshot, SnapPlayer, SnapEffect } from "../net/protocol";
@@ -45,7 +45,7 @@ export interface Loadout {
   gadgetIds?: string[];
   /** single-player sub-mode: biohazard survival, or offline deathmatch
    *  (you + 3 AI bots, first to 15 kills wins) */
-  gameMode?: "biohazard" | "deathmatch";
+  gameMode?: "biohazard" | "deathmatch" | "cashout";
 }
 
 /** One row of the deathmatch leaderboard. */
@@ -102,11 +102,16 @@ export interface HudState {
   /** gatling spin-up 0..1 (0 = cold, 1 = full fire rate) */
   warmup: number;
   /** single-player sub-mode */
-  mode: "biohazard" | "deathmatch";
+  mode: "biohazard" | "deathmatch" | "cashout";
   /** deathmatch leaderboard (4 combatants). Absent in other modes. */
   dm?: DmEntry[];
   /** kill target to win the deathmatch */
   dmTarget?: number;
+  // ---- Ranked Cashout mode fields ----
+  teamCash?: number[];
+  cashoutTimeLeft?: number;
+  isOvertime?: boolean;
+  combatantsData?: { id: number; name: string; hp: number; maxHp: number; teamId: number; coins: number; dead: boolean }[];
   skillId: string;
   skillName: string;
   skillIcon: string;
@@ -244,6 +249,11 @@ interface Combatant {
   weaponCd?: number;
   /** spacing timer between gadget deployments */
   gadgetTimer?: number;
+  // ---- Ranked Cashout mode properties ----
+  teamId?: number;
+  coins?: number;
+  deadTimer?: number;
+  respawnTimer?: number;
 }
 
 interface Bullet {
@@ -546,6 +556,44 @@ const EMPTY_FRAME: InputFrame = {
 /** PvP: seconds a downed player waits before respawning */
 const RESPAWN_TIME = 4;
 
+export interface Vault {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  state: "preheat" | "idle" | "unlocking" | "unlocked";
+  timer: number;       // preheat timer (15s) or unlock timer (20s)
+  unlockingTeamId: number | null; // which team is currently unlocking it
+}
+
+export interface CashBox {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  value: number;       // $10000, $15000, or $22000
+  carriedByCid: number | null; // cid of player/bot holding it
+  throwTimer: number;   // brief grace period after throw so thrower doesn't instantly pick it back up
+  thrownByCid: number | null;
+}
+
+export interface CashoutStation {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  state: "idle" | "cashout" | "stealing" | "settled";
+  cash: number;        // current accumulated cash
+  timer: number;       // remaining cashout time (max 120s)
+  ownerTeamId: number | null; // current owner team (0..3)
+  stealerCid: number | null;  // combatant cid stealing it
+  stealTimer: number;         // current steal progress (max 7s)
+  boxCount: number;           // number of boxes inserted (1 or 2)
+  challengerTeamId: number | null; // Double Jeopardy challenger team
+}
+
 export class GameEngine {
   private canvas: HTMLCanvasElement | null;
   private ctx: CanvasRenderingContext2D | null;
@@ -629,7 +677,18 @@ export class GameEngine {
   private authoritative = false;
   private net: Net | null = null;
   /** single-player sub-mode */
-  private gameMode: "biohazard" | "deathmatch" = "biohazard";
+  private gameMode: "biohazard" | "deathmatch" | "cashout" = "biohazard";
+  // ---- Ranked Cashout state variables ----
+  private vaults: Vault[] = [];
+  private cashBoxes: CashBox[] = [];
+  private cashoutStations: CashoutStation[] = [];
+  private teamCash: number[] = [0, 0, 0, 0]; // cash assets for Team 0, 1, 2, 3
+  private cashBoxCount = 0;                  // how many cash boxes have spawned overall
+  private cashoutTimeLeft = 480;             // 8 minutes time limit
+  private isOvertime = false;
+  private vaultSeq = 1;
+  private boxSeq = 1;
+  private stationSeq = 1;
   private selfPid = 0;
   private peerPid = 0;
   private peerName = "";
@@ -1161,16 +1220,85 @@ export class GameEngine {
     this.player.shieldHp = this.gun.shieldMaxHp ?? 0;
     this.applyRuntime();
 
-    // ---- deathmatch: build 4 combatants (you + 3 AI bots) ----
-    if (this.gameMode === "deathmatch") {
+    // ---- deathmatch & cashout: build combatants ----
+    if (this.gameMode === "cashout") {
       this.isDM = true;
-      this.dmKillLimit = this.mode === "local" ? 15 : 8;
-      // neutralise bases so they're never targeted / drawn / shown in UI
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
       this.enemyBase.maxHp = Infinity;
-      // four spawn anchors so nobody starts on top of another
+
+      // 12 spawn points distributed in circles
+      this.dmSpawns = [];
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const dist = 350 + Math.random() * 180;
+        this.dmSpawns.push({
+          x: this.worldW * 0.5 + Math.cos(angle) * dist,
+          y: this.worldH * 0.5 + Math.sin(angle) * dist,
+        });
+      }
+
+      // Human player (cid 0, team 0)
+      const human: Combatant = {
+        id: 0, isBot: false, name: "你", color: "#38bdf8",
+        player: this.player,
+        character: this.character, outfit: this.outfit, skill: this.skill,
+        guns: this.guns, gunIndex: this.gunIndex,
+        weaponStates: this.weaponStates, gadgets: this.gadgets,
+        selectedGadget: this.selectedGadget,
+        skillCd: this.skillCd, dashCharges: this.dashCharges,
+        dashRecharge: this.dashRecharge, gadgetCd: this.gadgetCd,
+        lastGadget: this.lastGadget, kills: 0, score: 0,
+        wander: 0, strafeDir: 1, strafeTimer: 0,
+        teamId: 0, coins: 2, deadTimer: 0, respawnTimer: 0
+      };
+      this.combatants = [human];
+      this.player.cid = 0;
+
+      // Setup 11 bots (2 allies, 9 enemies in 3 teams)
+      const teamColors = ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"];
+      const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+      const picks = this.rollBotLoadouts(11);
+
+      for (let i = 1; i < 12; i++) {
+        const teamId = Math.floor(i / 3);
+        const memberIndex = i % 3;
+        const name = teamId === 0 ? `队友${memberIndex}` : `${teamNames[teamId]}·成员${memberIndex + 1}`;
+        const color = teamColors[teamId];
+        const sp = this.dmSpawns[i];
+        const bot = this.makeBot(i, picks[i - 1], name, color, sp.x, sp.y);
+        bot.teamId = teamId;
+        bot.coins = 2;
+        bot.deadTimer = 0;
+        bot.respawnTimer = 0;
+        this.combatants.push(bot);
+      }
+
+      // Initialize Ranked Cashout state
+      this.vaults = [];
+      this.cashBoxes = [];
+      this.cashoutStations = [];
+      this.teamCash = [0, 0, 0, 0];
+      this.cashBoxCount = 0;
+      this.cashoutTimeLeft = 480; // 8 minutes
+      this.isOvertime = false;
+
+      // Spawn 2 initial vaults and stations
+      this.spawnVault();
+      this.spawnVault();
+      this.spawnCashoutStation();
+      this.spawnCashoutStation();
+
+      this.banner = { text: "排位提现 · 夺取现金盒进行提现！", t: 2.8 };
+      this.activeId = 0;
+    } else if (this.gameMode === "deathmatch") {
+      this.isDM = true;
+      this.dmKillLimit = this.mode === "local" ? 15 : 8;
+      this.base.hp = Infinity;
+      this.base.maxHp = Infinity;
+      this.enemyBase.hp = Infinity;
+      this.enemyBase.maxHp = Infinity;
       this.dmSpawns = [
         { x: this.worldW * 0.5, y: this.worldH - 200 },
         { x: this.worldW * 0.15, y: this.worldH * 0.2 },
@@ -1178,7 +1306,6 @@ export class GameEngine {
         { x: this.worldW * 0.5, y: this.worldH * 0.16 },
       ];
       if (this.mode === "local") {
-        // combatant 0 = the local human (reuses the existing globals)
         const human: Combatant = {
           id: 0, isBot: false, name: "你", color: "#38bdf8",
           player: this.player,
@@ -1845,7 +1972,7 @@ export class GameEngine {
       return;
     }
     if (this.gameOver || this.paused) return;
-    if (KEYS_MOVE.has(e.code)) this.keys.add(e.code);
+    if (KEYS_MOVE.has(e.code) || e.code === "KeyF") this.keys.add(e.code);
 
     // ---- guest: record intents, the host simulates them ----
     if (this.mode === "guest") {
@@ -2365,6 +2492,25 @@ export class GameEngine {
     if (this.touchMode) {
       const tgt = this.findAimTarget(p);
       if (tgt) p.angle = Math.atan2(tgt.y - p.y, tgt.x - p.x);
+    }
+
+    // Ranked Cashout carried box throwing & block fire
+    const carriedBox = this.gameMode === "cashout" ? this.cashBoxes.find(b => b.carriedByCid === this.activeId) : null;
+    if (carriedBox) {
+      if (this.firing) {
+        carriedBox.carriedByCid = null;
+        carriedBox.throwTimer = 0.8;
+        carriedBox.thrownByCid = this.activeId;
+        carriedBox.vx = Math.cos(p.angle) * 480;
+        carriedBox.vy = Math.sin(p.angle) * 480;
+        carriedBox.x = p.x + Math.cos(p.angle) * (p.size + 15);
+        carriedBox.y = p.y + Math.sin(p.angle) * (p.size + 15);
+        this.spawnParticles(carriedBox.x, carriedBox.y, "#fbbf24", 8, 80, 0.3);
+      }
+      this.firing = false;
+      this.beamActive = false;
+      this.flameActive = false;
+      return;
     }
 
     // weapon handling
@@ -5421,7 +5567,10 @@ export class GameEngine {
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.tickRespawns(dt);
-    if (this.matchLive) this.updateWaves(dt);
+    if (this.gameMode === "cashout") {
+      this.updateCashoutMode(dt);
+    }
+    if (this.matchLive && this.gameMode !== "cashout") this.updateWaves(dt);
     // online PvP time limit — end the match at MATCH_DURATION seconds
     if (this.mode !== "local" && this.matchLive && !this.gameOver && this.time >= MATCH_DURATION) {
       this.endGame("时间到！");
@@ -6638,6 +6787,18 @@ export class GameEngine {
       baseMaxHp: this.base ? (this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp) : 0,
       enemyBaseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)) : 0,
       enemyBaseMaxHp: this.base ? (this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp) : 0,
+      teamCash: this.gameMode === "cashout" ? this.teamCash : undefined,
+      cashoutTimeLeft: this.gameMode === "cashout" ? this.cashoutTimeLeft : undefined,
+      isOvertime: this.gameMode === "cashout" ? this.isOvertime : undefined,
+      combatantsData: this.gameMode === "cashout" ? this.combatants.map(c => ({
+        id: c.id,
+        name: c.name,
+        hp: c.player.hp,
+        maxHp: c.player.maxHp,
+        teamId: c.teamId ?? 0,
+        coins: c.coins ?? 0,
+        dead: !!(c.player.deadTimer && c.player.deadTimer > 0)
+      })) : undefined,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
@@ -6705,7 +6866,10 @@ export class GameEngine {
 
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    if (this.gameMode !== "biohazard" && !this.isDM) {
+    if (this.gameMode === "cashout") {
+      this.drawCashoutElements(ctx);
+    }
+    if (this.gameMode !== "biohazard" && this.gameMode !== "cashout" && !this.isDM) {
       this.drawBase(ctx, this.enemyBase, false);
       this.drawBase(ctx, this.base, true);
     }
@@ -6723,6 +6887,22 @@ export class GameEngine {
       for (const c of this.combatants) {
         const q = c.player;
         if (q.deadTimer && q.deadTimer > 0) continue;
+        
+        // Draw carried cash box if carrying one
+        const hasBox = this.gameMode === "cashout" ? this.cashBoxes.find(b => b.carriedByCid === c.id) : null;
+        if (hasBox) {
+          ctx.save();
+          ctx.translate(q.x, q.y - q.size - 10);
+          ctx.fillStyle = "#fbbf24";
+          ctx.strokeStyle = "#d97706";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.rect(-6, -4, 12, 8);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+
         this.drawNetCharacter(
           ctx,
           q.x,
@@ -7289,64 +7469,18 @@ export class GameEngine {
       }
 
       if (d.kind === "turret_mg") {
-        // base
-        ctx.fillStyle = "#334155";
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        // rotating barrel
-        ctx.rotate(d.angle);
-        ctx.fillStyle = d.color;
-        roundRect(ctx, 0, -3, d.size + 6, 6, 2);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        // core
-        ctx.fillStyle = rgba(d.color, 0.8);
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.rotate(d.angle + Math.PI / 2);
+        drawGadgetIcon(ctx, { iconShape: "turret_mg", color: d.color } as never, 0, 0, d.size * 2);
       } else if (d.kind === "turret_cannon") {
-        ctx.fillStyle = "#3b3366";
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.rotate(d.angle);
-        ctx.fillStyle = d.color;
-        roundRect(ctx, 0, -5, d.size + 8, 10, 3);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.stroke();
-        ctx.fillStyle = rgba(d.color, 0.8);
-        ctx.beginPath();
-        ctx.arc(0, 0, 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.rotate(d.angle + Math.PI / 2);
+        drawGadgetIcon(ctx, { iconShape: "turret_cannon", color: d.color } as never, 0, 0, d.size * 2);
       } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
-        // mine body
+        // Mine blink animation
         const blink = d.armed <= 0 ? (Math.floor(this.time * 4) % 2 === 0 ? 1 : 0.4) : 0.5;
-        ctx.fillStyle = rgba(d.color, blink);
-        ctx.strokeStyle = shade(d.color, -0.3);
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        // spike on top
-        ctx.fillStyle = shade(d.color, -0.2);
-        ctx.beginPath();
-        ctx.moveTo(-4, -6);
-        ctx.lineTo(0, -12);
-        ctx.lineTo(4, -6);
-        ctx.closePath();
-        ctx.fill();
-        // pulse ring when armed
+        const colorWithBlink = rgba(d.color, blink);
+        drawGadgetIcon(ctx, { iconShape: d.kind, color: colorWithBlink } as never, 0, 0, d.size * 2.2);
+
+        // Pulse ring when armed
         if (d.armed <= 0) {
           ctx.strokeStyle = rgba(d.color, 0.3);
           ctx.lineWidth = 1.5;
@@ -7355,7 +7489,7 @@ export class GameEngine {
           ctx.stroke();
         }
       } else if (d.kind === "healing_station") {
-        // range indicator
+        // Range indicator
         ctx.strokeStyle = rgba(d.color, 0.15);
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 8]);
@@ -7363,7 +7497,7 @@ export class GameEngine {
         ctx.arc(0, 0, d.radius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        // pulsing aura
+        // Pulsing aura
         const pulse = 0.5 + Math.sin(this.time * 3) * 0.2;
         const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, d.size * 2);
         rg.addColorStop(0, rgba(d.color, pulse * 0.5));
@@ -7372,23 +7506,9 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(0, 0, d.size * 2, 0, Math.PI * 2);
         ctx.fill();
-        // body — white cross on green
-        ctx.fillStyle = "#15803d";
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = "#bbf7d0";
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(-d.size * 0.5, 0);
-        ctx.lineTo(d.size * 0.5, 0);
-        ctx.moveTo(0, -d.size * 0.5);
-        ctx.lineTo(0, d.size * 0.5);
-        ctx.stroke();
+
+        // Render station icon
+        drawGadgetIcon(ctx, { iconShape: "healing_station", color: d.color } as never, 0, 0, d.size * 2);
       }
       ctx.restore();
 
@@ -7602,32 +7722,10 @@ export class GameEngine {
     for (const gr of this.grenades) {
       ctx.save();
       ctx.translate(gr.x, gr.y);
-      const fire = gr.kind === "fire";
-      const glue = gr.kind === "glue";
-      const poison = gr.kind === "poison";
-      ctx.fillStyle = fire ? "#7f1d1d" : glue ? "#0e7490" : poison ? "#3f6212" : "#1f2937";
-      ctx.strokeStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#fbbf24";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = fire ? "#fb923c" : glue ? "#22d3ee" : poison ? "#84cc16" : "#f97316";
-      ctx.fillRect(-2, -9, 4, 4);
-      if (fire) {
-        // little flame tongue
-        ctx.fillStyle = "#fde68a";
-        ctx.beginPath();
-        ctx.moveTo(-1.5, -9);
-        ctx.quadraticCurveTo(0, -13, 1.5, -9);
-        ctx.fill();
-      } else if (poison) {
-        // little toxic puff
-        ctx.fillStyle = "#bef264";
-        ctx.beginPath();
-        ctx.arc(0, -11, 1.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const color = gr.kind === "fire" ? "#f97316" : gr.kind === "glue" ? "#06b6d4" : gr.kind === "poison" ? "#22c55e" : "#fbbf24";
+      // Spinning rotation effect for throwing grenades
+      ctx.rotate(this.time * 6);
+      drawGadgetIcon(ctx, { iconShape: gr.kind + "_grenade", color: color } as never, 0, 0, 15);
       ctx.restore();
     }
   }
@@ -8574,6 +8672,23 @@ export class GameEngine {
       ctx.fillStyle = rgba("#a855f7", 0.1);
       ctx.fillRect(0, 0, this.W, this.H);
     }
+    
+    // Draw interaction progress bar
+    if (this.gameMode === "cashout" && this.humanInteractProgress > 0) {
+      const cx = this.W / 2;
+      const cy = this.H / 2 + 55;
+      ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(cx - 70, cy - 8, 140, 16);
+      ctx.strokeRect(cx - 70, cy - 8, 140, 16);
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillRect(cx - 68, cy - 6, 136 * this.humanInteractProgress, 12);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(this.humanInteractLabel, cx, cy - 14);
+    }
     const p = this.player;
     const hpFrac = p.hp / p.maxHp;
     if (hpFrac < 0.35 && !this.gameOver) {
@@ -8596,6 +8711,461 @@ export class GameEngine {
       const pulse = 0.2 + Math.sin(this.time * 5) * 0.1;
       ctx.fillStyle = rgba("#ef4444", pulse * (0.3 - bf));
       ctx.fillRect(0, 0, this.W, this.H);
+    }
+  }
+
+  // ---- Ranked Cashout mode helper methods ----
+  public humanInteractProgress = 0;
+  public humanInteractLabel = "";
+
+  private spawnVault() {
+    if (this.vaults.length >= 2) return;
+    const padding = 200;
+    const x = padding + Math.random() * (this.worldW - padding * 2);
+    const y = padding + Math.random() * (this.worldH - padding * 2);
+    const id = this.vaultSeq++;
+    this.vaults.push({
+      id,
+      x,
+      y,
+      size: 16,
+      state: "preheat",
+      timer: 15,
+      unlockingTeamId: null,
+    });
+  }
+
+  private spawnCashoutStation() {
+    if (this.cashoutStations.length >= 2) return;
+    const padding = 200;
+    const x = padding + Math.random() * (this.worldW - padding * 2);
+    const y = padding + Math.random() * (this.worldH - padding * 2);
+    const id = this.stationSeq++;
+    this.cashoutStations.push({
+      id,
+      x,
+      y,
+      size: 20,
+      state: "idle",
+      cash: 0,
+      timer: 0,
+      ownerTeamId: null,
+      stealerCid: null,
+      stealTimer: 0,
+      boxCount: 0,
+      challengerTeamId: null,
+    });
+  }
+
+  private unlockVault(v: Vault) {
+    const id = this.boxSeq++;
+    this.cashBoxCount++;
+    let value = 10000;
+    if (this.cashBoxCount > 4) value = 22000;
+    else if (this.cashBoxCount > 2) value = 15000;
+
+    this.cashBoxes.push({
+      id,
+      x: v.x,
+      y: v.y,
+      vx: 0,
+      vy: 0,
+      size: 10,
+      value,
+      carriedByCid: null,
+      throwTimer: 0,
+      thrownByCid: null,
+    });
+
+    if (v.unlockingTeamId !== null) {
+      this.teamCash[v.unlockingTeamId] += 1000;
+      const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+      this.addScoreFeed(v.unlockingTeamId === 0 ? "我方解锁保险箱！" : `${teamNames[v.unlockingTeamId]} 解锁了保险箱！`, 1000);
+      this.banner = { text: v.unlockingTeamId === 0 ? "已获得保险箱现金盒！" : "警告：敌方解锁了保险箱！", t: 2.0 };
+    }
+
+    this.vaults = this.vaults.filter((val) => val.id !== v.id);
+  }
+
+  private endCashoutMatch() {
+    this.gameOver = true;
+    this.running = false;
+    
+    // Sort teams by cash
+    const rank = [0, 1, 2, 3].sort((a, b) => this.teamCash[b] - this.teamCash[a]);
+    const isWin = rank[0] === 0 || rank[1] === 0; // Top 2 win
+    
+    const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+    const results = rank.map((tid, idx) => `${idx + 1}. ${teamNames[tid]} ($${this.teamCash[tid]})`).join("\n");
+    const endMsg = isWin
+      ? `恭喜获胜晋级！\n\n对局排名结算：\n${results}`
+      : `淘汰！未能进入前二。\n\n对局排名结算：\n${results}`;
+      
+    this.endGame(endMsg);
+  }
+
+  private collideBoxWithWalls(box: CashBox) {
+    const r = box.size;
+    for (const w of this.walls) {
+      if (w.hp <= 0) continue;
+      if (
+        box.x + r > w.x &&
+        box.x - r < w.x + w.w &&
+        box.y + r > w.y &&
+        box.y - r < w.y + w.h
+      ) {
+        if (Math.abs(box.vx) > Math.abs(box.vy)) {
+          box.vx *= -0.5;
+          if (box.vx > 0) box.x = w.x + w.w + r;
+          else box.x = w.x - r;
+        } else {
+          box.vy *= -0.5;
+          if (box.vy > 0) box.y = w.y + w.h + r;
+          else box.y = w.y - r;
+        }
+      }
+    }
+  }
+
+  private isInteracting(c: Combatant, tx: number, ty: number, dist: number): boolean {
+    const d = Math.hypot(c.player.x - tx, c.player.y - ty);
+    if (d > dist) return false;
+    if (c.id === 0) return this.keys.has("KeyF");
+    return true; // bots automatically maintain interaction
+  }
+
+  private reviveCombatant(c: Combatant, safeSpawn = false) {
+    c.player.hp = c.player.maxHp;
+    c.player.deadTimer = 0;
+    c.respawnTimer = 0;
+    if (safeSpawn) {
+      const padding = 200;
+      let rx = padding + Math.random() * (this.worldW - padding * 2);
+      let ry = padding + Math.random() * (this.worldH - padding * 2);
+      c.player.x = rx;
+      c.player.y = ry;
+    }
+    this.spawnParticles(c.player.x, c.player.y, "#22c55e", 20, 150, 0.5);
+  }
+
+  private updateCashoutMode(dt: number) {
+    if (this.gameOver) return;
+
+    // 1. Tick match timer
+    this.cashoutTimeLeft -= dt;
+    if (this.cashoutTimeLeft <= 0) {
+      this.cashoutTimeLeft = 0;
+      const activeCashout = this.cashoutStations.some(st => st.state === "cashout" || st.state === "stealing");
+      if (activeCashout && !this.isOvertime) {
+        this.isOvertime = true;
+        this.banner = { text: "加时赛开始！(最多 1 分钟)", t: 3.0 };
+      }
+      
+      if (this.isOvertime) {
+        if (Math.abs(this.cashoutTimeLeft) >= 60 || !activeCashout) {
+          this.endCashoutMatch();
+        }
+      } else {
+        this.endCashoutMatch();
+      }
+    }
+
+    // 2. Tick Vault preheating
+    for (const v of this.vaults) {
+      if (v.state === "preheat") {
+        v.timer -= dt;
+        if (v.timer <= 0) {
+          v.state = "idle";
+          v.timer = 0;
+          this.addScoreFeed("保险箱已就绪", 0);
+        }
+      }
+    }
+
+    // 3. Tick Cash Boxes physics and carrying
+    for (const box of this.cashBoxes) {
+      if (box.carriedByCid !== null) {
+        const carrier = this.combatants.find(c => c.id === box.carriedByCid);
+        if (carrier && carrier.player.hp > 0) {
+          box.x = carrier.player.x;
+          box.y = carrier.player.y - 15;
+          box.vx = 0;
+          box.vy = 0;
+        } else {
+          box.carriedByCid = null;
+          box.throwTimer = 1.0;
+        }
+      } else {
+        if (box.throwTimer > 0) {
+          box.throwTimer -= dt;
+        }
+        box.x += box.vx * dt;
+        box.y += box.vy * dt;
+        box.vx *= Math.pow(0.1, dt);
+        box.vy *= Math.pow(0.1, dt);
+        
+        const margin = box.size;
+        if (box.x < margin) { box.x = margin; box.vx *= -0.5; }
+        if (box.x > this.worldW - margin) { box.x = this.worldW - margin; box.vx *= -0.5; }
+        if (box.y < margin) { box.y = margin; box.vy *= -0.5; }
+        if (box.y > this.worldH - margin) { box.y = this.worldH - margin; box.vy *= -0.5; }
+
+        this.collideBoxWithWalls(box);
+
+        const speed = Math.hypot(box.vx, box.vy);
+        if (speed > 120) {
+          for (const c of this.combatants) {
+            if (c.player.hp > 0 && c.id !== box.thrownByCid) {
+              const d = Math.hypot(c.player.x - box.x, c.player.y - box.y);
+              if (d < c.player.size + box.size) {
+                this.damagePlayerEntity(c.player, 50, undefined, 0, 0, box.thrownByCid ?? undefined);
+                box.vx = 0;
+                box.vy = 0;
+                box.thrownByCid = null;
+                this.spawnParticles(box.x, box.y, "#fbbf24", 15, 100, 0.4);
+                break;
+              }
+            }
+          }
+        } else {
+          for (const c of this.combatants) {
+            if (c.player.hp > 0 && box.throwTimer <= 0) {
+              const d = Math.hypot(c.player.x - box.x, c.player.y - box.y);
+              if (d < c.player.size + box.size + 10) {
+                box.carriedByCid = c.id;
+                box.vx = 0;
+                box.vy = 0;
+                box.throwTimer = 0;
+                box.thrownByCid = null;
+                c.selectedGadget = -1;
+                this.addScoreFeed(c.id === 0 ? "你拾取了现金盒" : `${c.name} 拾取了现金盒`, 0);
+                break;
+              }
+            }
+          }
+        }
+
+        // Check insertion into Cashout Stations
+        for (const st of this.cashoutStations) {
+          const d = Math.hypot(st.x - box.x, st.y - box.y);
+          if (d < st.size + box.size + 15) {
+            const inserterCid = box.thrownByCid !== null ? box.thrownByCid : 0;
+            const inserterTeam = this.combatants.find(c => c.id === inserterCid)?.teamId ?? 0;
+            
+            this.cashBoxes = this.cashBoxes.filter(b => b.id !== box.id);
+            
+            const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+            const instantReward = Math.round(box.value * 0.2);
+            this.teamCash[inserterTeam] += instantReward;
+            
+            st.cash += box.value;
+            st.timer = 120;
+            st.ownerTeamId = inserterTeam;
+            st.boxCount++;
+            st.state = "cashout";
+            
+            this.addScoreFeed(`${teamNames[inserterTeam]} 塞入现金盒，即时获得 $${instantReward}`, instantReward);
+            this.banner = { text: inserterTeam === 0 ? "提现已启动！保护提现站！" : "警告：敌方启动了提现站！", t: 2.5 };
+            
+            if (st.boxCount === 2) {
+              st.challengerTeamId = inserterTeam;
+              this.addScoreFeed(`🚨 ${teamNames[inserterTeam]} 触发了双重危机！`, 0);
+              this.banner = { text: "双重危机！最终结算若不属于该队，将扣除 50% 资产！", t: 3.5 };
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // 4. Tick Cashout Stations
+    for (let i = this.cashoutStations.length - 1; i >= 0; i--) {
+      const st = this.cashoutStations[i];
+      if (st.state === "cashout" || st.state === "stealing") {
+        st.timer -= dt;
+        
+        if (st.state === "stealing" && st.stealerCid !== null) {
+          const stealer = this.combatants.find(c => c.id === st.stealerCid);
+          if (stealer && stealer.player.hp > 0 && this.isInteracting(stealer, st.x, st.y, 60)) {
+            st.stealTimer += dt;
+            if (st.stealTimer >= 7) {
+              const oldOwner = st.ownerTeamId;
+              st.ownerTeamId = stealer.teamId ?? 0;
+              st.state = "cashout";
+              st.stealerCid = null;
+              st.stealTimer = 0;
+              
+              this.teamCash[st.ownerTeamId] += 1000;
+              
+              const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+              this.addScoreFeed(st.ownerTeamId === 0 ? "提现站已被我方偷取！" : `提现站已被 ${teamNames[st.ownerTeamId]} 偷取！`, 1000);
+              this.banner = { text: st.ownerTeamId === 0 ? "提现站已归我方所有！" : "警告：提现站已被敌方偷取！", t: 2.0 };
+            }
+          } else {
+            st.state = "cashout";
+            st.stealerCid = null;
+            st.stealTimer = 0;
+          }
+        }
+
+        if (st.timer <= 0) {
+          st.state = "settled";
+          const winningTeam = st.ownerTeamId ?? 0;
+          const cashReward = st.cash;
+          
+          this.teamCash[winningTeam] += cashReward;
+          
+          if (st.challengerTeamId !== null && st.challengerTeamId !== winningTeam) {
+            const penalisedTeam = st.challengerTeamId;
+            const lostCash = Math.round(this.teamCash[penalisedTeam] * 0.5);
+            this.teamCash[penalisedTeam] -= lostCash;
+            const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+            this.addScoreFeed(`${teamNames[penalisedTeam]} 双重危机挑战失败！扣除资产 $${lostCash}`, 0);
+          }
+
+          const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+          this.addScoreFeed(`${teamNames[winningTeam]} 提现结算完成！获得 $${cashReward}`, cashReward);
+          
+          this.spawnCoinBurstFX(st.x, st.y, st.size * 2, false, false, "", 0, -50);
+
+          this.cashoutStations = this.cashoutStations.filter(s => s.id !== st.id);
+          this.spawnVault();
+          this.spawnCashoutStation();
+        }
+      }
+    }
+
+    // 5. Teammate Revives & General Interaction Logic
+    this.humanInteractProgress = 0;
+    this.humanInteractLabel = "";
+
+    for (const c of this.combatants) {
+      if (c.player.hp <= 0) {
+        if (c.deadTimer && c.deadTimer > 0) {
+          c.deadTimer -= dt;
+          if (c.deadTimer <= 0) {
+            c.deadTimer = 0;
+            if (c.coins && c.coins > 0) {
+              c.coins--;
+              this.reviveCombatant(c);
+              this.addScoreFeed(c.id === 0 ? "你已自主复活" : `${c.name} 已使用复活币复活`, 0);
+            }
+          }
+        }
+        continue; 
+      }
+
+      const wantsInteract = c.id === 0 ? this.keys.has("KeyF") : true;
+
+      // A. Revive teammate
+      let revivingTeammate = false;
+      for (const t of this.combatants) {
+        if (t.teamId === c.teamId && t.id !== c.id && t.player.hp <= 0) {
+          const d = Math.hypot(t.player.x - c.player.x, t.player.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            t.deadTimer = (t.deadTimer ?? 0) - dt;
+            if (!t.deadTimer || t.deadTimer > 4) t.deadTimer = 4;
+            t.deadTimer -= dt * 2.0;
+            
+            if (c.id === 0) {
+              this.humanInteractProgress = Math.max(0, Math.min(1, 1 - (t.deadTimer / 4)));
+              this.humanInteractLabel = `正在复活队友: ${t.name}`;
+            }
+
+            if (t.deadTimer <= 0) {
+              this.reviveCombatant(t);
+              this.addScoreFeed(c.id === 0 ? `你复活了队友: ${t.name}` : `${c.name} 复活了队友: ${t.name}`, 0);
+            }
+            revivingTeammate = true;
+            break;
+          }
+        }
+      }
+      if (revivingTeammate) continue;
+
+      // B. Vault unlocking
+      for (const v of this.vaults) {
+        if (v.state === "idle" || (v.state === "unlocking" && v.unlockingTeamId === c.teamId)) {
+          const d = Math.hypot(v.x - c.player.x, v.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            v.state = "unlocking";
+            v.unlockingTeamId = c.teamId ?? 0;
+            v.timer += dt;
+            
+            if (c.id === 0) {
+              this.humanInteractProgress = Math.max(0, Math.min(1, v.timer / 20));
+              this.humanInteractLabel = "正在解锁保险箱...";
+            }
+
+            if (v.timer >= 20) {
+              this.unlockVault(v);
+            }
+            break;
+          }
+        } else if (v.state === "unlocking" && v.unlockingTeamId !== c.teamId) {
+          const d = Math.hypot(v.x - c.player.x, v.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            v.unlockingTeamId = c.teamId ?? 0;
+            v.timer = 0.5;
+            this.addScoreFeed(c.id === 0 ? "你正在接管保险箱！" : `${c.name} 正在接管保险箱！`, 0);
+            break;
+          }
+        }
+      }
+
+      // C. Cashout Station steal
+      for (const st of this.cashoutStations) {
+        if ((st.state === "cashout" || st.state === "stealing") && st.ownerTeamId !== c.teamId) {
+          const d = Math.hypot(st.x - c.player.x, st.y - c.player.y);
+          if (d < 50 && wantsInteract) {
+            st.state = "stealing";
+            st.stealerCid = c.id;
+            if (c.id === 0) {
+              this.humanInteractProgress = Math.max(0, Math.min(1, st.stealTimer / 7));
+              this.humanInteractLabel = "正在偷取提现站...";
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // 6. Check Team Wipes
+    const activeTeams = [0, 1, 2, 3];
+    for (const teamId of activeTeams) {
+      const members = this.combatants.filter(c => c.teamId === teamId);
+      const allDead = members.every(c => c.player.hp <= 0);
+      if (allDead) {
+        const anyWipeActive = members.some(c => (c.respawnTimer ?? 0) > 0);
+        if (!anyWipeActive) {
+          const currentCash = this.teamCash[teamId];
+          const lostAmount = Math.round(currentCash * 0.15);
+          this.teamCash[teamId] -= lostAmount;
+          
+          const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+          this.addScoreFeed(teamId === 0 ? `我方队伍团灭！扣除 $${lostAmount}` : `${teamNames[teamId]} 团灭！扣除 $${lostAmount}`, 0);
+          
+          for (const m of members) {
+            m.respawnTimer = 25;
+            m.player.deadTimer = 25;
+          }
+        } else {
+          for (const m of members) {
+            if (m.respawnTimer && m.respawnTimer > 0) {
+              m.respawnTimer -= dt;
+              m.player.deadTimer = m.respawnTimer;
+              if (m.respawnTimer <= 0) {
+                m.respawnTimer = 0;
+                m.player.deadTimer = 0;
+                this.reviveCombatant(m, true);
+                if (m.id === 0) {
+                  this.addScoreFeed("队伍强制复活已完成", 0);
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
