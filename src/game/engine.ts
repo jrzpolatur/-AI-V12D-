@@ -639,6 +639,7 @@ export class GameEngine {
   private peerLoadout: Loadout | null = null;
   private remoteInput: InputFrame | null = null;
   private lastSnap: Snapshot | null = null;
+  private seenFx = new Set<number>();
   private snapAccum = 0;
   private inpAccum = 0;
   /** the opponent avatar (simulated on host, mirrored on guest) */
@@ -941,10 +942,19 @@ export class GameEngine {
   /** Cycle to the next carried weapon (used by the mobile "切枪" button). */
   cycleWeapon() {
     if (this.guns.length <= 1) return;
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendWeapon = true;
+      return;
+    }
     this.selectGun((this.gunIndex + 1) % this.guns.length);
   }
 
   triggerSkill() {
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendSkill = true;
+      this.localSkillCooldown();
+      return;
+    }
     this.activateSkill();
   }
 
@@ -969,6 +979,15 @@ export class GameEngine {
     if (this.gameOver || this.paused) return;
     if (index < 0 || index >= this.gadgets.length) return;
     const def = this.gadgets[index];
+    
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendGadget = index;
+      this.gadgetCd.set(def.id, def.cooldown);
+      sound.skill();
+      this.emit(true);
+      return;
+    }
+
     const cd = this.gadgetCd.get(def.id) ?? 0;
     if (cd > 0) return;
     // count deployed of this kind
@@ -985,6 +1004,10 @@ export class GameEngine {
   }
 
   reloadCurrent() {
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendReload = true;
+      return;
+    }
     const g = this.gun;
     const ws = this.weaponStates.get(g.id);
     if (g.magazine && ws && ws.reload <= 0 && ws.ammo < g.magazine) {
@@ -2056,6 +2079,7 @@ export class GameEngine {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      this.updateParticles(dt);
       this.emit(false);
       return;
     }
@@ -2144,6 +2168,7 @@ export class GameEngine {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      this.updateParticles(dt);
       // tick local cooldown read-outs so the HUD shows gadget/skill/dash CD
       // correctly (the guest runs no world sim, so it must age these itself)
       for (const [k, v] of this.gadgetCd) {
@@ -5536,6 +5561,10 @@ export class GameEngine {
     if (this.mode === "local") this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
     const foe = s.players.find((p) => p.id !== me.id) ?? s.players[1];
+    
+    const oldScore = this.score;
+    const oldKills = this.kills;
+    
     if (me) {
       if (this.mode === "guest" || this.authoritative) {
         // Client-side prediction position reconciliation
@@ -5588,12 +5617,64 @@ export class GameEngine {
     this.score = s.score;
     this.kills = s.kills;
     this.gold = s.gold;
+
+    // Trigger local score feedback for guest client
+    if (this.mode === "guest" && this.score > oldScore) {
+      const diff = this.score - oldScore;
+      if (this.kills > oldKills) {
+        this.addScoreFeed("淘汰", diff, this.peerName || "对手", diff, this.kills);
+      } else {
+        this.addScoreFeed(diff >= 200 ? "金币收集" : "伤害击中", diff);
+      }
+    }
+
     // Guest now has the host's world — handshake complete.
     this.peerReady = true;
+    
+    // Spawn local coin particles on the guest when new coinburst effects are received
+    if (this.mode === "guest" && s.effects) {
+      for (const e of s.effects) {
+        if (!this.seenFx.has(e.id)) {
+          this.seenFx.add(e.id);
+          if (this.seenFx.size > 1000) {
+            const oldest = this.seenFx.keys().next().value;
+            if (oldest !== undefined) this.seenFx.delete(oldest);
+          }
+          if (e.type === "coinburst") {
+            const style = e.style ?? "bullet";
+            const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
+            const coinCount = e.radius > 60 ? 48 : 24;
+            const dx = e.dirX ?? 0;
+            const dy = e.dirY ?? 0;
+            for (let i = 0; i < coinCount; i++) {
+              const a = Math.random() * Math.PI * 2;
+              const sp = 140 + Math.random() * 320;
+              let vx = Math.cos(a) * sp;
+              let vy = Math.sin(a) * sp - 120;
+              if (dx !== 0 || dy !== 0) {
+                vx = vx * 0.35 + dx * sp;
+                vy = vy * 0.35 + dy * sp - 60;
+              }
+              const flight = 0.35 + Math.random() * 0.15;
+              this.particles.push({
+                x: e.x, y: e.y, vx, vy,
+                life: flight + 1.0, maxLife: flight + 1.0,
+                color: pal[Math.floor(Math.random() * pal.length)],
+                size: 2.5 + Math.random() * 2,
+                gravity: 280,
+                bounce: 0.3,
+                style: "coin",
+                ground: e.y + (Math.random() - 0.5) * 20 + 30,
+              });
+            }
+          }
+        }
+      }
+    }
+
     // mirror the host's visual effects so explosions / sweeps / shockwaves show
     // on the guest side too (the guest runs no world simulation of its own).
     this.netEffects = s.effects ? s.effects.map((e) => ({ ...e })) : [];
-    // mirror thrown grenades + deployed gadgets so the guest can render them
     // mirror thrown grenades + deployed gadgets so the guest can render them
     this.netGrenades = s.grenades ? s.grenades.map((g) => ({ ...g }) as Grenade) : [];
     this.netDeployables = s.deployables
@@ -5625,8 +5706,46 @@ export class GameEngine {
     if (s.dmKills && this.isDM && this.combatants.length > 0) {
       const hostC = this.combatants.find(c => c.id === 1);
       const guestC = this.combatants.find(c => c.id === 2);
-      if (hostC) hostC.kills = s.dmKills[0];
-      if (guestC) guestC.kills = s.dmKills[1];
+      const oldHostKills = hostC?.kills ?? 0;
+      const oldGuestKills = guestC?.kills ?? 0;
+      
+      const newHostKills = s.dmKills[0];
+      const newGuestKills = s.dmKills[1];
+      
+      if (hostC) hostC.kills = newHostKills;
+      if (guestC) guestC.kills = newGuestKills;
+
+      // Local kill feed updates for DM on guest/client
+      if (this.mode === "guest") {
+        if (newHostKills > oldHostKills) {
+          const isMe = this.selfPid === 1;
+          const kName = isMe ? "你" : (this.peerName || "对手");
+          const vName = isMe ? (this.peerName || "对手") : "你";
+          const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
+          this.killFeed.push({
+            id: this.kfSeq++,
+            killerName: kName,
+            victimName: vName,
+            weaponIconShape: gun.iconShape,
+            weaponGlow: gun.glow,
+            timer: 4.2
+          });
+        }
+        if (newGuestKills > oldGuestKills) {
+          const isMe = this.selfPid === 2;
+          const kName = isMe ? "你" : (this.peerName || "对手");
+          const vName = isMe ? (this.peerName || "对手") : "你";
+          const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
+          this.killFeed.push({
+            id: this.kfSeq++,
+            killerName: kName,
+            victimName: vName,
+            weaponIconShape: gun.iconShape,
+            weaponGlow: gun.glow,
+            timer: 4.2
+          });
+        }
+      }
     }
     if (s.gameOver && !this.gameOver) {
       // The host's gameOverReason is from the host's POV; derive the guest's
@@ -5823,6 +5942,8 @@ export class GameEngine {
       ctx.fill();
     }
     ctx.restore();
+    // draw particles
+    this.drawParticles(ctx);
     // mirrored host effects (explosions, sweeps, shockwaves, ...)
     if (this.netEffects.length) this.drawEffects(ctx, this.netEffects as unknown as Effect[]);
     ctx.restore();

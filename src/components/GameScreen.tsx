@@ -141,7 +141,10 @@ export default function GameScreen({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
-  const [hud, setHud] = useState<HudState>(initialHud);
+  const [hud, setHud] = useState<HudState>(() => ({
+    ...initialHud,
+    mode: mode !== "local" ? "deathmatch" : (loadout.gameMode ?? "biohazard"),
+  }));
   const settings = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFull, setIsFull] = useState(false);

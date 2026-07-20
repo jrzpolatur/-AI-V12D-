@@ -44,6 +44,7 @@ export default function MobileControls({
   // ---- movement joystick (floating, left half) ----
   const joyPointer = useRef<number | null>(null);
   const joyOrigin = useRef({ x: 0, y: 0 });
+  const knobRef = useRef<HTMLDivElement>(null);
   const [joy, setJoy] = useState({
     active: false,
     x: 0, // visual center (relative to left zone)
@@ -77,7 +78,9 @@ export default function MobileControls({
       dx = (dx / dist) * R;
       dy = (dy / dist) * R;
     }
-    setJoy((st) => ({ ...st, kx: dx, ky: dy }));
+    if (knobRef.current) {
+      knobRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
     engineRef.current?.setVirtualMove(dx / R, dy / R);
   };
   const onJoyUp = (e: React.PointerEvent) => {
@@ -197,6 +200,7 @@ export default function MobileControls({
             style={{ left: joy.x, top: joy.y, touchAction: "none" }}
           >
             <div
+              ref={knobRef}
               className="h-14 w-14 rounded-full bg-white/30 shadow-lg ring-2 ring-white/40"
               style={{ transform: `translate(${joy.kx}px, ${joy.ky}px)` }}
             />

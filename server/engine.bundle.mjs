@@ -2666,6 +2666,7 @@ var GameEngine = class {
   peerLoadout = null;
   remoteInput = null;
   lastSnap = null;
+  seenFx = /* @__PURE__ */ new Set();
   snapAccum = 0;
   inpAccum = 0;
   /** the opponent avatar (simulated on host, mirrored on guest) */
@@ -2927,9 +2928,18 @@ var GameEngine = class {
   /** Cycle to the next carried weapon (used by the mobile "切枪" button). */
   cycleWeapon() {
     if (this.guns.length <= 1) return;
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendWeapon = true;
+      return;
+    }
     this.selectGun((this.gunIndex + 1) % this.guns.length);
   }
   triggerSkill() {
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendSkill = true;
+      this.localSkillCooldown();
+      return;
+    }
     this.activateSkill();
   }
   /**
@@ -2951,6 +2961,13 @@ var GameEngine = class {
     if (this.gameOver || this.paused) return;
     if (index < 0 || index >= this.gadgets.length) return;
     const def = this.gadgets[index];
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendGadget = index;
+      this.gadgetCd.set(def.id, def.cooldown);
+      sound.skill();
+      this.emit(true);
+      return;
+    }
     const cd = this.gadgetCd.get(def.id) ?? 0;
     if (cd > 0) return;
     const deployed = this.deployables.filter((d) => d.kind === def.kind).length;
@@ -2964,6 +2981,10 @@ var GameEngine = class {
     this.emit(true);
   }
   reloadCurrent() {
+    if (this.mode === "guest" || this.authoritative) {
+      this.pendReload = true;
+      return;
+    }
     const g = this.gun;
     const ws = this.weaponStates.get(g.id);
     if (g.magazine && ws && ws.reload <= 0 && ws.ammo < g.magazine) {
@@ -3906,6 +3927,7 @@ var GameEngine = class {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      this.updateParticles(dt);
       this.emit(false);
       return;
     }
@@ -3979,6 +4001,7 @@ var GameEngine = class {
       }
       this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
       this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      this.updateParticles(dt);
       for (const [k, v] of this.gadgetCd) {
         if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
       }
@@ -6967,6 +6990,8 @@ var GameEngine = class {
     if (this.mode === "local") this.paused = s.paused;
     const me = s.players.find((p) => p.id === this.selfPid) ?? s.players[0];
     const foe = s.players.find((p) => p.id !== me.id) ?? s.players[1];
+    const oldScore = this.score;
+    const oldKills = this.kills;
     if (me) {
       if (this.mode === "guest" || this.authoritative) {
         const distSq = (this.player.x - me.x) ** 2 + (this.player.y - me.y) ** 2;
@@ -7015,7 +7040,58 @@ var GameEngine = class {
     this.score = s.score;
     this.kills = s.kills;
     this.gold = s.gold;
+    if (this.mode === "guest" && this.score > oldScore) {
+      const diff = this.score - oldScore;
+      if (this.kills > oldKills) {
+        this.addScoreFeed("\u6DD8\u6C70", diff, this.peerName || "\u5BF9\u624B", diff, this.kills);
+      } else {
+        this.addScoreFeed(diff >= 200 ? "\u91D1\u5E01\u6536\u96C6" : "\u4F24\u5BB3\u51FB\u4E2D", diff);
+      }
+    }
     this.peerReady = true;
+    if (this.mode === "guest" && s.effects) {
+      for (const e of s.effects) {
+        if (!this.seenFx.has(e.id)) {
+          this.seenFx.add(e.id);
+          if (this.seenFx.size > 1e3) {
+            const oldest = this.seenFx.keys().next().value;
+            if (oldest !== void 0) this.seenFx.delete(oldest);
+          }
+          if (e.type === "coinburst") {
+            const style = e.style ?? "bullet";
+            const pal = COIN_STYLE[style] ?? COIN_STYLE.bullet;
+            const coinCount = e.radius > 60 ? 48 : 24;
+            const dx = e.dirX ?? 0;
+            const dy = e.dirY ?? 0;
+            for (let i = 0; i < coinCount; i++) {
+              const a = Math.random() * Math.PI * 2;
+              const sp = 140 + Math.random() * 320;
+              let vx = Math.cos(a) * sp;
+              let vy = Math.sin(a) * sp - 120;
+              if (dx !== 0 || dy !== 0) {
+                vx = vx * 0.35 + dx * sp;
+                vy = vy * 0.35 + dy * sp - 60;
+              }
+              const flight = 0.35 + Math.random() * 0.15;
+              this.particles.push({
+                x: e.x,
+                y: e.y,
+                vx,
+                vy,
+                life: flight + 1,
+                maxLife: flight + 1,
+                color: pal[Math.floor(Math.random() * pal.length)],
+                size: 2.5 + Math.random() * 2,
+                gravity: 280,
+                bounce: 0.3,
+                style: "coin",
+                ground: e.y + (Math.random() - 0.5) * 20 + 30
+              });
+            }
+          }
+        }
+      }
+    }
     this.netEffects = s.effects ? s.effects.map((e) => ({ ...e })) : [];
     this.netGrenades = s.grenades ? s.grenades.map((g) => ({ ...g })) : [];
     this.netDeployables = s.deployables ? s.deployables.map((d) => ({ ...d, targets: [] })) : [];
@@ -7041,8 +7117,42 @@ var GameEngine = class {
     if (s.dmKills && this.isDM && this.combatants.length > 0) {
       const hostC = this.combatants.find((c) => c.id === 1);
       const guestC = this.combatants.find((c) => c.id === 2);
-      if (hostC) hostC.kills = s.dmKills[0];
-      if (guestC) guestC.kills = s.dmKills[1];
+      const oldHostKills = hostC?.kills ?? 0;
+      const oldGuestKills = guestC?.kills ?? 0;
+      const newHostKills = s.dmKills[0];
+      const newGuestKills = s.dmKills[1];
+      if (hostC) hostC.kills = newHostKills;
+      if (guestC) guestC.kills = newGuestKills;
+      if (this.mode === "guest") {
+        if (newHostKills > oldHostKills) {
+          const isMe = this.selfPid === 1;
+          const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
+          const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
+          const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
+          this.killFeed.push({
+            id: this.kfSeq++,
+            killerName: kName,
+            victimName: vName,
+            weaponIconShape: gun.iconShape,
+            weaponGlow: gun.glow,
+            timer: 4.2
+          });
+        }
+        if (newGuestKills > oldGuestKills) {
+          const isMe = this.selfPid === 2;
+          const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
+          const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
+          const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
+          this.killFeed.push({
+            id: this.kfSeq++,
+            killerName: kName,
+            victimName: vName,
+            weaponIconShape: gun.iconShape,
+            weaponGlow: gun.glow,
+            timer: 4.2
+          });
+        }
+      }
     }
     if (s.gameOver && !this.gameOver) {
       const iAmJoiner = this.mode === "guest";
@@ -7206,6 +7316,7 @@ var GameEngine = class {
       ctx.fill();
     }
     ctx.restore();
+    this.drawParticles(ctx);
     if (this.netEffects.length) this.drawEffects(ctx, this.netEffects);
     ctx.restore();
   }

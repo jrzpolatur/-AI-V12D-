@@ -8,6 +8,8 @@ import type { Loadout } from "./game/engine";
 import { useOnlineCount } from "./hooks/useOnlineCount";
 import homeBg from "./assets/home-bg.png";
 
+import { tabLock } from "./utils/tabLock";
+
 type Screen = "menu" | "loadout" | "lobby" | "game";
 
 export default function App() {
@@ -53,7 +55,10 @@ export default function App() {
         loadout={loadout}
         mode={mode}
         net={mode === "local" ? null : net}
-        onExit={() => setScreen("menu")}
+        onExit={() => {
+          tabLock.release();
+          setScreen("menu");
+        }}
       />
     );
   }

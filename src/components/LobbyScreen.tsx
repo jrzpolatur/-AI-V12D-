@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Net, type NetStatus } from "../net/Net";
 import { useOnlineCount } from "../hooks/useOnlineCount";
+import { tabLock } from "../utils/tabLock";
 
 export default function LobbyScreen({
   onReady,
@@ -26,6 +27,13 @@ export default function LobbyScreen({
 
   const netRef = useRef<Net | null>(null);
   const advanced = useRef(false);
+  
+  const handleConflict = () => {
+    setStatus("error");
+    setInfo("检测到您在另一个标签页中已开始匹配或游戏！请关闭其他标签页。");
+    netRef.current?.disconnect();
+  };
+
   if (!netRef.current) {
     netRef.current = new Net({
       onStatus: (s, i) => {
@@ -58,16 +66,23 @@ export default function LobbyScreen({
       },
     });
   }
+
   const net = netRef.current;
 
   // Auto-connect on mount with auto-reconnect so a flaky link (e.g. free-tier
   // cold starts) recovers transparently instead of flipping colours.
   useEffect(() => {
     net.connect(url, true);
+    return () => {
+      tabLock.release();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const doFind = () => net.find(name);
+  const doFind = () => {
+    tabLock.acquire(handleConflict);
+    net.find(name);
+  };
 
   const ready = status === "ready";
   const canFind = status === "connected" || status === "idle" || status === "error";
