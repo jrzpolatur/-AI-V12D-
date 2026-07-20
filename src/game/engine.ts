@@ -46,6 +46,8 @@ export interface Loadout {
   /** single-player sub-mode: biohazard survival, or offline deathmatch
    *  (you + 3 AI bots, first to 15 kills wins) */
   gameMode?: "biohazard" | "deathmatch" | "cashout";
+  /** number of players in deathmatch (4, 6, 8) */
+  dmPlayerCount?: 4 | 6 | 8;
 }
 
 /** One row of the deathmatch leaderboard. */
@@ -135,8 +137,8 @@ export interface HudState {
   banner: string | null;
   kills: number;
   gold: number;
-  scoreFeed: { id: number; text: string; score: number; victimName?: string; subScore?: number; totalKills?: number }[];
-  killFeed: { id: number; killerName: string; victimName: string; weaponIconShape: string; weaponGlow: string }[];
+  activeScoreFeed: { totalScore: number; timer: number; events: { id: number; text: string; victimName?: string; subScore: number }[]; totalKills: number } | null;
+  killFeed: { id: number; type: "kill" | "event"; text?: string; teamColor?: string; killerName?: string; victimName?: string; weaponIconShape?: string; weaponGlow?: string }[];
   /** bow charge 0..1 (0 when not drawing) */
   bowChargePct: number;
   /** shield HP (null if not a shield weapon) */
@@ -249,11 +251,19 @@ interface Combatant {
   weaponCd?: number;
   /** spacing timer between gadget deployments */
   gadgetTimer?: number;
+  // ---- bot AI throttle state (decision caching) ----
+  aiTimer?: number;
+  // Only MOVEMENT intent is cached between decisions; AIM + FIRE are recomputed
+  // every frame by `botAimFire` so bots stay aggressive (cached firing caused the
+  // "see an enemy but don't shoot" regression).
+  aiMvx?: number;
+  aiMvy?: number;
   // ---- Ranked Cashout mode properties ----
   teamId?: number;
   coins?: number;
   deadTimer?: number;
   respawnTimer?: number;
+  respawnCoins?: number;
 }
 
 interface Bullet {
@@ -537,7 +547,25 @@ const DASH_RECHARGE = 5; // seconds per charge
 // gadget aiming: how far a placement (turret/mine/station) or a thrown
 // grenade may be placed/lobbed from the player.
 const GADGET_DEPLOY_DIST = 240;
-const GADGET_THROW_DIST = 280;
+// grenade throw range: +125% (280 * 2.25) per request.
+const GADGET_THROW_DIST = 630;
+/** Perf caps for client-side visual entities (local PvE, no network cost). */
+const MAX_PARTICLES = 700;
+const MAX_EFFECTS = 240;
+/** Broad-phase spatial grid cell size (px). */
+const GRID_CELL = 220;
+/** Bot AI re-decides this often (seconds) instead of every frame. */
+const BOT_THINK_INTERVAL = 0.12;
+/** Spatial-grid item used for broad-phase collision/damage queries. */
+type GridItem = {
+  kind: "enemy" | "player" | "deployable";
+  idx: number;
+  x: number;
+  y: number;
+  size: number;
+  ref: any;
+  ownerId?: number;
+};
 /** Online PvP match time limit (seconds). The host ends the match at this point. */
 const MATCH_DURATION = 175;
 /** A neutral input frame used when a peer hasn't sent one yet (stand still). */
@@ -577,6 +605,21 @@ export interface CashBox {
   carriedByCid: number | null; // cid of player/bot holding it
   throwTimer: number;   // brief grace period after throw so thrower doesn't instantly pick it back up
   thrownByCid: number | null;
+}
+
+export interface Statue {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  carriedByCid: number | null;
+  throwTimer: number;
+  thrownByCid: number | null;
+  deadCid: number;
+  teamId: number;
+  reviveProgress: number; // 0 to 5 seconds
 }
 
 export interface CashoutStation {
@@ -653,6 +696,10 @@ export class GameEngine {
   private effects: Effect[] = [];
   private pickups: Pickup[] = [];
   private grenades: Grenade[] = [];
+  // spatial hash grid for broad-phase collision/damage queries (perf)
+  private grid = new Map<string, GridItem[]>();
+  private gridMaxR = 0;
+  private particlePool: Particle[] = [];
   private walls: Wall[] = [];
   private deployables: Deployable[] = [];
   private base!: Base;
@@ -681,6 +728,7 @@ export class GameEngine {
   // ---- Ranked Cashout state variables ----
   private vaults: Vault[] = [];
   private cashBoxes: CashBox[] = [];
+  private statues: Statue[] = [];
   private cashoutStations: CashoutStation[] = [];
   private teamCash: number[] = [0, 0, 0, 0]; // cash assets for Team 0, 1, 2, 3
   private cashBoxCount = 0;                  // how many cash boxes have spawned overall
@@ -741,34 +789,43 @@ export class GameEngine {
   private wave = 0;
   private waveTimer = 0;
   private spawnTimer = 0;
-  public scoreFeed: { id: number; text: string; score: number; timer: number; victimName?: string; subScore?: number; totalKills?: number }[] = [];
-  public killFeed: { id: number; killerName: string; victimName: string; weaponIconShape: string; weaponGlow: string; timer: number }[] = [];
+  // removed old scoreFeed array
+  public killFeed: { id: number; type: "kill" | "event"; text?: string; teamColor?: string; killerName?: string; victimName?: string; weaponIconShape?: string; weaponGlow?: string; timer: number }[] = [];
   private nextScoreFeedId = 0;
   private nextKillFeedId = 0;
 
+  public activeScoreFeed: { totalScore: number; timer: number; events: { id: number; text: string; victimName?: string; subScore: number }[]; totalKills: number } | null = null;
+  private nextScoreFeedEventId = 0;
+
   addScoreFeed(text: string, score: number, victimName?: string, subScore?: number, totalKills?: number) {
     if (this.gameMode === "biohazard") return;
-    if (text === "伤害击中" && !victimName) {
-      const existing = this.scoreFeed.find(f => f.text === "伤害击中" && f.timer > 0.5);
-      if (existing) {
-        existing.score += score;
-        existing.timer = 2.0;
-        this.emit(true);
-        return;
+    
+    if (!this.activeScoreFeed || this.activeScoreFeed.timer <= 0) {
+      this.activeScoreFeed = {
+        totalScore: score,
+        timer: 5.0,
+        events: [{ id: this.nextScoreFeedEventId++, text, victimName, subScore: subScore || score }],
+        totalKills: totalKills || 0
+      };
+    } else {
+      this.activeScoreFeed.totalScore += score;
+      this.activeScoreFeed.timer = 5.0; // Reset to 5s
+      if (totalKills) this.activeScoreFeed.totalKills = totalKills;
+      
+      // Combine identical text events if victim is the same
+      const existingEvent = this.activeScoreFeed.events.find(e => e.text === text && e.victimName === victimName);
+      if (existingEvent) {
+        existingEvent.subScore += (subScore || score);
+      } else {
+        this.activeScoreFeed.events.unshift({ id: this.nextScoreFeedEventId++, text, victimName, subScore: subScore || score });
+      }
+      
+      // Keep only up to 5 recent events in the list
+      if (this.activeScoreFeed.events.length > 5) {
+        this.activeScoreFeed.events.pop();
       }
     }
-    this.scoreFeed.push({
-      id: this.nextScoreFeedId++,
-      text,
-      score,
-      timer: 3.5, // slightly longer for kill feed
-      victimName,
-      subScore,
-      totalKills,
-    });
-    if (this.scoreFeed.length > 4) {
-      this.scoreFeed.shift();
-    }
+    
     this.emit(true);
   }
 
@@ -797,6 +854,21 @@ export class GameEngine {
     }
     this.emit(true);
   }
+
+  public addEventMessage(text: string, teamColor?: string) {
+    this.killFeed.push({
+      id: this.nextKillFeedId++,
+      type: "event",
+      text,
+      teamColor,
+      timer: 8,
+    });
+    if (this.killFeed.length > 5) {
+      this.killFeed.shift();
+    }
+    this.emit(true);
+  }
+
   private maxConcurrent = 10;
   private intermission = 0;
   private banner: { text: string; t: number } | null = null;
@@ -853,6 +925,7 @@ export class GameEngine {
   private keys = new Set<string>();
   private mouse = { x: 400, y: 300 };
   private firing = false;
+  private secondaryFiring = false;
   /** virtual movement vector from the on-screen joystick (-1..1 each axis) */
   private virtualMove = { x: 0, y: 0 };
   /** touch device: enables the mobile on-screen controls + mobile-only aim assist */
@@ -1088,6 +1161,16 @@ export class GameEngine {
     this.resize();
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
+
+    if (this.gameMode === "deathmatch") {
+      const pCount = this.loadout.dmPlayerCount || 4;
+      const scale = pCount === 4 ? 1 : pCount === 6 ? 1.2 : 1.5;
+      this.worldW = RUNTIME.worldW * scale;
+      this.worldH = RUNTIME.worldH * scale;
+    } else {
+      this.worldW = RUNTIME.worldW;
+      this.worldH = RUNTIME.worldH;
+    }
     // Every mode now uses the (expanded) world bounds from RUNTIME so the
     // camera can scroll and follow the player — including biohazard, which is
     // no longer a fixed single-screen arena but a larger roaming survival map.
@@ -1296,17 +1379,23 @@ export class GameEngine {
       this.activeId = 0;
     } else if (this.gameMode === "deathmatch") {
       this.isDM = true;
-      this.dmKillLimit = this.mode === "local" ? 15 : 8;
+      const pCount = this.loadout.dmPlayerCount || 4;
+      this.dmKillLimit = this.mode === "local" ? (pCount === 4 ? 15 : pCount === 6 ? 18 : 24) : 8;
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
       this.enemyBase.maxHp = Infinity;
-      this.dmSpawns = [
-        { x: this.worldW * 0.5, y: this.worldH - 200 },
-        { x: this.worldW * 0.15, y: this.worldH * 0.2 },
-        { x: this.worldW * 0.85, y: this.worldH * 0.2 },
-        { x: this.worldW * 0.5, y: this.worldH * 0.16 },
-      ];
+      
+      this.dmSpawns = [];
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const dist = 350 + Math.random() * 180;
+        this.dmSpawns.push({
+          x: this.worldW * 0.5 + Math.cos(angle) * dist,
+          y: this.worldH * 0.5 + Math.sin(angle) * dist,
+        });
+      }
+
       if (this.mode === "local") {
         const human: Combatant = {
           id: 0, isBot: false, name: "你", color: "#38bdf8",
@@ -1322,14 +1411,15 @@ export class GameEngine {
         };
         this.combatants = [human];
         this.player.cid = 0;
-        const botColors = ["#f472b6", "#a3e635", "#fbbf24"];
-        const botNames = ["阿尔法", "贝塔", "伽马"];
-        const picks = this.rollBotLoadouts(3);
-        for (let i = 0; i < 3; i++) {
+        const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
+        const botNames = ["阿尔法", "贝塔", "伽马", "德尔塔", "艾普西龙", "泽塔", "伊塔", "西塔"];
+        const botCount = pCount - 1;
+        const picks = this.rollBotLoadouts(botCount);
+        for (let i = 0; i < botCount; i++) {
           const sp = this.dmSpawns[i + 1];
           this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
         }
-        this.banner = { text: "死亡竞赛 · 先杀 15 人获胜！", t: 2.4 };
+        this.banner = { text: `死亡竞赛 · 先杀 ${this.dmKillLimit} 人获胜！`, t: 2.4 };
       } else {
         this.combatants = [];
         this.banner = { text: "死亡竞赛 · 先杀 8 人获胜！", t: 2.4 };
@@ -1751,6 +1841,29 @@ export class GameEngine {
         break;
     }
 
+    if (this.gameMode === "deathmatch" || this.gameMode === "cashout") {
+      const baseArea = 2400 * 1200;
+      const currentArea = this.worldW * this.worldH;
+      const extraRatio = (currentArea / baseArea) - 1;
+      if (extraRatio > 0.5) {
+        // Scatter additional cover and buildings proportionately
+        const numExtra = Math.floor(extraRatio * 20);
+        for (let i = 0; i < numExtra; i++) {
+          const rx = 200 + Math.random() * (this.worldW - 400);
+          const ry = 200 + Math.random() * (this.worldH - 400);
+          
+          // Keep center relatively clear
+          if (Math.hypot(rx - cx, ry - cy) < 600) continue;
+          
+          if (Math.random() > 0.5) {
+            building(rx, ry, 150 + Math.random() * 150, 150 + Math.random() * 100);
+          } else {
+            cover(rx, ry, 100 + Math.random() * 100, 50 + Math.random() * 50);
+          }
+        }
+      }
+    }
+
     // ---- invisible boundary "air walls" ----
     // These solid (non-glue) walls sit just outside the playfield. They block
     // the player, monsters and bullets from ever leaving the arena, so nothing
@@ -1974,7 +2087,7 @@ export class GameEngine {
       return;
     }
     if (this.gameOver || this.paused) return;
-    if (KEYS_MOVE.has(e.code) || e.code === "KeyF") this.keys.add(e.code);
+    if (KEYS_MOVE.has(e.code) || e.code === "KeyF" || e.code === "KeyV") this.keys.add(e.code);
 
     // ---- guest: record intents, the host simulates them ----
     if (this.mode === "guest") {
@@ -2052,6 +2165,7 @@ export class GameEngine {
       this.semiAutoLatch = false; // fresh trigger pull allows a semi-auto shot
     }
     if (e.button === 2) {
+      this.secondaryFiring = true;
       // guest only records intent; host simulates the skill/shield/slam
       if (this.mode === "guest") {
         this.pendSkill = true;
@@ -2077,6 +2191,8 @@ export class GameEngine {
     if (e.button === 0) {
       this.firing = false;
       this.semiAutoLatch = false;
+    } else if (e.button === 2) {
+      this.secondaryFiring = false;
     }
   }
 
@@ -2127,12 +2243,11 @@ export class GameEngine {
 
   // ---------------------------------------------------------------- update
   private update(dt: number) {
-    // ---- tick feed timers ----
     let feedDirty = false;
-    for (let i = this.scoreFeed.length - 1; i >= 0; i--) {
-      this.scoreFeed[i].timer -= dt;
-      if (this.scoreFeed[i].timer <= 0) {
-        this.scoreFeed.splice(i, 1);
+    if (this.activeScoreFeed) {
+      this.activeScoreFeed.timer -= dt;
+      if (this.activeScoreFeed.timer <= 0) {
+        this.activeScoreFeed = null;
         feedDirty = true;
       }
     }
@@ -2202,7 +2317,12 @@ export class GameEngine {
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
-        this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
+        const selfC = this.combatants.find(c => c.id === 0);
+        if (this.gameMode === "cashout" && selfC && (selfC.coins ?? 0) > 0) {
+          this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活 (复活币: ${selfC.coins})`, t: 0.4 };
+        } else {
+          this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
+        }
       } else {
         this.player.deadTimer = 0;
       }
@@ -2211,8 +2331,8 @@ export class GameEngine {
         this.inpAccum = 0;
         this.sendInput();
       }
-      this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
-      this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      this.camX = this.player.x - this.W / 2;
+      this.camY = this.player.y - this.H / 2;
       this.updateParticles(dt);
       this.emit(false);
       return;
@@ -2297,7 +2417,12 @@ export class GameEngine {
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
-        this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
+        const selfC = this.combatants.find(c => c.id === 0);
+        if (this.gameMode === "cashout" && selfC && (selfC.coins ?? 0) > 0) {
+          this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活 (复活币: ${selfC.coins})`, t: 0.4 };
+        } else {
+          this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
+        }
       } else {
         this.player.deadTimer = 0;
       }
@@ -2306,8 +2431,8 @@ export class GameEngine {
         this.inpAccum = 0;
         this.sendInput();
       }
-      this.camX = Math.max(0, Math.min(this.worldW - this.W, this.player.x - this.W / 2));
-      this.camY = Math.max(0, Math.min(this.worldH - this.H, this.player.y - this.H / 2));
+      this.camX = this.player.x - this.W / 2;
+      this.camY = this.player.y - this.H / 2;
       this.updateParticles(dt);
       // tick local cooldown read-outs so the HUD shows gadget/skill/dash CD
       // correctly (the guest runs no world sim, so it must age these itself)
@@ -2393,8 +2518,9 @@ export class GameEngine {
     const targetCamY = this.player.y - this.H / 2;
     this.camX += (targetCamX - this.camX) * Math.min(1, dt * 8);
     this.camY += (targetCamY - this.camY) * Math.min(1, dt * 8);
-    this.camX = Math.max(0, Math.min(this.worldW - this.W, this.camX));
-    this.camY = Math.max(0, Math.min(this.worldH - this.H, this.camY));
+    // Unclamped camera for strict following
+    // this.camX = Math.max(0, Math.min(this.worldW - this.W, this.camX));
+    // this.camY = Math.max(0, Math.min(this.worldH - this.H, this.camY));
   }
 
   private get gun(): GunDef {
@@ -2496,20 +2622,32 @@ export class GameEngine {
       if (tgt) p.angle = Math.atan2(tgt.y - p.y, tgt.x - p.x);
     }
 
-    // Ranked Cashout carried box throwing & block fire
+    // Ranked Cashout carried box / statue throwing & block fire
     const carriedBox = this.gameMode === "cashout" ? this.cashBoxes.find(b => b.carriedByCid === this.activeId) : null;
-    if (carriedBox) {
-      if (this.firing) {
-        carriedBox.carriedByCid = null;
-        carriedBox.throwTimer = 0.8;
-        carriedBox.thrownByCid = this.activeId;
-        carriedBox.vx = Math.cos(p.angle) * 480;
-        carriedBox.vy = Math.sin(p.angle) * 480;
-        carriedBox.x = p.x + Math.cos(p.angle) * (p.size + 15);
-        carriedBox.y = p.y + Math.sin(p.angle) * (p.size + 15);
-        this.spawnParticles(carriedBox.x, carriedBox.y, "#fbbf24", 8, 80, 0.3);
+    const carriedStatue = this.gameMode === "cashout" ? this.statues.find(s => s.carriedByCid === this.activeId) : null;
+    const carriedItem = carriedBox || carriedStatue;
+    
+    if (carriedItem) {
+      if (this.firing) { // Left click: Throw
+        carriedItem.carriedByCid = null;
+        carriedItem.throwTimer = 0.8;
+        carriedItem.thrownByCid = this.activeId;
+        carriedItem.vx = Math.cos(p.angle) * 480;
+        carriedItem.vy = Math.sin(p.angle) * 480;
+        carriedItem.x = p.x + Math.cos(p.angle) * (p.size + 15);
+        carriedItem.y = p.y + Math.sin(p.angle) * (p.size + 15);
+        this.spawnParticles(carriedItem.x, carriedItem.y, carriedBox ? "#fbbf24" : "#cbd5e1", 8, 80, 0.3);
+      } else if (this.secondaryFiring) { // Right click: Drop
+        carriedItem.carriedByCid = null;
+        carriedItem.throwTimer = 0.8;
+        carriedItem.thrownByCid = this.activeId;
+        carriedItem.vx = Math.cos(p.angle) * 50; // Gentle drop
+        carriedItem.vy = Math.sin(p.angle) * 50;
+        carriedItem.x = p.x + Math.cos(p.angle) * (p.size + 15);
+        carriedItem.y = p.y + Math.sin(p.angle) * (p.size + 15);
       }
       this.firing = false;
+      this.secondaryFiring = false;
       this.beamActive = false;
       this.flameActive = false;
       return;
@@ -2695,7 +2833,8 @@ export class GameEngine {
     if (g.id === "rocket" || g.id === "sniper" || g.id === "fcar" || g.id === "sa1216" || g.id === "mgl32" || g.id === "mortar") {
       p.x -= Math.cos(base) * 3;
       p.y -= Math.sin(base) * 3;
-      this.shake = Math.min(14, this.shake + (g.id === "rocket" || g.id === "mgl32" ? 7 : 4));
+      // shake only when player is hit (per user request)
+      // if (!this.simulatingOther) this.shake = Math.min(14, this.shake + (g.id === "rocket" || g.id === "mgl32" ? 7 : 4));
     }
     // point-blank "swat" — a monster clinging to the avatar (e.g. the biohazard
     // crawler that rushes the face) overlaps the player, so a normally-spawned
@@ -2896,7 +3035,8 @@ export class GameEngine {
       radius,
       color: g.glow,
     });
-    this.shake = 17;
+    // shake only when player is hit
+    // if (!this.simulatingOther) this.shake = 17;
     sound.slam();
     this.spawnParticles(p.x, p.y, g.glow, 28, 280, 0.5);
     this.spawnParticles(p.x, p.y, "#fde68a", 16, 200, 0.4);
@@ -3004,7 +3144,12 @@ export class GameEngine {
         }
       }
     }
+    const maxRx = Math.max(ox, ox + dx * best);
+    const minRx = Math.min(ox, ox + dx * best);
+    const maxRy = Math.max(oy, oy + dy * best);
+    const minRy = Math.min(oy, oy + dy * best);
     for (const w of this.walls) {
+      if (w.x + w.w < minRx || w.x > maxRx || w.y + w.h < minRy || w.y > maxRy) continue;
       const t = this.rayAabb(ox, oy, dx, dy, w);
       if (t >= 0 && t < best) {
         best = t;
@@ -3264,7 +3409,8 @@ export class GameEngine {
     sound.shoot("sniper");
     this.spawnParticles(bx, by, g.glow, 4, 120, 0.25);
     if (chargePct >= 0.85) {
-      this.shake = Math.min(10, this.shake + 4);
+      // shake only when player is hit
+      // if (!this.simulatingOther) this.shake = Math.min(10, this.shake + 4);
     }
   }
 
@@ -3300,7 +3446,7 @@ export class GameEngine {
               p.shieldHp = 0;
               p.shieldBlockTime = 0;
               p.shieldCd = g.shieldRechargeTime ?? 8;
-              this.shake = 10;
+              if (!this.simulatingOther) this.shake = 10;
               sound.explosion();
             }
             continue; // bullet absorbed
@@ -3333,6 +3479,7 @@ export class GameEngine {
   private collideWalls(ent: { x: number; y: number }, size: number) {
     for (const w of this.walls) {
       if (w.glue) continue; // glue walls don't block, they slow
+      if (ent.x + size < w.x || ent.x - size > w.x + w.w || ent.y + size < w.y || ent.y - size > w.y + w.h) continue;
       const cx = Math.max(w.x, Math.min(ent.x, w.x + w.w));
       const cy = Math.max(w.y, Math.min(ent.y, w.y + w.h));
       let dx = ent.x - cx;
@@ -3373,6 +3520,7 @@ export class GameEngine {
   private pointInWall(x: number, y: number, size: number): Wall | null {
     for (const w of this.walls) {
       if (w.glue || w.invisible) continue;
+      if (x + size < w.x || x - size > w.x + w.w || y + size < w.y || y - size > w.y + w.h) continue;
       if (
         x > w.x - size &&
         x < w.x + w.w + size &&
@@ -3449,6 +3597,7 @@ export class GameEngine {
   // ------------------------------------------------------- bullets
   private updateBullets(dt: number) {
     const next: Bullet[] = [];
+    this.buildGrid();
     for (const b of this.bullets) {
       // ---- mortar lob: arc (z-axis) to the landing point, explode on arrival ----
       if (b.lobTx !== undefined) {
@@ -3539,7 +3688,11 @@ export class GameEngine {
       }
 
       if (!dead && !this.isDM && b.owner !== "foe") {
-        for (const e of this.enemies) {
+        const enemies = this.queryGrid(b.x, b.y, b.size + this.gridMaxR + 2)
+          .filter((it) => it.kind === "enemy")
+          .sort((a, b2) => a.idx - b2.idx);
+        for (const it of enemies) {
+          const e = it.ref as Enemy;
           if (b.hit.has(e.id)) continue;
           const rr = e.size + b.size + 2;
           const ddx = e.x - b.x;
@@ -3573,9 +3726,12 @@ export class GameEngine {
       if (!dead) {
         if (this.combatants.length > 0) {
           const oid = b.ownerId ?? (b.owner === "foe" ? 2 : 1);
-          for (const c of this.combatants) {
-            if (c.id === oid) continue;
-            const q = c.player;
+          const players = this.queryGrid(b.x, b.y, b.size + this.gridMaxR + 2)
+            .filter((it) => it.kind === "player")
+            .sort((a, b2) => a.idx - b2.idx);
+          for (const it of players) {
+            if (it.ownerId === oid) continue;
+            const q = it.ref as Player;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if (this.hitsPlayer(b, q)) {
               this.damagePlayerEntity(q, b.damage, b, 0, 0, oid);
@@ -3619,7 +3775,11 @@ export class GameEngine {
 
       // ---- deployed turrets / stations / mines are solid & destructible ----
       if (!dead) {
-        for (const d of this.deployables) {
+        const deployables = this.queryGrid(b.x, b.y, b.size + this.gridMaxR + 2)
+          .filter((it) => it.kind === "deployable")
+          .sort((a, b2) => a.idx - b2.idx);
+        for (const it of deployables) {
+          const d = it.ref as Deployable;
           const isMine =
             d.kind === "mine_explosive" ||
             d.kind === "mine_poison" ||
@@ -4288,7 +4448,8 @@ export class GameEngine {
           }
           if (dpl < br) {
             this.player.flash = Math.max(this.player.flash, 0.5);
-            this.shake = Math.min(10, this.shake + 4);
+            // shake only when player is hit
+            // this.shake = Math.min(10, this.shake + 4);
           }
         }
       }
@@ -4381,14 +4542,18 @@ export class GameEngine {
     this.enemies = next;
 
     // field effects (poison cloud, fire field) damage enemies inside
+    this.buildGrid();
     for (const fx of this.effects) {
       if (fx.type !== "poisoncloud" && fx.type !== "firefield") continue;
       if (fx.tickT === undefined) fx.tickT = 0;
       fx.tickT -= dt;
       if (fx.tickT <= 0) {
         fx.tickT = 0.25;
-        for (const e of this.enemies) {
-          if (Math.hypot(e.x - fx.x, e.y - fx.y) < fx.radius + e.size) {
+        const fcand = this.queryGrid(fx.x, fx.y, fx.radius);
+        for (const it of fcand) {
+          if (it.kind !== "enemy") continue;
+          const e = it.ref as Enemy;
+          if ((e.x - fx.x) ** 2 + (e.y - fx.y) ** 2 < (fx.radius + e.size) ** 2) {
             if (fx.type === "poisoncloud") {
               // ramp poison so lingering enemies take ever-increasing damage
               this.applyPoison(e, ((fx.dps ?? 20) * 0.25) * 0.8);
@@ -4401,10 +4566,11 @@ export class GameEngine {
           }
         }
         if (this.isDM) {
-          for (const c of this.combatants) {
-            const q = c.player;
+          for (const it of fcand) {
+            if (it.kind !== "player") continue;
+            const q = it.ref as Player;
             if (q.deadTimer && q.deadTimer > 0) continue;
-            if (Math.hypot(q.x - fx.x, q.y - fx.y) < fx.radius + q.size) {
+            if ((q.x - fx.x) ** 2 + (q.y - fx.y) ** 2 < (fx.radius + q.size) ** 2) {
               // pass the effect ownerId (if any) so kills are properly credited
               this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, undefined, 0, 0, fx.ownerId ?? -1);
             }
@@ -4479,7 +4645,8 @@ export class GameEngine {
     const ringR = size * (big ? 4 : style === "explosive" ? 3.4 : 3);
     this.effects.push({ type: "coinburst", x, y, t: 0, duration: big ? 0.72 : 0.55, radius: ringR, color: pal[0], style, dirX: dx, dirY: dy });
     this.effects.push({ type: "shock", x, y, t: 0, duration: 0.42, radius: ringR * 0.82, color: pal[1] });
-    this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
+    // shake only when player is hit
+    // if (!this.simulatingOther) this.shake = Math.min(26, this.shake + (big ? 22 : med ? 12 : 7));
     const coinCount = big ? 64 : med ? 32 : 18;
     for (let i = 0; i < coinCount; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -4533,7 +4700,8 @@ export class GameEngine {
       // biohazard keeps the classic simple radial burst
       this.effects.push({ type: "coinburst", x: e.x, y: e.y, t: 0, duration: 0.5, radius: e.size * 3, color: "#fbbf24" });
       this.effects.push({ type: "shock", x: e.x, y: e.y, t: 0, duration: 0.35, radius: e.size * 2.4, color: "#fde68a" });
-      this.shake = Math.min(22, this.shake + (big ? 20 : med ? 10 : 5));
+      // shake only when player is hit
+      // this.shake = Math.min(22, this.shake + (big ? 20 : med ? 10 : 5));
       const coinCount = big ? 54 : med ? 26 : 14;
       for (let i = 0; i < coinCount; i++) {
         const a = Math.random() * Math.PI * 2;
@@ -4570,7 +4738,8 @@ export class GameEngine {
       const pd = Math.hypot(this.player.x - e.x, this.player.y - e.y);
       if (pd < r + this.player.size)
         this.damagePlayer(Math.round(dmg * (1 - pd / (r + this.player.size))));
-      this.shake = Math.min(16, this.shake + 8);
+      // shake only when player is hit
+      // this.shake = Math.min(16, this.shake + 8);
     }
     // score popup as gold pickup
     const dropChance = big ? 1 : med ? 0.32 : 0.12;
@@ -4637,7 +4806,8 @@ export class GameEngine {
     if (this.gameMode === "biohazard") return; // no bases in biohazard
     this.base.hp -= dmg;
     this.base.flash = 1;
-    this.shake = Math.min(12, this.shake + dmg * 0.25);
+    // shake only when player is hit
+    // this.shake = Math.min(12, this.shake + dmg * 0.25);
     const a = Math.random() * Math.PI * 2;
     this.spawnParticles(
       this.base.x + Math.cos(a) * this.base.radius,
@@ -4659,7 +4829,8 @@ export class GameEngine {
     dmg *= RUNTIME.playerDamageMult;
     this.enemyBase.hp -= dmg;
     this.enemyBase.flash = 1;
-    this.shake = Math.min(8, this.shake + dmg * 0.08);
+    // shake only when player is hit
+    // this.shake = Math.min(8, this.shake + dmg * 0.08);
     const a = Math.random() * Math.PI * 2;
     this.spawnParticles(
       this.enemyBase.x + Math.cos(a) * this.enemyBase.radius,
@@ -4721,21 +4892,20 @@ export class GameEngine {
         p.shieldHp = 0;
         p.shieldBlockTime = 0;
         p.shieldCd = this.gun.shieldRechargeTime ?? 8;
-        this.shake = 12;
+        const isLocalVictimShield = (p === this.localPlayer) || (p.cid !== undefined && ((this.mode === "local" && p.cid === 0) || (this.mode !== "local" && p.cid === this.selfPid)));
+        if (isLocalVictimShield) this.shake = 12;
         sound.explosion();
       }
       // Track score for shield damage
       const shieldDiff = prevShield - p.shieldHp;
       if (shieldDiff > 0 && this.gameMode !== "biohazard") {
-        const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
-        if (isLocalAttacker) {
-          const scoreGained = Math.round(shieldDiff);
-          if (scoreGained > 0) {
-            const killerC = this.combatants.find((c) => c.id === (attackerId ?? 0));
-            if (killerC) killerC.score += scoreGained;
-            else this.score += scoreGained;
-            this.addScoreFeed("伤害击中", scoreGained);
-          }
+        const scoreGained = Math.round(shieldDiff);
+        if (scoreGained > 0 && attackerId !== undefined && attackerId >= 0) {
+          const killerC = this.combatants.find((c) => c.id === attackerId);
+          if (killerC) killerC.score += scoreGained;
+          else this.score += scoreGained;
+          const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
+          if (isLocalAttacker) this.addScoreFeed("伤害击中", scoreGained);
         }
       }
       return;
@@ -4750,7 +4920,11 @@ export class GameEngine {
     if (!this.isDM) p.iframes = 0.45;
     p.lastHitTime = this.time;
     sound.hurt();
-    this.shake = Math.min(16, this.shake + dmg * 0.4);
+    // Only shake screen when the LOCAL player is hit
+    const isLocalVictim = (p === this.localPlayer) || (p.cid !== undefined && ((this.mode === "local" && p.cid === 0) || (this.mode !== "local" && p.cid === this.selfPid)));
+    if (isLocalVictim) {
+      this.shake = Math.min(16, this.shake + dmg * 0.4);
+    }
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
     // apply knockback (melee); clamp to world bounds
     if (knockX || knockY) {
@@ -4761,15 +4935,13 @@ export class GameEngine {
     // Track score for health damage
     const hpDiff = prevHp - p.hp;
     if (hpDiff > 0 && this.gameMode !== "biohazard") {
-      const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
-      if (isLocalAttacker) {
-        const scoreGained = Math.round(hpDiff);
-        if (scoreGained > 0) {
-          const killerC = this.combatants.find((c) => c.id === (attackerId ?? 0));
-          if (killerC) killerC.score += scoreGained;
-          else this.score += scoreGained;
-          this.addScoreFeed("伤害击中", scoreGained);
-        }
+      const scoreGained = Math.round(hpDiff);
+      if (scoreGained > 0 && attackerId !== undefined && attackerId >= 0) {
+        const killerC = this.combatants.find((c) => c.id === attackerId);
+        if (killerC) killerC.score += scoreGained;
+        else this.score += scoreGained;
+        const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
+        if (isLocalAttacker) this.addScoreFeed("伤害击中", scoreGained);
       }
     }
 
@@ -4778,6 +4950,28 @@ export class GameEngine {
       p.deadTimer = RESPAWN_TIME;
       p.bowDrawing = false;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
+      
+      if (this.gameMode === "cashout") {
+        const c = this.combatants.find(comb => comb.id === p.cid);
+        if (c) {
+          c.player.deadTimer = 20;
+          this.statues.push({
+            id: Math.random() * 1000000 | 0,
+            x: p.x,
+            y: p.y,
+            vx: 0,
+            vy: 0,
+            size: 15,
+            carriedByCid: null,
+            throwTimer: 1.0,
+            thrownByCid: null,
+            deadCid: c.id,
+            teamId: c.teamId ?? 0,
+            reviveProgress: 0,
+          });
+        }
+      }
+
       // coin burst on every non-biohazard enemy death (deathmatch bots / PvP foe)
       if (this.gameMode !== "biohazard") {
         const killer =
@@ -4804,12 +4998,18 @@ export class GameEngine {
         if (killer && victim && killer.id !== victim.id) {
           killer.kills += 1;
           killer.score += 250;
+          if (this.gameMode === "cashout") {
+            this.teamCash[killer.teamId] += 500;
+          }
           const kName = killer.id === this.selfPid ? "你" : killer.name;
           const vName = victim.id === this.selfPid ? "你" : victim.name;
           
           this.addKillFeed(kName, vName, _b?.weapon, killer);
           if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
             this.addScoreFeed("淘汰", 250, vName, 250, killer.kills);
+            if (this.gameMode === "cashout") {
+              this.addScoreFeed("淘汰赏金", 500); // UI feedback for the cash
+            }
           }
 
           if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
@@ -4838,16 +5038,62 @@ export class GameEngine {
   }
 
   /** Count down downed avatars and revive them after RESPAWN_TIME. */
+  /** Pick a random respawn point for the PvE foe that is well away from the
+   *  player, so it doesn't keep coming back at the same center-top spot and
+   *  face-hug the player. Uses squared distance for the min-distance check. */
+  private randomFoeSpawn(): { x: number; y: number } {
+    const minDist = Math.max(320, Math.min(this.worldW, this.worldH) * 0.34);
+    const minD2 = minDist * minDist;
+    const margin = 60;
+    const px = this.player.x, py = this.player.y;
+    let best = { x: this.worldW / 2, y: 220 };
+    let bestD2 = -1;
+    for (let i = 0; i < 16; i++) {
+      const x = margin + Math.random() * (this.worldW - margin * 2);
+      const y = margin + Math.random() * (this.worldH - margin * 2);
+      const d2 = (x - px) ** 2 + (y - py) ** 2;
+      if (d2 >= minD2) return { x, y };
+      if (d2 > bestD2) { bestD2 = d2; best = { x, y }; }
+    }
+    return best;
+  }
+
   private tickRespawns(dt: number) {
     if (this.isDM) {
       for (const c of this.combatants) {
-        const sp = this.dmSpawns[this.mode === "local" ? c.id : c.id - 1] ?? { x: this.worldW / 2, y: this.worldH / 2 };
-        this.reviveIfReady(c.player, sp.x, sp.y, dt, c.guns, c.weaponStates);
+        const p = c.player;
+        if (!p.deadTimer || p.deadTimer <= 0) continue; // alive, nothing to do
+        if (p.deadTimer > dt) {
+          // still counting down this frame — no spawn calculation needed, just
+          // keep the revive timer ticking (reviveIfReady won't fire yet).
+          this.reviveIfReady(p, p.x, p.y, dt, c.guns, c.weaponStates);
+          continue;
+        }
+        // Fully random respawn mode: pick any DM spawn point at random (the
+        // player may even come back near an enemy — that's the intent).
+        const pool = this.dmSpawns;
+        const sp = pool.length
+          ? pool[Math.floor(Math.random() * pool.length)]
+          : { x: this.worldW / 2, y: this.worldH / 2 };
+        this.reviveIfReady(p, sp.x, sp.y, dt, c.guns, c.weaponStates);
       }
       return;
     }
     this.reviveIfReady(this.player, this.worldW / 2, this.worldH - 200, dt, this.guns, this.weaponStates);
-    if (this.foe) this.reviveIfReady(this.foe, this.worldW / 2, 220, dt);
+    // PvE foe: respawn at a RANDOM spot away from the player (not the fixed
+    // center-top), so it doesn't pile up in the middle and face-hug. Compute
+    // the random point only on the revive frame (like the DM branch).
+    if (this.foe) {
+      const foe = this.foe;
+      if (foe.deadTimer && foe.deadTimer > 0) {
+        if (foe.deadTimer <= dt) {
+          const sp = this.randomFoeSpawn();
+          this.reviveIfReady(foe, sp.x, sp.y, dt);
+        } else {
+          this.reviveIfReady(foe, foe.x, foe.y, dt);
+        }
+      }
+    }
   }
 
   private reviveIfReady(
@@ -5017,10 +5263,6 @@ export class GameEngine {
     this.character = c.character;
     this.outfit = c.outfit;
     this.skill = c.skill;
-    this.keys = new Set();
-    this.mouse = { x: c.player.x, y: c.player.y - 1 };
-    this.virtualMove = { x: 0, y: 0 };
-    this.firing = false;
     this.skillCd = c.skillCd ?? 0;
     this.dashCharges = c.dashCharges ?? MAX_DASH_CHARGES;
     this.dashRecharge = c.dashRecharge ?? 0;
@@ -5030,14 +5272,38 @@ export class GameEngine {
     this.weaponStates = c.weaponStates;
     this.semiAutoLatch = false;
     this.activeId = c.id;
-    // AI decides movement / aim / fire; returns one-shot action flags
-    const intent = this.botThink(c, dt);
-    this.updatePlayer(dt);
-    if (intent.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
-    if (intent.skill) this.activateSkill();
-    if (intent.reload) this.reloadCurrent();
-    if (intent.gadget >= 0)
-      this.deployGadget(intent.gadget, intent.gadgetX ?? this.mouse.x, intent.gadgetY ?? this.mouse.y);
+    // throttle AI decisions: run the heavy brain (botThink) at a low rate and
+    // replay only the cached MOVEMENT intent between decisions. AIM + FIRE are
+    // recomputed EVERY frame by `botAimFire` so bots stay aggressive and never
+    // hesitate when an enemy appears between decisions.
+    const decide = (c.aiTimer ?? 0) <= 0;
+    if (decide) {
+      this.keys = new Set();
+      this.mouse = { x: c.player.x, y: c.player.y - 1 };
+      this.virtualMove = { x: 0, y: 0 };
+      this.firing = false;
+      const intent = this.botThink(c, dt);
+      c.aiTimer = BOT_THINK_INTERVAL;
+      c.aiMvx = this.virtualMove.x;
+      c.aiMvy = this.virtualMove.y;
+      this.updatePlayer(dt);
+      if (intent.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+      if (intent.skill) this.activateSkill();
+      if (intent.reload) this.reloadCurrent();
+      if (intent.gadget >= 0)
+        this.deployGadget(intent.gadget, intent.gadgetX ?? this.mouse.x, intent.gadgetY ?? this.mouse.y);
+    } else {
+      c.aiTimer = (c.aiTimer ?? 0) - dt;
+      this.keys = new Set();
+      // IMPORTANT: give `this.mouse` a FRESH object here (like the decide branch).
+      // `sm` is a *reference* to the human's real mouse; without this, botAimFire
+      // would mutate the human's mouse coords directly -> crosshair goes crazy.
+      this.mouse = { x: c.player.x, y: c.player.y - 1 };
+      // replay cached movement, but recompute aim + fire responsively
+      this.virtualMove = { x: c.aiMvx ?? 0, y: c.aiMvy ?? 0 };
+      this.botAimFire(c);
+      this.updatePlayer(dt);
+    }
     // age the bot's OWN cooldowns so it can actually re-use skills / gadgets /
     // dashes. (The human's cooldowns are aged in `update()`; the bot context is
     // only live inside this function, so it must age them here or they'd stay
@@ -5343,13 +5609,69 @@ export class GameEngine {
     return intent;
   }
 
+  /** Cheap, per-frame aim + fire control for a bot. The heavy movement/weapon/
+   *  gadget brain (`botThink`) is throttled, but AIM + FIRE must stay responsive
+   *  or bots look braindead (the original throttle cached firing and bots would
+   *  stand there not shooting when an enemy entered view between decisions).
+   *  Only does a nearest-target scan (O(combatants)) + a single LOS ray, then
+   *  mirrors `botThink`'s fire gate (LOS && inRange && facing). */
+  private botAimFire(c: Combatant) {
+    const p = c.player;
+    let target: Player | null = null;
+    let bestD = Infinity;
+    for (const o of this.combatants) {
+      if (o.id === c.id) continue;
+      if (this.gameMode === "cashout" && o.teamId === c.teamId) continue;
+      const q = o.player;
+      if (q.deadTimer && q.deadTimer > 0) continue;
+      const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d < bestD) { bestD = d; target = q; }
+    }
+    if (!target) {
+      this.firing = false;
+      // cashout: keep throwing the carried box at the nearest station
+      if (this.gameMode === "cashout") {
+        const carried = this.cashBoxes.find((b) => b.carriedByCid === c.id);
+        if (carried) {
+          let bestSt = Infinity, sx = p.x, sy = p.y;
+          for (const st of this.cashoutStations) {
+            const d = Math.hypot(st.x - p.x, st.y - p.y);
+            if (d < bestSt) { bestSt = d; sx = st.x; sy = st.y; }
+          }
+          if (bestSt < 120) {
+            this.mouse.x = sx;
+            this.mouse.y = sy;
+            this.firing = true;
+          }
+        }
+      }
+      return;
+    }
+    const g = this.gun;
+    const dist = Math.sqrt(bestD);
+    const ang = Math.atan2(target.y - p.y, target.x - p.x);
+    // light target leading so moving foes still get hit
+    const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
+    this.mouse.x = target.x + target.vx * lead;
+    this.mouse.y = target.y + target.vy * lead;
+    const los = this.botLOS(p.x, p.y, target.x, target.y);
+    const inRange = dist < this.gunEffRange(g) + 40;
+    const facing = Math.abs(this.angleDiff(ang, p.angle));
+    this.firing = los && inRange && facing < 1.2;
+  }
+
   /** Line-of-sight test: true if the segment (x0,y0)->(x1,y1) is not blocked by a wall. */
   private botLOS(x0: number, y0: number, x1: number, y1: number): boolean {
     const dx = x1 - x0, dy = y1 - y0;
     const dist = Math.hypot(dx, dy);
     if (dist < 1) return true;
     const nx = dx / dist, ny = dy / dist;
+    const minX = Math.min(x0, x1);
+    const maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1);
+    const maxY = Math.max(y0, y1);
     for (const w of this.walls) {
+      if (w.x + w.w < minX || w.x > maxX || w.y + w.h < minY || w.y > maxY) continue;
       const t = this.rayAabb(x0, y0, nx, ny, w);
       if (t >= 0 && t <= dist) return false;
     }
@@ -6238,7 +6560,8 @@ export class GameEngine {
       radius: Math.max(w.w, w.h),
       color: w.glue ? "#22d3ee" : "#d6b27a",
     });
-    this.shake = Math.min(14, this.shake + 5);
+    // shake only when player is hit
+    // this.shake = Math.min(14, this.shake + 5);
   }
 
   private damageDeployable(d: Deployable, dmg: number, _ownerId?: number) {
@@ -6247,6 +6570,61 @@ export class GameEngine {
     if (Math.random() < 0.8)
       this.spawnParticles(d.x, d.y, d.color, 4, 120, 0.25);
     // removal + death FX (explosion) happen in `updateDeployables` once hp <= 0
+  }
+
+  /** Rebuild the broad-phase spatial grid from current targets. Called once
+   *  per collision pass; positions are fresh enough for a single frame. */
+  private buildGrid() {
+    this.grid.clear();
+    let maxR = 0;
+    const cs = GRID_CELL;
+    const put = (it: GridItem) => {
+      if (it.size > maxR) maxR = it.size;
+      const cx = Math.floor(it.x / cs);
+      const cy = Math.floor(it.y / cs);
+      const k = cx + "|" + cy;
+      let arr = this.grid.get(k);
+      if (!arr) {
+        arr = [];
+        this.grid.set(k, arr);
+      }
+      arr.push(it);
+    };
+    this.enemies.forEach((e, i) =>
+      put({ kind: "enemy", idx: i, x: e.x, y: e.y, size: e.size, ref: e })
+    );
+    if (this.isDM) {
+      this.combatants.forEach((c, i) =>
+        put({ kind: "player", idx: i, x: c.player.x, y: c.player.y, size: c.player.size, ref: c.player, ownerId: c.id })
+      );
+    } else if (this.foe) {
+      put({ kind: "player", idx: 0, x: this.player.x, y: this.player.y, size: this.player.size, ref: this.player, ownerId: this.activeId });
+      put({ kind: "player", idx: 1, x: this.foe.x, y: this.foe.y, size: this.foe.size, ref: this.foe, ownerId: this.peerPid });
+    } else {
+      put({ kind: "player", idx: 0, x: this.player.x, y: this.player.y, size: this.player.size, ref: this.player, ownerId: this.activeId });
+    }
+    this.deployables.forEach((d, i) =>
+      put({ kind: "deployable", idx: i, x: d.x, y: d.y, size: d.size, ref: d, ownerId: d.ownerId })
+    );
+    this.gridMaxR = maxR;
+  }
+
+  /** Return all grid items whose cell overlaps the (x,y,r) disc. Callers still
+   *  apply the exact distance test, so results are identical to brute force. */
+  private queryGrid(x: number, y: number, r: number): GridItem[] {
+    const cs = GRID_CELL;
+    const cx0 = Math.floor((x - r) / cs);
+    const cx1 = Math.floor((x + r) / cs);
+    const cy0 = Math.floor((y - r) / cs);
+    const cy1 = Math.floor((y + r) / cs);
+    const out: GridItem[] = [];
+    for (let cx = cx0; cx <= cx1; cx++) {
+      for (let cy = cy0; cy <= cy1; cy++) {
+        const arr = this.grid.get(cx + "|" + cy);
+        if (arr) for (const it of arr) out.push(it);
+      }
+    }
+    return out;
   }
 
   private explode(
@@ -6276,12 +6654,17 @@ export class GameEngine {
       radius,
       color,
     });
-    this.shake = Math.min(20, this.shake + 8);
+    // shake only when player is hit
+    // if (!this.simulatingOther) this.shake = Math.min(20, this.shake + 8);
     sound.explosion();
     this.spawnParticles(x, y, color, 26, 260, 0.55);
     this.spawnParticles(x, y, "#fde68a", 14, 200, 0.4);
     if (damage > 0) {
-      for (const e of this.enemies) {
+      this.buildGrid();
+      const cand = this.queryGrid(x, y, radius);
+      for (const it of cand) {
+        if (it.kind !== "enemy") continue;
+        const e = it.ref as Enemy;
         const d = Math.hypot(e.x - x, e.y - y);
         if (d < radius + e.size) {
           const fall = 1 - d / (radius + e.size);
@@ -6298,9 +6681,10 @@ export class GameEngine {
       }
       if (this.isDM) {
         // splash also hits other combatants (not the owner)
-        for (const c of this.combatants) {
-          if (c.id === (ownerId ?? -1)) continue;
-          const q = c.player;
+        for (const it of cand) {
+          if (it.kind !== "player") continue;
+          if (it.ownerId === (ownerId ?? -1)) continue;
+          const q = it.ref as Player;
           if (q.deadTimer && q.deadTimer > 0) continue;
           const d = Math.hypot(q.x - x, q.y - y);
           if (d < radius + q.size) {
@@ -6310,8 +6694,8 @@ export class GameEngine {
               q,
               damage * (0.5 + fall * 0.5),
               undefined,
-              Math.cos(a) * 200 * fall,
-              Math.sin(a) * 200 * fall,
+              0,
+              0,
               ownerId
             );
           }
@@ -6319,7 +6703,9 @@ export class GameEngine {
       }
       // splash also damages deployed turrets / stations / mines — but never the
       // owner's own turret/station (mines can always be caught in a blast).
-      for (const d of this.deployables) {
+      for (const it of cand) {
+        if (it.kind !== "deployable") continue;
+        const d = it.ref as Deployable;
         const isMine =
           d.kind === "mine_explosive" ||
           d.kind === "mine_poison" ||
@@ -6360,28 +6746,34 @@ export class GameEngine {
     oy?: number
   ) {
     for (let i = 0; i < count; i++) {
+      if (this.particles.length >= MAX_PARTICLES) break; // pool saturated: drop
+      const p = this.particlePool.pop() ?? ({} as Particle);
       const a = Math.random() * Math.PI * 2;
       const s = speed * (0.3 + Math.random() * 0.7);
-      this.particles.push({
-        x: ox ?? x,
-        y: oy ?? y,
-        vx: Math.cos(a) * s,
-        vy: Math.sin(a) * s,
-        life: life * (0.6 + Math.random() * 0.8),
-        maxLife: life,
-        color,
-        size: 2 + Math.random() * 3,
-        shrink: true,
-      });
-    }
-    if (this.particles.length > 900) {
-      this.particles.splice(0, this.particles.length - 900);
+      p.x = ox ?? x;
+      p.y = oy ?? y;
+      p.vx = Math.cos(a) * s;
+      p.vy = Math.sin(a) * s;
+      p.life = life * (0.6 + Math.random() * 0.8);
+      p.maxLife = life;
+      p.color = color;
+      p.size = 2 + Math.random() * 3;
+      p.shrink = true;
+      // reset optional fields so a recycled particle doesn't keep stale state
+      p.gravity = undefined;
+      p.coin = undefined;
+      p.spin = undefined;
+      p.flight = undefined;
+      p.rest = undefined;
+      p.landed = undefined;
+      this.particles.push(p);
     }
   }
 
   private updateParticles(dt: number) {
     const next: Particle[] = [];
     for (const p of this.particles) {
+      let alive = false;
       if (p.coin) {
         // coins arc briefly, then land and linger on the ground for ~1s
         if (!p.landed) {
@@ -6397,7 +6789,7 @@ export class GameEngine {
         }
         if (p.spin !== undefined) p.spin += dt * 12;
         p.life -= dt;
-        if (p.life > 0) next.push(p);
+        alive = p.life > 0;
       } else {
         p.x += p.vx * dt;
         p.y += p.vy * dt;
@@ -6408,8 +6800,10 @@ export class GameEngine {
         }
         if (p.spin !== undefined) p.spin += dt * 12;
         p.life -= dt;
-        if (p.life > 0) next.push(p);
+        alive = p.life > 0;
       }
+      if (alive) next.push(p);
+      else if (this.particlePool.length < MAX_PARTICLES) this.particlePool.push(p);
     }
     this.particles = next;
   }
@@ -6417,6 +6811,10 @@ export class GameEngine {
   private updateEffects(dt: number) {
     for (const e of this.effects) e.t += dt;
     this.effects = this.effects.filter((e) => e.t < e.duration);
+    // hard cap so a flood of fields/explosions can't grow the array without bound
+    if (this.effects.length > MAX_EFFECTS) {
+      this.effects.splice(0, this.effects.length - MAX_EFFECTS);
+    }
   }
 
   private updatePickups(dt: number) {
@@ -6708,11 +7106,12 @@ export class GameEngine {
       }
       case "grenade": {
         const a = p.angle;
+        // throw range +125%: 420 -> 945
         this.grenades.push({
           x: p.x,
           y: p.y,
-          vx: Math.cos(a) * 420,
-          vy: Math.sin(a) * 420,
+          vx: Math.cos(a) * 945,
+          vy: Math.sin(a) * 945,
           life: 0.55,
           fuse: 0.55,
           kind: "frag",
@@ -6897,8 +7296,13 @@ export class GameEngine {
       banner: this.banner ? this.banner.text : null,
       kills: this.isDM ? (this.mode === "local" ? this.combatants[0]?.kills ?? 0 : this.combatants.find(c => c.id === this.selfPid)?.kills ?? 0) : this.kills,
       gold: this.gold,
-      scoreFeed: this.scoreFeed.map(f => ({ id: f.id, text: f.text, score: f.score, victimName: f.victimName, subScore: f.subScore, totalKills: f.totalKills })),
-      killFeed: this.killFeed.map(f => ({ id: f.id, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
+      activeScoreFeed: this.activeScoreFeed ? {
+        totalScore: this.activeScoreFeed.totalScore,
+        timer: this.activeScoreFeed.timer,
+        events: this.activeScoreFeed.events.map(e => ({ id: e.id, text: e.text, victimName: e.victimName, subScore: e.subScore })),
+        totalKills: this.activeScoreFeed.totalKills
+      } : null,
+      killFeed: this.killFeed.map(f => ({ id: f.id, type: f.type, text: f.text, teamColor: f.teamColor, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
       shieldMaxHp: this.gun.shieldMaxHp ?? null,
@@ -6978,18 +7382,46 @@ export class GameEngine {
         const q = c.player;
         if (q.deadTimer && q.deadTimer > 0) continue;
         
-        // Draw carried cash box if carrying one
+        // Draw carried pickables (cash box or statue)
         const hasBox = this.gameMode === "cashout" ? this.cashBoxes.find(b => b.carriedByCid === c.id) : null;
-        if (hasBox) {
+        const hasStatue = this.gameMode === "cashout" ? this.statues.find(s => s.carriedByCid === c.id) : null;
+        
+        if (hasBox || hasStatue) {
           ctx.save();
           ctx.translate(q.x, q.y - q.size - 10);
-          ctx.fillStyle = "#fbbf24";
-          ctx.strokeStyle = "#d97706";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.rect(-6, -4, 12, 8);
-          ctx.fill();
-          ctx.stroke();
+          
+          if (hasBox) {
+            ctx.fillStyle = "#fbbf24";
+            ctx.strokeStyle = "#d97706";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.rect(-6, -4, 12, 8);
+            ctx.fill();
+            ctx.stroke();
+          } else if (hasStatue) {
+            const teamColors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b"];
+            const tColor = teamColors[hasStatue.teamId] || "#cbd5e1";
+            ctx.fillStyle = "#1e293b";
+            ctx.strokeStyle = tColor;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-3, 4);
+            ctx.lineTo(-3, -1);
+            ctx.lineTo(-5, -1);
+            ctx.lineTo(-5, -3);
+            ctx.lineTo(-3, -3);
+            ctx.lineTo(-3, -6);
+            ctx.arc(0, -6, 3, Math.PI, 0);
+            ctx.lineTo(3, -3);
+            ctx.lineTo(5, -3);
+            ctx.lineTo(5, -1);
+            ctx.lineTo(3, -1);
+            ctx.lineTo(3, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+          
           ctx.restore();
         }
 
@@ -7009,6 +7441,16 @@ export class GameEngine {
         );
         if (q.electrifiedTime && q.electrifiedTime > 0) {
           this.drawElectricArcs(ctx, q.x, q.y, q.size, q.electrifiedGlow ?? "#38bdf8", this.time);
+        }
+        if (q.iframes > 0 && q.dashTime <= 0) {
+          ctx.save();
+          ctx.globalAlpha = 0.35 + Math.sin(this.time * 20) * 0.15;
+          ctx.strokeStyle = "#e0f2fe";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(q.x, q.y, q.size + 4, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
         }
       }
     } else {
@@ -7218,6 +7660,144 @@ export class GameEngine {
     ctx.strokeStyle = rgba(this.sceneTheme.accent, 0.35);
     ctx.lineWidth = 3;
     ctx.strokeRect(2, 2, this.worldW - 4, this.worldH - 4);
+  }
+
+  private drawCashoutElements(ctx: CanvasRenderingContext2D) {
+    // Draw Vaults
+    for (const v of this.vaults) {
+      ctx.save();
+      ctx.translate(v.x, v.y);
+      
+      // Base shape
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(-20, -20, 40, 40);
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-20, -20, 40, 40);
+      
+      // Inner glowing panel based on state
+      ctx.fillStyle = v.state === "idle" ? "#eab308" : v.state === "unlocking" ? "#f97316" : "#22c55e";
+      ctx.fillRect(-10, -10, 20, 20);
+      
+      // Progress bar if unlocking
+      if (v.state === "unlocking") {
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(-20, 25, 40, 6);
+        ctx.fillStyle = "#f97316";
+        ctx.fillRect(-20, 25, 40 * v.progress, 6);
+      }
+      
+      ctx.restore();
+    }
+
+    // Draw Cashout Stations
+    for (const st of this.cashoutStations) {
+      ctx.save();
+      ctx.translate(st.x, st.y);
+      
+      // Base shape
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(-25, -25, 50, 50);
+      
+      // Team color indicator
+      let teamColor = "#94a3b8"; // Default neutral
+      if (st.ownerTeam === 0) teamColor = "#3b82f6"; // Blue
+      else if (st.ownerTeam === 1) teamColor = "#ef4444"; // Red
+      else if (st.ownerTeam === 2) teamColor = "#10b981"; // Green
+      else if (st.ownerTeam === 3) teamColor = "#f59e0b"; // Yellow
+      
+      ctx.strokeStyle = teamColor;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(-25, -25, 50, 50);
+      
+      // Core state
+      ctx.fillStyle = st.state === "idle" ? "#475569" : teamColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Cashout progress bar
+      if (st.state === "cashout" || st.state === "stealing") {
+        // Main cashout progress ring
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * st.cashoutProgress);
+        ctx.strokeStyle = teamColor;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      
+      // Steal progress bar
+      if (st.state === "stealing") {
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(-25, 30, 50, 6);
+        ctx.fillStyle = "#a855f7"; // Steal color
+        ctx.fillRect(-25, 30, 50 * st.stealProgress, 6);
+      }
+      
+      ctx.restore();
+    }
+
+    // Draw Cash Boxes (when dropped)
+    for (const box of this.cashBoxes) {
+      if (box.carriedByCid !== null) continue; // drawn on the player
+      ctx.save();
+      ctx.translate(box.x, box.y);
+      ctx.fillStyle = "#fbbf24";
+      ctx.strokeStyle = "#d97706";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.rect(-8, -6, 16, 12);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 8px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("$", 0, 0);
+      ctx.restore();
+    }
+
+    // Draw Statues (when dropped)
+    for (const st of this.statues) {
+      if (st.carriedByCid !== null) continue; // drawn on the player
+      ctx.save();
+      ctx.translate(st.x, st.y);
+      
+      const teamColors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b"];
+      const tColor = teamColors[st.teamId] || "#cbd5e1";
+
+      ctx.fillStyle = "#1e293b";
+      ctx.strokeStyle = tColor;
+      ctx.lineWidth = 2;
+      
+      // Draw statue shape (a tombstone or cross)
+      ctx.beginPath();
+      ctx.moveTo(-6, 8);
+      ctx.lineTo(-6, -2);
+      ctx.lineTo(-10, -2);
+      ctx.lineTo(-10, -6);
+      ctx.lineTo(-6, -6);
+      ctx.lineTo(-6, -12);
+      ctx.arc(0, -12, 6, Math.PI, 0);
+      ctx.lineTo(6, -6);
+      ctx.lineTo(10, -6);
+      ctx.lineTo(10, -2);
+      ctx.lineTo(6, -2);
+      ctx.lineTo(6, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      
+      // Revive progress
+      if (st.reviveProgress > 0) {
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(-10, 12, 20, 4);
+        ctx.fillStyle = "#4ade80";
+        ctx.fillRect(-10, 12, 20 * (st.reviveProgress / 5.0), 4);
+      }
+      
+      ctx.restore();
+    }
   }
 
   private drawWalls(ctx: CanvasRenderingContext2D) {
@@ -7537,8 +8117,19 @@ export class GameEngine {
     ctx.stroke();
   }
 
+  /** Is (x,y) within the camera viewport (plus margin)? Used to skip drawing\n   *  entities that are fully off-screen (cheap perf win when the world is large\n   *  but the viewport is small). */
+  private inView(x: number, y: number, margin = 0): boolean {
+    return (
+      x >= this.camX - margin &&
+      x <= this.camX + this.W + margin &&
+      y >= this.camY - margin &&
+      y <= this.camY + this.H + margin
+    );
+  }
+
   private drawDeployables(ctx: CanvasRenderingContext2D) {
     for (const d of this.deployables) {
+      if (!this.inView(d.x, d.y, d.size + 40)) continue;
       ctx.save();
       ctx.translate(d.x, d.y);
       // shadow
@@ -7614,6 +8205,7 @@ export class GameEngine {
 
   private drawFieldEffects(ctx: CanvasRenderingContext2D) {
     for (const e of this.effects) {
+      if (!this.inView(e.x, e.y, e.radius + 20)) continue;
       if (e.type === "poisoncloud") {
         const k = 1 - e.t / e.duration;
         ctx.save();
@@ -7743,6 +8335,7 @@ export class GameEngine {
 
   private drawPickups(ctx: CanvasRenderingContext2D) {
     for (const pk of this.pickups) {
+      if (!this.inView(pk.x, pk.y, 30)) continue;
       const y = pk.y + Math.sin(pk.bob) * 3;
       const blink = pk.life < 3 && Math.floor(pk.life * 6) % 2 === 0;
       if (blink) continue;
@@ -7779,6 +8372,7 @@ export class GameEngine {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const p of this.particles) {
+      if (!this.inView(p.x, p.y, p.size + 6)) continue;
       const a = Math.max(0, p.life / p.maxLife);
       if (p.coin) {
         // spinning coin — ellipse simulates rotation; once landed it lies flat
@@ -7810,6 +8404,7 @@ export class GameEngine {
 
   private drawGrenades(ctx: CanvasRenderingContext2D) {
     for (const gr of this.grenades) {
+      if (!this.inView(gr.x, gr.y, 20)) continue;
       ctx.save();
       ctx.translate(gr.x, gr.y);
       const color = gr.kind === "fire" ? "#f97316" : gr.kind === "glue" ? "#06b6d4" : gr.kind === "poison" ? "#22c55e" : "#fbbf24";
@@ -7822,6 +8417,7 @@ export class GameEngine {
 
   private drawEnemies(ctx: CanvasRenderingContext2D) {
     for (const e of this.enemies) {
+      if (!this.inView(e.x, e.y, e.size * 2.5 + 30)) continue;
       const scale = e.spawnT;
       // shadow
       ctx.save();
@@ -7954,6 +8550,7 @@ export class GameEngine {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const b of this.enemyBullets) {
+      if (!this.inView(b.x, b.y, b.size * 3 + 6)) continue;
       const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3);
       rg.addColorStop(0, rgba(b.color, 0.9));
       rg.addColorStop(1, rgba(b.color, 0));
@@ -8226,6 +8823,7 @@ export class GameEngine {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const b of this.bullets) {
+      if (!this.inView(b.x, b.y - (b.z ?? 0), b.size * 3.4 + 6)) continue;
       if (b.z && b.z > 1) {
         // ground shadow at the (current) landing-projected position
         ctx.globalCompositeOperation = "source-over";
@@ -8894,7 +9492,7 @@ export class GameEngine {
     this.endGame(endMsg);
   }
 
-  private collideBoxWithWalls(box: CashBox) {
+  private collideBoxWithWalls(box: { x: number; y: number; vx: number; vy: number; size: number }) {
     const r = box.size;
     for (const w of this.walls) {
       if (w.hp <= 0) continue;
@@ -8989,10 +9587,31 @@ export class GameEngine {
         if (box.throwTimer > 0) {
           box.throwTimer -= dt;
         }
+        
+        // Auto-attract to cashout stations
+        let attracted = false;
+        for (const st of this.cashoutStations) {
+          const d = Math.hypot(st.x - box.x, st.y - box.y);
+          if (d < 250) {
+            // Apply strong acceleration towards station
+            const angle = Math.atan2(st.y - box.y, st.x - box.x);
+            box.vx += Math.cos(angle) * 1500 * dt;
+            box.vy += Math.sin(angle) * 1500 * dt;
+            attracted = true;
+            break;
+          }
+        }
+        
         box.x += box.vx * dt;
         box.y += box.vy * dt;
-        box.vx *= Math.pow(0.1, dt);
-        box.vy *= Math.pow(0.1, dt);
+        if (!attracted) {
+          box.vx *= Math.pow(0.1, dt);
+          box.vy *= Math.pow(0.1, dt);
+        } else {
+          // Less friction during attract so it snaps quickly
+          box.vx *= Math.pow(0.5, dt);
+          box.vy *= Math.pow(0.5, dt);
+        }
         
         const margin = box.size;
         if (box.x < margin) { box.x = margin; box.vx *= -0.5; }
@@ -9064,6 +9683,95 @@ export class GameEngine {
             }
             break;
           }
+        }
+      }
+    }
+
+    // 3b. Tick Statues physics, carrying, and reviving
+    for (const st of this.statues) {
+      if (st.carriedByCid !== null) {
+        const carrier = this.combatants.find(c => c.id === st.carriedByCid);
+        if (carrier && carrier.player.hp > 0) {
+          st.x = carrier.player.x;
+          st.y = carrier.player.y - 15;
+          st.vx = 0;
+          st.vy = 0;
+        } else {
+          st.carriedByCid = null;
+          st.throwTimer = 1.0;
+        }
+      } else {
+        if (st.throwTimer > 0) {
+          st.throwTimer -= dt;
+        }
+        st.x += st.vx * dt;
+        st.y += st.vy * dt;
+        st.vx *= Math.pow(0.1, dt);
+        st.vy *= Math.pow(0.1, dt);
+        
+        const margin = st.size;
+        if (st.x < margin) { st.x = margin; st.vx *= -0.5; }
+        if (st.x > this.worldW - margin) { st.x = this.worldW - margin; st.vx *= -0.5; }
+        if (st.y < margin) { st.y = margin; st.vy *= -0.5; }
+        if (st.y > this.worldH - margin) { st.y = this.worldH - margin; st.vy *= -0.5; }
+
+        this.collideBoxWithWalls(st);
+
+        // Check if players want to pick up the statue
+        if (st.throwTimer <= 0) {
+          for (const c of this.combatants) {
+            if (c.player.hp > 0) {
+              const d = Math.hypot(c.player.x - st.x, c.player.y - st.y);
+              if (d < c.player.size + st.size + 10 && this.isInteracting(c, st.x, st.y, c.player.size + st.size + 20)) {
+                // Wait, F picks it up, but the prompt says: "long press V to revive for 5s".
+                // We'll let pickup happen if they interact and aren't holding V.
+                // But how to differentiate F and V? Right now `isInteracting` checks F.
+                // I will add V button logic later. For now, F picks up.
+                const isHoldingV = c.id === 0 ? this.keys.has("KeyV") : false; // For now bots don't use V
+                if (!isHoldingV) {
+                  st.carriedByCid = c.id;
+                  st.vx = 0;
+                  st.vy = 0;
+                  st.throwTimer = 0;
+                  st.thrownByCid = null;
+                  c.selectedGadget = -1;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        // Revive logic (V key)
+        let isBeingRevived = false;
+        for (const c of this.combatants) {
+          if (c.player.hp > 0 && c.teamId === st.teamId && c.id !== st.deadCid) {
+            const d = Math.hypot(c.player.x - st.x, c.player.y - st.y);
+            const isHoldingV = c.id === 0 ? this.keys.has("KeyV") : false; // Bots don't revive yet
+            if (d < c.player.size + st.size + 30 && isHoldingV) {
+              isBeingRevived = true;
+              break;
+            }
+          }
+        }
+        
+        if (isBeingRevived) {
+          st.reviveProgress += dt;
+          if (st.reviveProgress >= 5.0) {
+            // Revive!
+            const deadC = this.combatants.find(c => c.id === st.deadCid);
+            if (deadC && deadC.player.hp <= 0) {
+              deadC.player.hp = deadC.player.maxHp;
+              deadC.player.x = st.x;
+              deadC.player.y = st.y;
+              deadC.deadTimer = 0;
+              deadC.respawnTimer = 0;
+              this.statues = this.statues.filter(s => s.id !== st.id);
+              this.addScoreFeed(deadC.id === 0 ? "你已被复活" : `${deadC.name} 已被复活`, 0);
+            }
+          }
+        } else {
+          st.reviveProgress = 0;
         }
       }
     }
@@ -9235,9 +9943,11 @@ export class GameEngine {
           const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
           this.addScoreFeed(teamId === 0 ? `我方队伍团灭！扣除 $${lostAmount}` : `${teamNames[teamId]} 团灭！扣除 $${lostAmount}`, 0);
           
+          this.statues = this.statues.filter(s => s.teamId !== teamId);
+
           for (const m of members) {
-            m.respawnTimer = 25;
-            m.player.deadTimer = 25;
+            m.respawnTimer = 17;
+            m.player.deadTimer = 17;
           }
         } else {
           for (const m of members) {

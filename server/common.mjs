@@ -19,6 +19,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FILE = path.resolve(__dirname, "announcements.json");
 const TOKEN = process.env.ANNOUNCE_TOKEN || "admin";
 
+// Live push: every open main-menu tab that subscribes to the SSE stream gets
+// the new notice the instant an admin posts it (instead of waiting up to the
+// poll interval). Source of truth stays the file, so it survives restarts.
+const sseClients = new Set();
+function broadcastAnnouncement(text) {
+  const payload = `data: ${JSON.stringify({ text })}\n\n`;
+  for (const res of sseClients) {
+    try { res.write(payload); } catch { sseClients.delete(res); }
+  }
+}
+
 function load() {
   try {
     const d = JSON.parse(fs.readFileSync(FILE, "utf8"));
@@ -140,6 +151,27 @@ export function handleAnnouncement(req, res) {
       });
       return true;
     }
+  }
+
+  if (url === "/api/announcements/stream") {
+    if (req.method !== "GET") return false;
+    cors(res);
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    });
+    res.write("retry: 3000\n\n");
+    res.write(`data: ${JSON.stringify(load())}\n\n`); // push current value on connect
+    sseClients.add(res);
+    const ping = setInterval(() => {
+      try { res.write(": ping\n\n"); } catch { /* ignore */ }
+    }, 25000);
+    req.on("close", () => {
+      clearInterval(ping);
+      sseClients.delete(res);
+    });
+    return true;
   }
 
   if (url === "/admin") {

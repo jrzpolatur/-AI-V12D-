@@ -404,6 +404,10 @@ export default function LoadoutScreen({
     const m = localStorage.getItem("dm_loadout.gameMode");
     return m === "biohazard" || m === "deathmatch" || m === "cashout" ? (m as never) : "biohazard";
   });
+  const [dmPlayerCount, setDmPlayerCount] = useState<4 | 6 | 8>(() => {
+    const p = parseInt(localStorage.getItem("dm_loadout.dmPlayerCount") || "4", 10);
+    return (p === 4 || p === 6 || p === 8) ? (p as 4 | 6 | 8) : 4;
+  });
 
   // remember the last picked loadout so quitting & re-entering doesn't force a
   // full re-selection every time.
@@ -414,7 +418,8 @@ export default function LoadoutScreen({
     localStorage.setItem("dm_loadout.skillId", skillId);
     localStorage.setItem("dm_loadout.gadgetIds", JSON.stringify(gadgetIds));
     localStorage.setItem("dm_loadout.gameMode", gameMode);
-  }, [characterId, outfitId, gunIds, skillId, gadgetIds, gameMode]);
+    localStorage.setItem("dm_loadout.dmPlayerCount", String(dmPlayerCount));
+  }, [characterId, outfitId, gunIds, skillId, gadgetIds, gameMode, dmPlayerCount]);
 
   const gunId = gunIds[0] ?? "mac11";
   const toggleGun = (id: string) => {
@@ -460,6 +465,7 @@ export default function LoadoutScreen({
     skillId,
     gadgetIds,
     gameMode: isMultiplayer ? "deathmatch" : gameMode,
+    dmPlayerCount,
   };
   const character = CHARACTERS.find((c) => c.id === characterId)!;
   const outfit = OUTFITS.find((o) => o.id === outfitId)!;
@@ -681,15 +687,43 @@ export default function LoadoutScreen({
                   <span className="text-[10px] text-slate-400">尸潮生存 · 新武器</span>
                 </PickCard>
                 <PickCard
-                  active={gameMode === "deathmatch"}
-                  accent="#f472b6"
-                  onClick={() => setGameMode("deathmatch")}
-                >
-                  <span className="text-xl">🤖</span>
-                  <span className="text-xs font-semibold">人机对战</span>
-                  <span className="text-[10px] text-slate-400">离线 PvP · 先杀 15 人胜</span>
-                </PickCard>
-                <PickCard
+                active={gameMode === "deathmatch"}
+                accent="#f472b6"
+                onClick={() => setGameMode("deathmatch")}
+              >
+                <span className="text-xl">🤖</span>
+                <span className="text-xs font-semibold">人机对战</span>
+                <span className="text-[10px] text-slate-400">离线 PvP · 先达目标杀敌数胜</span>
+              </PickCard>
+              
+              {gameMode === "deathmatch" && (
+                <div className="flex w-full gap-2 mt-2 bg-black/30 p-2 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 w-12 flex items-center shrink-0">死斗规模</span>
+                  {[
+                    { count: 4, label: "4人", kills: 15 },
+                    { count: 6, label: "6人", kills: 18 },
+                    { count: 8, label: "8人", kills: 24 }
+                  ].map((opt) => (
+                    <button
+                      key={opt.count}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDmPlayerCount(opt.count as 4 | 6 | 8);
+                      }}
+                      className={`flex-1 rounded-lg py-1.5 flex flex-col items-center justify-center text-[10px] border transition-colors ${
+                        dmPlayerCount === opt.count
+                          ? "bg-fuchsia-500/20 border-fuchsia-400 text-white"
+                          : "bg-black/40 border-white/10 text-slate-400 hover:border-white/30"
+                      }`}
+                    >
+                      <span className="font-bold">{opt.label}</span>
+                      <span className="text-[8px] opacity-70">{opt.kills}杀</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <PickCard
                   active={gameMode === "cashout"}
                   accent="#fbbf24"
                   onClick={() => setGameMode("cashout")}

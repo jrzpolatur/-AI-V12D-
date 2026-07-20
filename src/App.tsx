@@ -28,24 +28,38 @@ export default function App() {
   const onlineCount = useOnlineCount();
 
   // 主界面公告 / 消息：从同一服务器拉取（连接服务器的玩家都能看到）。
+  // 实时同步：用 EventSource 订阅 SSE 流，管理员一发布，在线玩家秒级刷新；
+  // 同时保留首屏 GET 拉取 + 兜底轮询（防 SSE 被代理/网络中断时长期不更新）。
   const [announce, setAnnounce] = useState("");
   useEffect(() => {
     let alive = true;
+    const apply = (text: string) => {
+      if (!alive) return;
+      setAnnounce(typeof text === "string" && text.trim() ? text : "");
+    };
     const load = () => {
       fetch("/api/announcements")
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (alive && d && typeof d.text === "string" && d.text.trim()) {
-            setAnnounce(d.text);
-          }
-        })
+        .then((d) => { if (d && typeof d.text === "string") apply(d.text); })
         .catch(() => {});
     };
     load();
-    const id = setInterval(load, 20000); // 管理员发布后自动刷新
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource("/api/announcements/stream");
+      es.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d && "text" in d) apply(d.text);
+        } catch { /* ignore malformed frame */ }
+      };
+      // EventSource auto-reconnects on error; nothing to do here.
+    } catch { /* EventSource unsupported (e.g. file://) — rely on polling */ }
+    const id = setInterval(load, 30000); // fallback if SSE drops
     return () => {
       alive = false;
       clearInterval(id);
+      if (es) es.close();
     };
   }, []);
 

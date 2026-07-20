@@ -55,7 +55,7 @@ const initialHud: HudState = {
   banner: null,
   kills: 0,
   gold: 0,
-  scoreFeed: [],
+  activeScoreFeed: null,
   killFeed: [],
   bowChargePct: 0,
   shieldHp: null,
@@ -749,34 +749,36 @@ export default function GameScreen({
       )}
 
       {/* ============ BATTLEFIELD STYLE SCORE FEED ============ */}
-      {hud.scoreFeed && hud.scoreFeed.length > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[32%] flex flex-col items-center justify-center gap-1 z-50">
-          {hud.scoreFeed.map((sf) => (
-            <div
-              key={sf.id}
-              className="flex flex-col items-center animate-score-pop"
-              style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.85))" }}
-            >
+      {hud.activeScoreFeed && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[32%] flex flex-col items-center justify-center gap-1 z-50 animate-score-pop"
+             style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.85))" }}>
+          
+          <div className="flex items-center gap-2 text-2xl font-black mb-1">
+            <span className="text-yellow-400 font-mono text-3xl">+{hud.activeScoreFeed.totalScore}</span>
+          </div>
+
+          {hud.activeScoreFeed.events.map((sf) => (
+            <div key={sf.id} className="flex flex-col items-center">
               {sf.victimName ? (
-                <>
-                  <div className="flex items-center gap-2 text-2xl font-black mb-1">
-                    <span className="text-slate-100">{sf.text}</span>
-                    <span className="text-red-500 uppercase">{sf.victimName}</span>
-                    <span className="text-yellow-400 font-mono">${sf.score}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm font-bold text-slate-200">
-                    <span>淘汰数 {sf.totalKills}</span>
-                    <span className="text-amber-400 font-mono">+{sf.subScore}</span>
-                  </div>
-                </>
+                <div className="flex items-center gap-3 text-sm font-bold text-slate-200">
+                  <span className="text-slate-100">{sf.text}</span>
+                  <span className="text-red-500 uppercase">{sf.victimName}</span>
+                  <span className="text-amber-400 font-mono">+{sf.subScore}</span>
+                </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-black text-amber-400 font-mono">+{sf.score}</span>
                   <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">{sf.text}</span>
+                  <span className="text-sm font-black text-amber-400 font-mono">+{sf.subScore}</span>
                 </div>
               )}
             </div>
           ))}
+
+          {hud.activeScoreFeed.totalKills > 0 && (
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-300 mt-1">
+              <span>淘汰数 {hud.activeScoreFeed.totalKills}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -788,14 +790,20 @@ export default function GameScreen({
               key={kf.id}
               className="flex items-center gap-2 rounded-lg bg-black/55 px-3 py-1 text-xs font-bold text-white shadow-lg border border-white/5 backdrop-blur-sm animate-kf-slide"
             >
-              <span className="text-sky-300">{kf.killerName}</span>
-              <span
-                className="flex items-center justify-center rounded bg-slate-950/80 px-1.5 py-0.5 border border-white/10"
-                style={{ boxShadow: `0 0 5px ${kf.weaponGlow}44` }}
-              >
-                <WeaponIcon iconShape={kf.weaponIconShape} glow={kf.weaponGlow} size={20} />
-              </span>
-              <span className="text-rose-300">{kf.victimName}</span>
+              {kf.type === "event" ? (
+                <span style={{ color: kf.teamColor || "#facc15" }}>{kf.text}</span>
+              ) : (
+                <>
+                  <span className="text-sky-300">{kf.killerName}</span>
+                  <span
+                    className="flex items-center justify-center rounded bg-slate-950/80 px-1.5 py-0.5 border border-white/10"
+                    style={{ boxShadow: `0 0 5px ${kf.weaponGlow}44` }}
+                  >
+                    <WeaponIcon iconShape={kf.weaponIconShape!} glow={kf.weaponGlow!} size={20} />
+                  </span>
+                  <span className="text-rose-300">{kf.victimName}</span>
+                </>
+              )}
             </div>
           ))}
         </div>

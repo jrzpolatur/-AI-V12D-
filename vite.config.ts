@@ -16,4 +16,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  // Dev-only: forward the announcement API + admin page to the running game
+  // server (relay/prod/authoritative on :8080) so the notice board shows up
+  // during `npm run dev` too. In production the server serves both the app and
+  // /api from the same origin, so no proxy is needed.
+  server: {
+    proxy: {
+      "/api": "http://localhost:8080",
+      "/admin": "http://localhost:8080",
+    },
+  },
 });

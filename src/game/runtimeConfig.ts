@@ -43,8 +43,8 @@ export interface RuntimeConfig {
 }
 
 export const RUNTIME_DEFAULTS: RuntimeConfig = {
-  worldW: 2400,
-  worldH: 1200,
+  worldW: 6000,
+  worldH: 3000,
   baseHp: 2000,
   enemyBaseHp: 2000,
   breathingDelay: 5,
