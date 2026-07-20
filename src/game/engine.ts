@@ -1213,6 +1213,7 @@ export class GameEngine {
 
     // ---- multiplayer bootstrapping ----
     if (this.mode !== "local" && this.net) {
+      this.authoritative = this.net.isAuthoritative;
       // Use role-based ids (host=1, guest=2) instead of the relay's global pid
       // counter. The server's pid is NOT guaranteed to be 1/2 (it increments
       // across all rooms), so relying on it silently swapped "me"/"foe" in some

@@ -34,6 +34,7 @@ export class Net {
   private mode: "host" | "guest" = "guest";
   status: NetStatus = "idle";
   peerName = "";
+  isAuthoritative = false;
   /** the pid assigned to THIS client by the (authoritative) server */
   youPid = 0;
   peerPid = 0;
@@ -194,6 +195,7 @@ export class Net {
         break;
       case "start":
         this.pendingFind = null;
+        this.isAuthoritative = (m as { youPid?: number }).youPid !== undefined;
         // The authoritative server sends an explicit `youPid` (1/2). The relay
         // server does NOT, so fall back to the role derived from playerMode:
         // host = creator = pid 1, guest = joiner = pid 2. Without this, relay

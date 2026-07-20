@@ -3182,6 +3182,7 @@ var GameEngine = class {
       this.combatants = [];
     }
     if (this.mode !== "local" && this.net) {
+      this.authoritative = this.net.isAuthoritative;
       this.selfPid = this.reqSelfPid ?? (this.net.youPid || (this.mode === "host" ? 1 : 2));
       this.peerPid = this.reqPeerPid ?? (this.net.peerPid || (this.selfPid === 1 ? 2 : 1));
       this.foeGuns = this.guns.slice();
