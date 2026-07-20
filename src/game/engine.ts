@@ -1240,6 +1240,8 @@ export class GameEngine {
       }
 
       // Human player (cid 0, team 0)
+      this.player.x = this.dmSpawns[0].x;
+      this.player.y = this.dmSpawns[0].y;
       const human: Combatant = {
         id: 0, isBot: false, name: "你", color: "#38bdf8",
         player: this.player,
@@ -5107,28 +5109,95 @@ export class GameEngine {
       weaponSwitch: boolean; skill: boolean; reload: boolean; gadget: number;
       gadgetX?: number; gadgetY?: number;
     };
-    // pick the nearest living opponent
+    // pick the nearest living opponent (ignore teammates in Cashout mode)
     let target: Player | null = null;
     let bestD = Infinity;
     for (const o of this.combatants) {
       if (o.id === c.id) continue;
+      if (this.gameMode === "cashout" && o.teamId === c.teamId) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
       const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
       if (d < bestD) { bestD = d; target = q; }
     }
-    if (!target) {
+
+    // Cashout mode objective decision (Vault, Cash Box, Cashout Station)
+    let objX: number | null = null;
+    let objY: number | null = null;
+    let isInsertingBox = false;
+
+    if (this.gameMode === "cashout") {
+      const carriedBox = this.cashBoxes.find(b => b.carriedByCid === c.id);
+      if (carriedBox) {
+        let bestStDist = Infinity;
+        for (const st of this.cashoutStations) {
+          const d = Math.hypot(st.x - p.x, st.y - p.y);
+          if (d < bestStDist) {
+            bestStDist = d;
+            objX = st.x;
+            objY = st.y;
+          }
+        }
+        if (bestStDist < 120) {
+          isInsertingBox = true;
+        }
+      } else {
+        // Find loose cashbox
+        let bestBoxDist = Infinity;
+        for (const box of this.cashBoxes) {
+          if (box.carriedByCid === null && box.throwTimer <= 0) {
+            const d = Math.hypot(box.x - p.x, box.y - p.y);
+            if (d < bestBoxDist) {
+              bestBoxDist = d;
+              objX = box.x;
+              objY = box.y;
+            }
+          }
+        }
+        // If no loose box, find active vault
+        if (objX === null) {
+          let bestVaultDist = Infinity;
+          for (const v of this.vaults) {
+            if (v.state === "idle" || v.state === "unlocking") {
+              const d = Math.hypot(v.x - p.x, v.y - p.y);
+              if (d < bestVaultDist) {
+                bestVaultDist = d;
+                objX = v.x;
+                objY = v.y;
+              }
+            }
+          }
+        }
+        // If no vault, find station to steal/defend
+        if (objX === null) {
+          let bestStDist = Infinity;
+          for (const st of this.cashoutStations) {
+            if (st.state === "cashout" || st.state === "stealing") {
+              const d = Math.hypot(st.x - p.x, st.y - p.y);
+              if (d < bestStDist) {
+                bestStDist = d;
+                objX = st.x;
+                objY = st.y;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!target && objX === null && objY === null) {
       this.firing = false;
       this.virtualMove.x = 0;
       this.virtualMove.y = 0;
       return intent;
     }
-    const dist = Math.sqrt(bestD);
-    const ang = Math.atan2(target.y - p.y, target.x - p.x);
+
+    const dist = target ? Math.sqrt(bestD) : 0;
+    const ang = target ? Math.atan2(target.y - p.y, target.x - p.x) : 0;
 
     // ---- smart weapon selection by distance (with hysteresis) ----
     c.weaponCd = (c.weaponCd ?? 0) - dt;
-    if (c.guns.length > 1 && (c.weaponCd ?? 0) <= 0) {
+    if (target && c.guns.length > 1 && (c.weaponCd ?? 0) <= 0) {
       let best = c.gunIndex;
       let bestScore = -Infinity;
       for (let i = 0; i < c.guns.length; i++) {
@@ -5137,59 +5206,79 @@ export class GameEngine {
         const dps = gg.damage * gg.fireRate * (gg.pellets ?? 1) * (gg.parallel ?? 1);
         let score: number;
         if (dist <= r * 1.05) {
-          // usable range: reward dps, peak when distance sits in the sweet spot
           const util = 1 - Math.abs(dist - r * 0.6) / (r + 1);
           score = dps * (0.5 + Math.max(0, util));
         } else {
-          score = dps * 0.05 - (dist - r); // out of reach -> strongly penalised
+          score = dps * 0.05 - (dist - r);
         }
         if (score > bestScore) { bestScore = score; best = i; }
       }
       if (best !== c.gunIndex) {
         this.gunIndex = best;
-        c.weaponCd = 1.2; // avoid flip-flopping between guns
+        c.weaponCd = 1.2;
       }
     }
     const g = this.gun;
 
     // ---- aim with light target leading so moving foes get hit ----
-    const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
-    this.mouse.x = target.x + target.vx * lead;
-    this.mouse.y = target.y + target.vy * lead;
+    if (target) {
+      const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
+      this.mouse.x = target.x + target.vx * lead;
+      this.mouse.y = target.y + target.vy * lead;
+    } else if (objX !== null && objY !== null) {
+      this.mouse.x = objX;
+      this.mouse.y = objY;
+    }
 
-    // ---- periodic re-decision of strafe / approach / retreat ----
-    c.strafeTimer = (c.strafeTimer ?? 0) - dt;
-    if (c.strafeTimer <= 0) {
-      c.strafeTimer = 0.6 + Math.random() * 1.0;
-      const r = Math.random();
-      if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1; // flip strafe
-      else if (r < 0.82) c.strafeDir = 0; // approach
-      else c.strafeDir = 2; // retreat
+    // ---- movement: navigate to objective or combat strafe ----
+    if (objX !== null && objY !== null && (!target || dist > 250)) {
+      const objAng = Math.atan2(objY - p.y, objX - p.x);
+      this.virtualMove.x = Math.cos(objAng);
+      this.virtualMove.y = Math.sin(objAng);
+    } else if (target) {
+      c.strafeTimer = (c.strafeTimer ?? 0) - dt;
+      if (c.strafeTimer <= 0) {
+        c.strafeTimer = 0.6 + Math.random() * 1.0;
+        const r = Math.random();
+        if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1;
+        else if (r < 0.82) c.strafeDir = 0;
+        else c.strafeDir = 2;
+      }
+      let mvx = 0, mvy = 0;
+      if (c.strafeDir === 0) {
+        mvx = Math.cos(ang); mvy = Math.sin(ang);
+        if (dist < 150) { mvx = 0; mvy = 0; }
+      } else if (c.strafeDir === 2) {
+        mvx = -Math.cos(ang); mvy = -Math.sin(ang);
+      } else {
+        const sa = ang + (c.strafeDir ?? 1) * Math.PI / 2;
+        mvx = Math.cos(sa); mvy = Math.sin(sa);
+      }
+      this.virtualMove.x = mvx;
+      this.virtualMove.y = mvy;
     }
-    let mvx = 0, mvy = 0;
-    if (c.strafeDir === 0) {
-      mvx = Math.cos(ang); mvy = Math.sin(ang);
-      if (dist < 150) { mvx = 0; mvy = 0; } // hold position when point-blank
-    } else if (c.strafeDir === 2) {
-      mvx = -Math.cos(ang); mvy = -Math.sin(ang); // back off
-    } else {
-      const sa = ang + (c.strafeDir ?? 1) * Math.PI / 2; // strafe sideways
-      mvx = Math.cos(sa); mvy = Math.sin(sa);
+
+    if (isInsertingBox) {
+      this.firing = true; // throw cash box at station!
     }
-    this.virtualMove.x = mvx;
-    this.virtualMove.y = mvy;
 
     // ---- fire aggressively: anything we can see, within this gun's range ----
-    const los = this.botLOS(p.x, p.y, target.x, target.y);
-    const inRange = dist < this.gunEffRange(g) + 40;
-    const facing = Math.abs(this.angleDiff(ang, p.angle));
-    this.firing = los && inRange && facing < 1.2;
+    let los = false;
+    let inRange = false;
+    if (target) {
+      los = this.botLOS(p.x, p.y, target.x, target.y);
+      inRange = dist < this.gunEffRange(g) + 40;
+      const facing = Math.abs(this.angleDiff(ang, p.angle));
+      this.firing = los && inRange && facing < 1.2;
+    } else if (!isInsertingBox) {
+      this.firing = false;
+    }
 
     // ---- skill usage: dash to dodge / escape, others offensively or when hurt ----
     if (c.skillCd <= 0) {
       const lowHp = p.hp < p.maxHp * 0.45;
       if (c.skill.id === "dash") {
-        if ((dist < 220 || lowHp) && Math.random() < 0.6) intent.skill = true;
+        if (target && (dist < 220 || lowHp) && Math.random() < 0.6) intent.skill = true;
       } else if ((inRange && los) || lowHp) {
         if (Math.random() < 0.25) intent.skill = true;
       }
@@ -5201,7 +5290,7 @@ export class GameEngine {
       for (const gd of c.gadgets) {
         if ((c.gadgetCd.get(gd.id) ?? 0) > 0) continue;
         let deploy = false;
-        let tx = target.x, ty = target.y;
+        let tx = target ? target.x : p.x, ty = target ? target.y : p.y;
         switch (gd.kind) {
           case "healing_station":
             deploy = p.hp < p.maxHp * 0.7;
@@ -5209,25 +5298,26 @@ export class GameEngine {
             break;
           case "turret_mg":
           case "turret_cannon":
-            deploy = dist > 180 && los; // add ranged suppression
+            deploy = target ? dist > 180 && los : false; // add ranged suppression
             tx = p.x + Math.cos(ang) * 130;
             ty = p.y + Math.sin(ang) * 130;
             break;
           case "mine_explosive":
           case "mine_poison":
           case "mine_fire":
-            deploy = dist < 220; // trap a closing foe
+            deploy = target ? dist < 220 : false; // trap a closing foe
             tx = p.x + Math.cos(ang) * 90;
             ty = p.y + Math.sin(ang) * 90;
             break;
           case "glue_grenade":
           case "fire_grenade":
-            deploy = dist < 360 && los;
-            tx = target.x; ty = target.y;
+          case "poison_grenade":
+            deploy = target ? dist < 360 && los : false;
+            tx = target ? target.x : p.x; ty = target ? target.y : p.y;
             break;
           default:
-            deploy = los && dist < 360;
-            tx = target.x; ty = target.y;
+            deploy = target ? los && dist < 360 : false;
+            tx = target ? target.x : p.x; ty = target ? target.y : p.y;
         }
         if (deploy && Math.random() < 0.6) {
           intent.gadget = c.gadgets.indexOf(gd);
