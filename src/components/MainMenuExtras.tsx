@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSettings, updateSettings } from "../game/settings";
 import { isTouchDevice } from "../utils/device";
 import MobileKeybindEditor from "./MobileKeybindEditor";
+import BotStrengthControl from "./BotStrengthControl";
 
 const FPS_OPTIONS = [
   { label: "不限制", value: 0 },
@@ -149,6 +150,9 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
                   ))}
                 </div>
               </div>
+
+              {/* Bot strength (AI step, decoupled from frame rate) */}
+              <BotStrengthControl />
 
               {/* Display */}
               <div className="mb-4">

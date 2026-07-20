@@ -2827,7 +2827,7 @@ var GADGET_THROW_DIST = 630;
 var MAX_PARTICLES = 700;
 var MAX_EFFECTS = 240;
 var GRID_CELL = 220;
-var BOT_THINK_INTERVAL = 0.12;
+var DEFAULT_BOT_AI_HZ = 16;
 var MATCH_DURATION = 175;
 var EMPTY_FRAME = {
   keys: [],
@@ -3093,6 +3093,12 @@ var GameEngine = class {
    *  remote foe (inside `simulateBot` / `simulateRemote`). Used to suppress HUD
    *  emits so the player's own HUD never flickers to an opponent's state. */
   simulatingOther = false;
+  /** bot AI decision frequency (Hz), decoupled from the render frame rate.
+   *  Sourced from settings; higher = smarter but more CPU. */
+  botAiHz = DEFAULT_BOT_AI_HZ;
+  get aiStep() {
+    return 1 / this.botAiHz;
+  }
   /** kills needed to win the deathmatch */
   dmKillLimit = 15;
   /** respawn anchor points (one per combatant) */
@@ -6865,6 +6871,11 @@ var GameEngine = class {
     this.simulatingOther = false;
   }
   // ------------------------------------------------------ deathmatch AI bots
+  /** Set the bot AI decision frequency (Hz). Higher = bots re-decide more often
+   *  (smarter, more CPU). Clamped to a sane range. */
+  setBotAiHz(hz) {
+    this.botAiHz = Math.min(120, Math.max(2, hz));
+  }
   /** Simulate one AI bot through the SAME per-player combat code by swapping the
    *  engine's single simulation context onto the bot, running its brain
    *  (`botThink`) + `updatePlayer`, then restoring the human's context. */
@@ -6896,7 +6907,7 @@ var GameEngine = class {
       this.virtualMove = { x: 0, y: 0 };
       this.firing = false;
       const intent = this.botThink(c, dt);
-      c.aiTimer = BOT_THINK_INTERVAL;
+      c.aiTimer = this.aiStep;
       c.aiMvx = this.virtualMove.x;
       c.aiMvy = this.virtualMove.y;
       this.updatePlayer(dt);
@@ -6910,7 +6921,7 @@ var GameEngine = class {
       this.keys = /* @__PURE__ */ new Set();
       this.mouse = { x: c.player.x, y: c.player.y - 1 };
       this.virtualMove = { x: c.aiMvx ?? 0, y: c.aiMvy ?? 0 };
-      this.botAimFire(c);
+      this.botAimFire(c, dt);
       this.updatePlayer(dt);
     }
     if (this.skillCd > 0) this.skillCd -= dt;
@@ -7198,7 +7209,7 @@ var GameEngine = class {
    *  stand there not shooting when an enemy entered view between decisions).
    *  Only does a nearest-target scan (O(combatants)) + a single LOS ray, then
    *  mirrors `botThink`'s fire gate (LOS && inRange && facing). */
-  botAimFire(c) {
+  botAimFire(c, dt) {
     const p = c.player;
     let target = null;
     let bestD = Infinity;
@@ -7242,7 +7253,16 @@ var GameEngine = class {
     const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
     this.mouse.x = target.x + target.vx * lead;
     this.mouse.y = target.y + target.vy * lead;
-    const los = this.botLOS(p.x, p.y, target.x, target.y);
+    let los;
+    if ((c.losTtl ?? 0) > 0 && c.losTarget === target) {
+      los = c.losResult ?? false;
+    } else {
+      los = this.botLOS(p.x, p.y, target.x, target.y);
+      c.losTarget = target;
+      c.losResult = los;
+      c.losTtl = 0.1;
+    }
+    c.losTtl = Math.max(0, (c.losTtl ?? 0) - dt);
     const inRange = dist < this.gunEffRange(g) + 40;
     const facing = Math.abs(this.angleDiff(ang, p.angle));
     this.firing = los && inRange && facing < 1.2;

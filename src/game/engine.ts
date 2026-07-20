@@ -258,6 +258,12 @@ interface Combatant {
   // "see an enemy but don't shoot" regression).
   aiMvx?: number;
   aiMvy?: number;
+  /** LOS cache for the per-frame aim/fire pass: reuses the expensive ray-vs-wall
+   *  test for a short window (~0.1s) while the nearest target is unchanged, so
+   *  the replay branch (which runs every render frame) doesn't re-cast it. */
+  losTarget?: Player | null;
+  losResult?: boolean;
+  losTtl?: number;
   // ---- Ranked Cashout mode properties ----
   teamId?: number;
   coins?: number;
@@ -554,8 +560,12 @@ const MAX_PARTICLES = 700;
 const MAX_EFFECTS = 240;
 /** Broad-phase spatial grid cell size (px). */
 const GRID_CELL = 220;
-/** Bot AI re-decides this often (seconds) instead of every frame. */
-const BOT_THINK_INTERVAL = 0.12;
+/** Default bot AI decision frequency, in *decisions per second* — deliberately
+ *  decoupled from the render frame rate. The live value is owned by the engine
+ *  (`botAiHz`) and sourced from settings via `setBotAiHz`, so a higher Hz makes
+ *  bots smarter (re-decide more often) at the cost of more CPU, and vice-versa.
+ *  The per-decision interval is `aiStep = 1 / botAiHz`. */
+const DEFAULT_BOT_AI_HZ = 16;
 /** Spatial-grid item used for broad-phase collision/damage queries. */
 type GridItem = {
   kind: "enemy" | "player" | "deployable";
@@ -904,6 +914,12 @@ export class GameEngine {
    *  remote foe (inside `simulateBot` / `simulateRemote`). Used to suppress HUD
    *  emits so the player's own HUD never flickers to an opponent's state. */
   private simulatingOther = false;
+  /** bot AI decision frequency (Hz), decoupled from the render frame rate.
+   *  Sourced from settings; higher = smarter but more CPU. */
+  private botAiHz = DEFAULT_BOT_AI_HZ;
+  private get aiStep() {
+    return 1 / this.botAiHz;
+  }
   /** kills needed to win the deathmatch */
   private dmKillLimit = 15;
   /** respawn anchor points (one per combatant) */
@@ -5242,6 +5258,12 @@ export class GameEngine {
   }
 
   // ------------------------------------------------------ deathmatch AI bots
+  /** Set the bot AI decision frequency (Hz). Higher = bots re-decide more often
+   *  (smarter, more CPU). Clamped to a sane range. */
+  setBotAiHz(hz: number) {
+    this.botAiHz = Math.min(120, Math.max(2, hz));
+  }
+
   /** Simulate one AI bot through the SAME per-player combat code by swapping the
    *  engine's single simulation context onto the bot, running its brain
    *  (`botThink`) + `updatePlayer`, then restoring the human's context. */
@@ -5272,10 +5294,12 @@ export class GameEngine {
     this.weaponStates = c.weaponStates;
     this.semiAutoLatch = false;
     this.activeId = c.id;
-    // throttle AI decisions: run the heavy brain (botThink) at a low rate and
-    // replay only the cached MOVEMENT intent between decisions. AIM + FIRE are
-    // recomputed EVERY frame by `botAimFire` so bots stay aggressive and never
-    // hesitate when an enemy appears between decisions.
+    // throttle AI decisions: run the heavy brain (botThink) at a fixed rate
+    // (`aiStep`, decoupled from the render frame rate) and replay only the cached
+    // MOVEMENT intent between decisions. AIM + FIRE are recomputed EVERY frame by
+    // `botAimFire` so bots stay aggressive and never hesitate when an enemy appears
+    // between decisions. The decision interval = 1 / botAiHz and can be tuned live
+    // from settings (higher Hz = smarter but more CPU).
     const decide = (c.aiTimer ?? 0) <= 0;
     if (decide) {
       this.keys = new Set();
@@ -5283,7 +5307,7 @@ export class GameEngine {
       this.virtualMove = { x: 0, y: 0 };
       this.firing = false;
       const intent = this.botThink(c, dt);
-      c.aiTimer = BOT_THINK_INTERVAL;
+      c.aiTimer = this.aiStep;
       c.aiMvx = this.virtualMove.x;
       c.aiMvy = this.virtualMove.y;
       this.updatePlayer(dt);
@@ -5301,7 +5325,7 @@ export class GameEngine {
       this.mouse = { x: c.player.x, y: c.player.y - 1 };
       // replay cached movement, but recompute aim + fire responsively
       this.virtualMove = { x: c.aiMvx ?? 0, y: c.aiMvy ?? 0 };
-      this.botAimFire(c);
+      this.botAimFire(c, dt);
       this.updatePlayer(dt);
     }
     // age the bot's OWN cooldowns so it can actually re-use skills / gadgets /
@@ -5615,7 +5639,7 @@ export class GameEngine {
    *  stand there not shooting when an enemy entered view between decisions).
    *  Only does a nearest-target scan (O(combatants)) + a single LOS ray, then
    *  mirrors `botThink`'s fire gate (LOS && inRange && facing). */
-  private botAimFire(c: Combatant) {
+  private botAimFire(c: Combatant, dt: number) {
     const p = c.player;
     let target: Player | null = null;
     let bestD = Infinity;
@@ -5654,7 +5678,21 @@ export class GameEngine {
     const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
     this.mouse.x = target.x + target.vx * lead;
     this.mouse.y = target.y + target.vy * lead;
-    const los = this.botLOS(p.x, p.y, target.x, target.y);
+    // ---- line-of-sight gate ----
+    // `botLOS` is the single most expensive call here: it casts a ray against
+    // EVERY wall (a ray-vs-AABB test per wall). Cache the result for ~0.1s while
+    // the nearest target is unchanged, so the replay branch (which runs every
+    // render frame) doesn't re-cast the ray each frame.
+    let los: boolean;
+    if ((c.losTtl ?? 0) > 0 && c.losTarget === target) {
+      los = c.losResult ?? false;
+    } else {
+      los = this.botLOS(p.x, p.y, target.x, target.y);
+      c.losTarget = target;
+      c.losResult = los;
+      c.losTtl = 0.1;
+    }
+    c.losTtl = Math.max(0, (c.losTtl ?? 0) - dt);
     const inRange = dist < this.gunEffRange(g) + 40;
     const facing = Math.abs(this.angleDiff(ang, p.angle));
     this.firing = los && inRange && facing < 1.2;

@@ -28,6 +28,10 @@ export interface GameSettings {
   muted: boolean;
   /** target frame rate; 0 = uncapped (follow the display refresh) */
   fps: number;
+  /** bot AI decision frequency in *decisions per second*. Decoupled from the
+   *  render frame rate — this is the single "step" knob that controls bot
+   *  strength: higher Hz = bots re-decide more often (smarter, but more CPU). */
+  botAiHz: number;
   /** on-screen mobile control buttons */
   mobile: MobileButtonCfg[];
 }
@@ -56,6 +60,7 @@ function defaultSettings(): GameSettings {
     volume: 0.5,
     muted: false,
     fps: 60,
+    botAiHz: 16,
     mobile: defaultMobileLayout(),
   };
 }
@@ -73,6 +78,10 @@ function load(): GameSettings {
           : base.volume,
       muted: typeof parsed.muted === "boolean" ? parsed.muted : base.muted,
       fps: typeof parsed.fps === "number" ? parsed.fps : base.fps,
+      botAiHz:
+        typeof parsed.botAiHz === "number"
+          ? Math.min(120, Math.max(2, parsed.botAiHz))
+          : base.botAiHz,
       // merge saved buttons onto defaults so newly added actions still appear
       mobile: base.mobile.map((def) => {
         const saved = (parsed.mobile ?? []).find((m) => m.id === def.id);

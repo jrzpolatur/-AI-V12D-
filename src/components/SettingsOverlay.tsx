@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSettings, updateSettings } from "../game/settings";
 import MobileKeybindEditor from "./MobileKeybindEditor";
+import BotStrengthControl from "./BotStrengthControl";
 
 const FPS_OPTIONS = [
   { label: "不限制", value: 0 },
@@ -96,6 +97,11 @@ export default function SettingsOverlay({
               </button>
             ))}
           </div>
+        </section>
+
+        {/* ---- Bot strength (AI step, decoupled from frame rate) ---- */}
+        <section className="mb-5">
+          <BotStrengthControl />
         </section>
 
         {/* ---- Display ---- */}

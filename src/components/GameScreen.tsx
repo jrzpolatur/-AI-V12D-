@@ -201,12 +201,13 @@ export default function GameScreen({
     };
   }, [loadout, isTouch]);
 
-  // ---- apply saved settings to audio + frame rate, live ----
+  // ---- apply saved settings to audio + frame rate + bot strength, live ----
   useEffect(() => {
     const apply = (st: ReturnType<typeof getSettings>) => {
       sound.setVolume(st.volume);
       sound.setEnabled(!st.muted);
       engineRef.current?.setTargetFps(st.fps);
+      engineRef.current?.setBotAiHz(st.botAiHz);
     };
     apply(getSettings());
     return subscribe(apply);
