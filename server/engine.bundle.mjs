@@ -2710,9 +2710,9 @@ var GameEngine = class {
   killFeed = [];
   nextScoreFeedId = 0;
   nextKillFeedId = 0;
-  addScoreFeed(text, score) {
+  addScoreFeed(text, score, victimName, subScore, totalKills) {
     if (this.gameMode === "biohazard") return;
-    if (text === "\u4F24\u5BB3\u51FB\u4E2D") {
+    if (text === "\u4F24\u5BB3\u51FB\u4E2D" && !victimName) {
       const existing = this.scoreFeed.find((f) => f.text === "\u4F24\u5BB3\u51FB\u4E2D" && f.timer > 0.5);
       if (existing) {
         existing.score += score;
@@ -2725,7 +2725,11 @@ var GameEngine = class {
       id: this.nextScoreFeedId++,
       text,
       score,
-      timer: 2
+      timer: 3.5,
+      // slightly longer for kill feed
+      victimName,
+      subScore,
+      totalKills
     });
     if (this.scoreFeed.length > 4) {
       this.scoreFeed.shift();
@@ -3100,10 +3104,8 @@ var GameEngine = class {
     if (this.gameMode === "deathmatch") {
       this.isDM = true;
       this.dmKillLimit = this.mode === "local" ? 15 : 8;
-      this.base.hp = Infinity;
-      this.base.maxHp = Infinity;
-      this.enemyBase.hp = Infinity;
-      this.enemyBase.maxHp = Infinity;
+      this.base = null;
+      this.enemyBase = null;
       this.dmSpawns = [
         { x: this.worldW * 0.5, y: this.worldH - 200 },
         { x: this.worldW * 0.15, y: this.worldH * 0.2 },
@@ -3194,7 +3196,7 @@ var GameEngine = class {
           skill: this.mode === "host" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
           guns: this.mode === "host" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "host" ? this.gunIndex : this.foe.gunIndex ?? 0,
-          weaponStates: this.mode === "host" ? this.weaponStates : /* @__PURE__ */ new Map(),
+          weaponStates: this.mode === "host" ? this.weaponStates : this.foeWeaponStates,
           gadgets: this.mode === "host" ? this.gadgets : this.foeGadgets,
           selectedGadget: this.mode === "host" ? this.selectedGadget : -1,
           skillCd: this.mode === "host" ? this.skillCd : 0,
@@ -3219,7 +3221,7 @@ var GameEngine = class {
           skill: this.mode === "guest" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
           guns: this.mode === "guest" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "guest" ? this.gunIndex : this.foe.gunIndex ?? 0,
-          weaponStates: this.mode === "guest" ? this.weaponStates : /* @__PURE__ */ new Map(),
+          weaponStates: this.mode === "guest" ? this.weaponStates : this.foeWeaponStates,
           gadgets: this.mode === "guest" ? this.gadgets : this.foeGadgets,
           selectedGadget: this.mode === "guest" ? this.selectedGadget : -1,
           skillCd: this.mode === "guest" ? this.skillCd : 0,
@@ -5149,7 +5151,8 @@ var GameEngine = class {
             radius: 92,
             color: "#fb923c",
             dps: 90,
-            tickT: 0
+            tickT: 0,
+            ownerId: gr.ownerId
           });
           this.spawnParticles(gr.x, gr.y, "#fb923c", 20, 200, 0.5);
         } else if (gr.kind === "poison") {
@@ -5163,11 +5166,12 @@ var GameEngine = class {
             color: "#84cc16",
             dps: 60,
             slow: 0.5,
-            tickT: 0
+            tickT: 0,
+            ownerId: gr.ownerId
           });
           this.spawnParticles(gr.x, gr.y, "#84cc16", 20, 200, 0.5);
         } else {
-          this.explode(gr.x, gr.y, 120, 180, "#fb923c");
+          this.explode(gr.x, gr.y, 120, 180, "#fb923c", void 0, gr.ownerId);
         }
       } else next.push(gr);
     }
@@ -5286,7 +5290,8 @@ var GameEngine = class {
           vy: sim.vy,
           life: sim.fuse,
           fuse: sim.fuse,
-          kind: "glue"
+          kind: "glue",
+          ownerId: this.activeId
         });
         break;
       }
@@ -5299,7 +5304,8 @@ var GameEngine = class {
           vy: sim.vy,
           life: sim.fuse,
           fuse: sim.fuse,
-          kind: "fire"
+          kind: "fire",
+          ownerId: this.activeId
         });
         break;
       }
@@ -5312,7 +5318,8 @@ var GameEngine = class {
           vy: sim.vy,
           life: sim.fuse,
           fuse: sim.fuse,
-          kind: "poison"
+          kind: "poison",
+          ownerId: this.activeId
         });
         break;
       }
@@ -5801,7 +5808,7 @@ var GameEngine = class {
             const q = c.player;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if (Math.hypot(q.x - fx.x, q.y - fx.y) < fx.radius + q.size) {
-              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, void 0, 0, 0, -1);
+              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, void 0, 0, 0, fx.ownerId ?? -1);
             }
           }
         }
@@ -6155,7 +6162,7 @@ var GameEngine = class {
           const vName = victim.id === this.selfPid ? "\u4F60" : victim.name;
           this.addKillFeed(kName, vName, _b?.weapon, killer);
           if (killer.id === this.selfPid || this.mode === "local" && killer.id === 0) {
-            this.addScoreFeed("\u51FB\u6740\u5F97\u5206", 250);
+            this.addScoreFeed("\u6DD8\u6C70", 250, vName, 250, killer.kills);
           }
           if (killer.id === this.selfPid || this.mode === "local" && killer.id === 0) {
             this.banner = { text: `\u51FB\u6740 ${vName}\uFF01`, t: 1.6 };
@@ -6172,7 +6179,7 @@ var GameEngine = class {
         this.kills += 1;
         this.score += 250;
         this.addKillFeed("\u4F60", this.peerName || "\u5BF9\u624B", _b?.weapon);
-        this.addScoreFeed("\u51FB\u6740\u5F97\u5206", 250);
+        this.addScoreFeed("\u6DD8\u6C70", 250, this.peerName || "\u5BF9\u624B", 250, this.kills);
         this.banner = { text: `\u51FB\u6740 ${this.peerName || "\u5BF9\u624B"}\uFF01`, t: 1.6 };
       } else {
         this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${RESPAWN_TIME} \u79D2\u540E\u590D\u6D3B`, t: 1.6 };
@@ -6748,8 +6755,8 @@ var GameEngine = class {
     this.lastGadget = player.lastGadget ?? 0;
     this.gadgets = gadgets.length ? gadgets : this.gadgets;
     this.gadgetCd = gadgetCd;
-    this.activeId = player === this.player ? this.selfPid : this.peerPid;
-    this.weaponStates = player === this.player ? sWs : this.foeWeaponStates;
+    this.activeId = player === sp ? this.selfPid : this.peerPid;
+    this.weaponStates = player === sp ? sWs : this.foeWeaponStates;
     for (const [k, v] of this.gadgetCd) {
       if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
     }
@@ -7647,7 +7654,8 @@ var GameEngine = class {
           vy: Math.sin(a) * 420,
           life: 0.55,
           fuse: 0.55,
-          kind: "frag"
+          kind: "frag",
+          ownerId: this.activeId
         });
         break;
       }
@@ -7785,10 +7793,10 @@ var GameEngine = class {
       // the top base (this.enemyBase); the creator (pid 1) defends the bottom
       // one (this.base). Use selfPid (not mode) so the authoritative path — where
       // BOTH peers run as "guest" — still orients each client correctly.
-      baseHp: Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)),
-      baseMaxHp: this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)),
-      enemyBaseMaxHp: this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp,
+      baseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)) : 0,
+      baseMaxHp: this.base ? this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp : 0,
+      enemyBaseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)) : 0,
+      enemyBaseMaxHp: this.base ? this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp : 0,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,
@@ -7797,7 +7805,7 @@ var GameEngine = class {
       banner: this.banner ? this.banner.text : null,
       kills: this.isDM ? this.mode === "local" ? this.combatants[0]?.kills ?? 0 : this.combatants.find((c) => c.id === this.selfPid)?.kills ?? 0 : this.kills,
       gold: this.gold,
-      scoreFeed: this.scoreFeed.map((f) => ({ id: f.id, text: f.text, score: f.score })),
+      scoreFeed: this.scoreFeed.map((f) => ({ id: f.id, text: f.text, score: f.score, victimName: f.victimName, subScore: f.subScore, totalKills: f.totalKills })),
       killFeed: this.killFeed.map((f) => ({ id: f.id, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,

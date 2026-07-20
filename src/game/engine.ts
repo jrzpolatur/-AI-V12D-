@@ -1226,7 +1226,7 @@ export class GameEngine {
           player: this.mode === "host" ? this.player : this.foe,
           character: this.mode === "host" ? this.character : this.foeChar!,
           outfit: this.mode === "host" ? this.outfit : this.foeOutfit!,
-          skill: this.mode === "host" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          skill: this.mode === "host" ? this.skill : getSkill(this.peerLoadout?.skillId ?? "dash"),
           guns: this.mode === "host" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "host" ? this.gunIndex : (this.foe.gunIndex ?? 0),
           weaponStates: this.mode === "host" ? this.weaponStates : this.foeWeaponStates,
@@ -1245,7 +1245,7 @@ export class GameEngine {
           player: this.mode === "guest" ? this.player : this.foe,
           character: this.mode === "guest" ? this.character : this.foeChar!,
           outfit: this.mode === "guest" ? this.outfit : this.foeOutfit!,
-          skill: this.mode === "guest" ? this.skill : getSkill(this.foe.skillId ?? "dash"),
+          skill: this.mode === "guest" ? this.skill : getSkill(this.peerLoadout?.skillId ?? "dash"),
           guns: this.mode === "guest" ? this.guns : this.foeGuns,
           gunIndex: this.mode === "guest" ? this.gunIndex : (this.foe.gunIndex ?? 0),
           weaponStates: this.mode === "guest" ? this.weaponStates : this.foeWeaponStates,
@@ -6495,10 +6495,10 @@ export class GameEngine {
       // the top base (this.enemyBase); the creator (pid 1) defends the bottom
       // one (this.base). Use selfPid (not mode) so the authoritative path — where
       // BOTH peers run as "guest" — still orients each client correctly.
-      baseHp: Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)),
-      baseMaxHp: this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp,
-      enemyBaseHp: Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)),
-      enemyBaseMaxHp: this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp,
+      baseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.enemyBase.hp : this.base.hp)) : 0,
+      baseMaxHp: this.base ? (this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp) : 0,
+      enemyBaseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)) : 0,
+      enemyBaseMaxHp: this.base ? (this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp) : 0,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       paused: this.paused,

@@ -55,6 +55,8 @@ const initialHud: HudState = {
   banner: null,
   kills: 0,
   gold: 0,
+  scoreFeed: [],
+  killFeed: [],
   bowChargePct: 0,
   shieldHp: null,
   shieldMaxHp: null,

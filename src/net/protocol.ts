@@ -96,7 +96,7 @@ export interface SnapGrenade {
   vy: number;
   life: number;
   fuse: number;
-  kind: "frag" | "glue" | "fire";
+  kind: "frag" | "glue" | "fire" | "poison";
 }
 
 /** A deployed gadget (turret / mine / healing station) mirrored to the guest. */
