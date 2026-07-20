@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import LoadoutScreen from "./components/LoadoutScreen";
 import GameScreen from "./components/GameScreen";
 import LobbyScreen from "./components/LobbyScreen";
+import MainMenuExtras from "./components/MainMenuExtras";
 import { Net } from "./net/Net";
 import type { NetMode } from "./net/protocol";
 import type { Loadout } from "./game/engine";
@@ -113,6 +114,9 @@ export default function App() {
         draggable={false}
       />
 
+      {/* 右上角：菜单按钮（公告 + 设置） */}
+      <MainMenuExtras announce={announce} />
+
       <div className="relative z-10 flex min-h-screen w-full flex-col items-center px-6 pt-16 sm:pt-24">
         {/* 进入游戏方块（靠上方） */}
         <div className="w-full max-w-md rounded-2xl border border-white/15 bg-white/10 p-6 shadow-2xl backdrop-blur-md">
@@ -139,21 +143,6 @@ export default function App() {
             </div>
           )}
         </div>
-
-        {/* 公告 / 消息（连接服务器后自动显示） */}
-        {announce && (
-          <div
-            className="w-full max-w-md rounded-2xl border border-amber-300/30 bg-black/35 p-4 text-center shadow-lg backdrop-blur-md"
-            style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
-          >
-            <div className="mb-1 text-xs font-bold tracking-[0.3em] text-amber-300/90">
-              📢 公告
-            </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-amber-50">
-              {announce}
-            </p>
-          </div>
-        )}
 
         {/* 底部小字 */}
         <p
