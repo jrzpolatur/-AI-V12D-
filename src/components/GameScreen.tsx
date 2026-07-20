@@ -674,13 +674,27 @@ export default function GameScreen({
           {hud.scoreFeed.map((sf) => (
             <div
               key={sf.id}
-              className="flex items-center gap-2 text-center animate-score-pop"
-              style={{
-                filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.85))"
-              }}
+              className="flex flex-col items-center animate-score-pop"
+              style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.85))" }}
             >
-              <span className="text-xl font-black text-amber-400 font-mono">+{sf.score}</span>
-              <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">{sf.text}</span>
+              {sf.victimName ? (
+                <>
+                  <div className="flex items-center gap-2 text-2xl font-black mb-1">
+                    <span className="text-slate-100">{sf.text}</span>
+                    <span className="text-red-500 uppercase">{sf.victimName}</span>
+                    <span className="text-yellow-400 font-mono">${sf.score}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm font-bold text-slate-200">
+                    <span>淘汰数 {sf.totalKills}</span>
+                    <span className="text-amber-400 font-mono">+{sf.subScore}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-black text-amber-400 font-mono">+{sf.score}</span>
+                  <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">{sf.text}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>

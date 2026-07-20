@@ -130,7 +130,7 @@ export interface HudState {
   banner: string | null;
   kills: number;
   gold: number;
-  scoreFeed: { id: number; text: string; score: number }[];
+  scoreFeed: { id: number; text: string; score: number; victimName?: string; subScore?: number; totalKills?: number }[];
   killFeed: { id: number; killerName: string; victimName: string; weaponIconShape: string; weaponGlow: string }[];
   /** bow charge 0..1 (0 when not drawing) */
   bowChargePct: number;
@@ -412,6 +412,7 @@ interface Effect {
   style?: string;
   dirX?: number;
   dirY?: number;
+  ownerId?: number;
 }
 
 interface Pickup {
@@ -431,6 +432,7 @@ interface Grenade {
   life: number;
   fuse: number;
   kind: "frag" | "glue" | "fire" | "poison";
+  ownerId?: number;
 }
 
 interface Wall {
@@ -678,14 +680,14 @@ export class GameEngine {
   private wave = 0;
   private waveTimer = 0;
   private spawnTimer = 0;
-  public scoreFeed: { id: number; text: string; score: number; timer: number }[] = [];
+  public scoreFeed: { id: number; text: string; score: number; timer: number; victimName?: string; subScore?: number; totalKills?: number }[] = [];
   public killFeed: { id: number; killerName: string; victimName: string; weaponIconShape: string; weaponGlow: string; timer: number }[] = [];
   private nextScoreFeedId = 0;
   private nextKillFeedId = 0;
 
-  addScoreFeed(text: string, score: number) {
+  addScoreFeed(text: string, score: number, victimName?: string, subScore?: number, totalKills?: number) {
     if (this.gameMode === "biohazard") return;
-    if (text === "伤害击中") {
+    if (text === "伤害击中" && !victimName) {
       const existing = this.scoreFeed.find(f => f.text === "伤害击中" && f.timer > 0.5);
       if (existing) {
         existing.score += score;
@@ -698,7 +700,10 @@ export class GameEngine {
       id: this.nextScoreFeedId++,
       text,
       score,
-      timer: 2.0,
+      timer: 3.5, // slightly longer for kill feed
+      victimName,
+      subScore,
+      totalKills,
     });
     if (this.scoreFeed.length > 4) {
       this.scoreFeed.shift();
@@ -3484,6 +3489,7 @@ export class GameEngine {
             color: "#fb923c",
             dps: 90,
             tickT: 0,
+            ownerId: gr.ownerId,
           });
           this.spawnParticles(gr.x, gr.y, "#fb923c", 20, 200, 0.5);
         } else if (gr.kind === "poison") {
@@ -3499,10 +3505,11 @@ export class GameEngine {
             dps: 60,
             slow: 0.5,
             tickT: 0,
+            ownerId: gr.ownerId,
           });
           this.spawnParticles(gr.x, gr.y, "#84cc16", 20, 200, 0.5);
         } else {
-          this.explode(gr.x, gr.y, 120, 180, "#fb923c");
+          this.explode(gr.x, gr.y, 120, 180, "#fb923c", undefined, gr.ownerId);
         }
       } else next.push(gr);
     }
@@ -3638,6 +3645,7 @@ export class GameEngine {
           life: sim.fuse,
           fuse: sim.fuse,
           kind: "glue",
+          ownerId: this.activeId,
         });
         break;
       }
@@ -3652,6 +3660,7 @@ export class GameEngine {
           life: sim.fuse,
           fuse: sim.fuse,
           kind: "fire",
+          ownerId: this.activeId,
         });
         break;
       }
@@ -3666,6 +3675,7 @@ export class GameEngine {
           life: sim.fuse,
           fuse: sim.fuse,
           kind: "poison",
+          ownerId: this.activeId,
         });
         break;
       }
@@ -4207,8 +4217,8 @@ export class GameEngine {
             const q = c.player;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if (Math.hypot(q.x - fx.x, q.y - fx.y) < fx.radius + q.size) {
-              // cloud damage has no single owner — credit nobody (attackerId -1)
-              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, undefined, 0, 0, -1);
+              // pass the effect ownerId (if any) so kills are properly credited
+              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, undefined, 0, 0, fx.ownerId ?? -1);
             }
           }
         }
@@ -4611,7 +4621,7 @@ export class GameEngine {
           
           this.addKillFeed(kName, vName, _b?.weapon, killer);
           if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
-            this.addScoreFeed("击杀得分", 250);
+            this.addScoreFeed("淘汰", 250, vName, 250, killer.kills);
           }
 
           if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
@@ -4631,7 +4641,7 @@ export class GameEngine {
         this.kills += 1;
         this.score += 250;
         this.addKillFeed("你", this.peerName || "对手", _b?.weapon);
-        this.addScoreFeed("击杀得分", 250);
+        this.addScoreFeed("淘汰", 250, this.peerName || "对手", 250, this.kills);
         this.banner = { text: `击杀 ${this.peerName || "对手"}！`, t: 1.6 };
       } else {
         this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
@@ -6328,6 +6338,7 @@ export class GameEngine {
           life: 0.55,
           fuse: 0.55,
           kind: "frag",
+          ownerId: this.activeId,
         });
         break;
       }
@@ -6496,7 +6507,7 @@ export class GameEngine {
       banner: this.banner ? this.banner.text : null,
       kills: this.isDM ? (this.mode === "local" ? this.combatants[0]?.kills ?? 0 : this.combatants.find(c => c.id === this.selfPid)?.kills ?? 0) : this.kills,
       gold: this.gold,
-      scoreFeed: this.scoreFeed.map(f => ({ id: f.id, text: f.text, score: f.score })),
+      scoreFeed: this.scoreFeed.map(f => ({ id: f.id, text: f.text, score: f.score, victimName: f.victimName, subScore: f.subScore, totalKills: f.totalKills })),
       killFeed: this.killFeed.map(f => ({ id: f.id, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
