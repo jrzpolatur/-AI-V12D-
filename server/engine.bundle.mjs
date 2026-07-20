@@ -2667,6 +2667,7 @@ var GameEngine = class {
   remoteInput = null;
   lastSnap = null;
   seenFx = /* @__PURE__ */ new Set();
+  newSnapArrived = false;
   snapAccum = 0;
   inpAccum = 0;
   /** the opponent avatar (simulated on host, mirrored on guest) */
@@ -3877,7 +3878,10 @@ var GameEngine = class {
     }
     if (this.mode !== "local" && this.net) this.pumpNet();
     if (this.authoritative) {
-      this.applySnapshot();
+      if (this.newSnapArrived) {
+        this.applySnapshot();
+        this.newSnapArrived = false;
+      }
       let dx = 0;
       let dy = 0;
       if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) dy -= 1;
@@ -3939,12 +3943,18 @@ var GameEngine = class {
           this.sendSnapshot();
         }
       } else if (this.mode === "guest") {
-        this.applySnapshot();
+        if (this.newSnapArrived) {
+          this.applySnapshot();
+          this.newSnapArrived = false;
+        }
       }
       return;
     }
     if (this.mode === "guest") {
-      this.applySnapshot();
+      if (this.newSnapArrived) {
+        this.applySnapshot();
+        this.newSnapArrived = false;
+      }
       let dx = 0;
       let dy = 0;
       if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) dy -= 1;
@@ -5092,37 +5102,39 @@ var GameEngine = class {
             const q = c.player;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if (this.hitsPlayer(b, q)) {
-              this.damagePlayerEntity(q, b.damage, b, 0, 0, b.ownerId);
+              this.damagePlayerEntity(q, b.damage, b, 0, 0, oid);
               if (b.explosive)
-                this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, b.ownerId);
+                this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
               dead = true;
               break;
             }
           }
         } else if (b.owner === "foe") {
+          const oid = b.ownerId ?? 2;
           if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
-            this.damagePlayerEntity(this.player, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            this.damagePlayerEntity(this.player, b.damage, b, 0, 0, oid);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
             dead = true;
           } else {
             const bb = this.base;
             const rr = bb.radius + b.size;
             if ((bb.x - b.x) ** 2 + (bb.y - b.y) ** 2 <= rr * rr) {
               this.damageBase(b.damage);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
               dead = true;
             }
           }
         } else {
+          const oid = b.ownerId ?? 1;
           const eb = this.enemyBase;
           const rr = eb.radius + b.size;
           if ((eb.x - b.x) ** 2 + (eb.y - b.y) ** 2 <= rr * rr) {
             this.damageEnemyBase(b.damage);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
             dead = true;
           } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
-            this.damagePlayerEntity(this.foe, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            this.damagePlayerEntity(this.foe, b.damage, b, 0, 0, oid);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
             dead = true;
           }
         }
@@ -6256,8 +6268,10 @@ var GameEngine = class {
     if (!this.net) return;
     for (const m of this.net.drainGameMsgs()) {
       if (m.t === "inp") this.remoteInput = m.input;
-      else if (m.t === "snap") this.lastSnap = m.snap;
-      else if (m.t === "hello") {
+      else if (m.t === "snap") {
+        this.lastSnap = m.snap;
+        this.newSnapArrived = true;
+      } else if (m.t === "hello") {
         this.peerName = m.name;
         this.peerLoadout = m.loadout;
         this.applyPeerLoadout();

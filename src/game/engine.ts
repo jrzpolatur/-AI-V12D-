@@ -640,6 +640,7 @@ export class GameEngine {
   private remoteInput: InputFrame | null = null;
   private lastSnap: Snapshot | null = null;
   private seenFx = new Set<number>();
+  private newSnapArrived = false;
   private snapAccum = 0;
   private inpAccum = 0;
   /** the opponent avatar (simulated on host, mirrored on guest) */
@@ -2023,7 +2024,10 @@ export class GameEngine {
     // mirrors. No local world simulation runs here (the server is authoritative),
     // which keeps the client light and in lock-step with the server's view.
     if (this.authoritative) {
-      this.applySnapshot();
+      if (this.newSnapArrived) {
+        this.applySnapshot();
+        this.newSnapArrived = false;
+      }
       
       // Client-side prediction for local player movement in authoritative client
       let dx = 0;
@@ -2095,14 +2099,20 @@ export class GameEngine {
           this.sendSnapshot();
         }
       } else if (this.mode === "guest") {
-        this.applySnapshot();
+        if (this.newSnapArrived) {
+          this.applySnapshot();
+          this.newSnapArrived = false;
+        }
       }
       return;
     }
 
     // ---- guest: no local simulation, just mirror the host snapshot ----
     if (this.mode === "guest") {
-      this.applySnapshot();
+      if (this.newSnapArrived) {
+        this.applySnapshot();
+        this.newSnapArrived = false;
+      }
       
       // Client-side prediction for local player movement
       let dx = 0;
@@ -3419,38 +3429,40 @@ export class GameEngine {
             const q = c.player;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if (this.hitsPlayer(b, q)) {
-              this.damagePlayerEntity(q, b.damage, b, 0, 0, b.ownerId);
+              this.damagePlayerEntity(q, b.damage, b, 0, 0, oid);
               if (b.explosive)
-                this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, b.ownerId);
+                this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
               dead = true;
               break;
             }
           }
         } else if (b.owner === "foe") {
+          const oid = b.ownerId ?? 2;
           if (!(this.player.deadTimer && this.player.deadTimer > 0) && this.hitsPlayer(b, this.player)) {
-            this.damagePlayerEntity(this.player, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            this.damagePlayerEntity(this.player, b.damage, b, 0, 0, oid);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
             dead = true;
           } else {
             const bb = this.base;
             const rr = bb.radius + b.size;
             if ((bb.x - b.x) ** 2 + (bb.y - b.y) ** 2 <= rr * rr) {
               this.damageBase(b.damage);
-              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+              if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
               dead = true;
             }
           }
         } else {
+          const oid = b.ownerId ?? 1;
           // enemy base (foe's base)
           const eb = this.enemyBase;
           const rr = eb.radius + b.size;
           if ((eb.x - b.x) ** 2 + (eb.y - b.y) ** 2 <= rr * rr) {
             this.damageEnemyBase(b.damage);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
             dead = true;
           } else if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0) && this.hitsPlayer(b, this.foe)) {
-            this.damagePlayerEntity(this.foe, b.damage, b);
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow);
+            this.damagePlayerEntity(this.foe, b.damage, b, 0, 0, oid);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage * 0.5, b.glow, b.weapon, oid);
             dead = true;
           }
         }
@@ -4732,7 +4744,10 @@ export class GameEngine {
     if (!this.net) return;
     for (const m of this.net.drainGameMsgs()) {
       if (m.t === "inp") this.remoteInput = m.input;
-      else if (m.t === "snap") this.lastSnap = m.snap;
+      else if (m.t === "snap") {
+        this.lastSnap = m.snap;
+        this.newSnapArrived = true;
+      }
       else if (m.t === "hello") {
         this.peerName = m.name;
         this.peerLoadout = m.loadout as Loadout;
