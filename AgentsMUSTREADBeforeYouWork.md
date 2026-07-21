@@ -183,3 +183,32 @@
 * 武器图标 `drawWeaponIcon()`（~1421 起）：rocket ~1713、poison_mist ~2147、lightning_whip ~2212、dual_blades ~2238、thrust_sword ~2261。
 * 道具/部署物图标 `drawGadgetIcon()`（~2298 起）：turret_mg ~2339、turret_cannon ~2371、mine_explosive ~2398、mine_poison ~2418、mine_fire ~2463、glue_grenade ~2494、fire_grenade ~2525、poison_grenade ~2590。
 
+---
+
+## 10. 构建/部署陷阱：首屏黑屏、加载慢、以及"卡在加载界面"三大坑（vite-plugin-singlefile）
+
+> [!CAUTION]
+> **血泪教训（v0.4.33 引入缺陷、v0.4.34 修复）**：首屏加载慢/黑屏容易修，但最容易踩的隐藏大坑是——**改完构建后整个应用卡在加载界面进不去**。下面三条都来自真实线上事故。
+
+### 10.1 坑一：大资源内联 → 首屏慢 / 黑屏
+* **症状**：首次加载有概率（约 30%）黑屏，且首屏加载时间长。
+* **根因**：`vite-plugin-singlefile` 默认 `useRecommendedBuildConfig:true` → 强制 `assetsInlineLimit=()=>true`，把 `home-bg.png`（**5.55 MB**）base64 内联进 `dist/index.html`，首屏 HTML 变成 6MB+。加上 `#root` 初始为空、`body` 背景深色 `#0b0c22`（`src/index.css`），JS 未挂载完时露出深色 body = 像黑屏。
+* **正确修复（落地 v0.4.34）**：把大图从 `src/assets` **移到 `public/`**，在 `App.tsx` 用**字面量字符串** `const homeBg = "home-bg.png"` 引用（不要 `import homeBg from "./assets/..."`）。这样图作为独立文件 `dist/home-bg.png` 输出（不内联），HTML 只内联 JS+CSS（~0.6MB）。`index.html` 的 `#root` 内保留首屏 splash（品牌+spinner），JS 挂载后由 React 自动替换。
+
+### 10.2 坑二（最致命）：`import.meta` 在经典脚本里 = 整个应用卡死
+* **症状（v0.4.33 真实事故）**：网页端**卡在加载界面（"加载中…"）进不去**，看似没进度但其实是 React 根本没挂载。
+* **根因链（必须理解）**：
+  1. 构建脚本 `scripts/fix-file-protocol.mjs` 会扫描产物，把内联脚本的 `<script type="module">` **降级成经典 `<script>`**（目的是让 `file://` 双击直接打开也能跑，模块脚本在 file:// 下会被 CORS 拦）。
+  2. `v0.4.33` 给 `vite.config.ts` 加了 `base:"./"`，且 `App.tsx` 用 `import homeBg from "./assets/home-bg.png"`。Vite 对 `import` 进来的资源在 `base:"./"` 下用 `new URL("home-bg-*.png", import.meta.url)` 生成路径 → 内联 bundle 里出现了 **`import.meta`**（模块专用语法）。
+  3. **经典 `<script>` 里写 `import.meta` 直接抛 `SyntaxError`** → 整段脚本不执行 → React 永不挂载 → splash 永远卡着。
+* **铁律（牢记）**：**绝不要在 file://-safe 的 singlefile 构建里用 `base:"./"` + `import` 资源**（会产生 `import.meta`）。需要大资源 → 放 `public/` + 字面量字符串引用（见 10.1）。验证脚本：`grep` 产物确认无 `import.meta`、无 top-level `import/export`、无动态 `import()`，且脚本标签是普通 `<script>` 位于 `</body>` 前。
+* **`vite.config.ts` 保持默认即可**：`plugins:[react(), tailwindcss(), viteSingleFile()]`，**不要**加 `base`、`assetsInlineLimit`、`inlineDynamicImports`、`useRecommendedBuildConfig:false` 这些花活——它们只会引入 10.2 的致命回归。
+
+### 10.3 坑三：动态导入 + singlefile 在 file:// 下失效
+* `App.tsx` 里用 `React.lazy(()=>import("./components/GameScreen"))` 做代码分割，在 singlefile 构建 + file:// 双击场景下，动态 chunk 会被 CORS 拦截导致进不了游戏。v0.4.34 已改回**静态 `import GameScreen`**（重型引擎 JS ~0.5MB，首屏解析很快，没必要懒加载）。
+
+### 10.4 配套确认
+* `server/prod.mjs` 与 `server/authoritative.mjs` 的 `STATIC_TYPES` 已含 `.png/.css/.js` 等 MIME，独立背景图/音频能被正确以 `image/png`、`audio/wav` 提供（否则变 `octet-stream` 不显示/不播放）。音频 wav 在 `public/`，交互时才 `new Audio()` 加载，不阻塞首屏。
+* `dist/` 被 `.gitignore` 忽略；部署时由服务器重新 `npm run build` 生成。`server/engine.bundle.mjs` 是 `build:engine`（esbuild 打包 `src/game/engine.ts`）产物，会随仓库提交，prod server 跑的是它。
+* **禁忌**：不要再把大资源塞回内联；不要给 singlefile 构建加 `base:"./"` 或动态导入。
+
