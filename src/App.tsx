@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import LoadoutScreen from "./components/LoadoutScreen";
 import LobbyScreen from "./components/LobbyScreen";
 import MainMenuExtras from "./components/MainMenuExtras";
@@ -6,14 +6,17 @@ import { Net } from "./net/Net";
 import type { NetMode } from "./net/protocol";
 import type { Loadout } from "./game/engine";
 import { useOnlineCount } from "./hooks/useOnlineCount";
-import homeBg from "./assets/home-bg.png";
+// Background image lives in /public and is referenced by a plain (relative)
+// path string so Vite does NOT run it through the asset pipeline. Going through
+// `import homeBg from "./assets/..."` + a relative `base` makes Vite emit
+// `import.meta.url`, which the file://-safe build turns into a classic <script>
+// — and `import.meta` is a SyntaxError in classic scripts, breaking the whole
+// app (React never mounts → stuck on the loading splash).
+const homeBg = "home-bg.png";
 
 import { tabLock } from "./utils/tabLock";
 
-// Lazily load the game screen so the heavy engine/draw/sound modules are NOT
-// parsed+executed on the main menu's first load (they only run when the player
-// actually starts a match). Keeps the initial bundle lean and the menu snappy.
-const GameScreen = lazy(() => import("./components/GameScreen"));
+import GameScreen from "./components/GameScreen";
 
 type Screen = "menu" | "loadout" | "lobby" | "game";
 
@@ -70,17 +73,15 @@ export default function App() {
 
   if (screen === "game") {
     return (
-      <Suspense fallback={null}>
-        <GameScreen
-          loadout={loadout}
-          mode={mode}
-          net={mode === "local" ? null : net}
-          onExit={() => {
-            tabLock.release();
-            setScreen("menu");
-          }}
-        />
-      </Suspense>
+      <GameScreen
+        loadout={loadout}
+        mode={mode}
+        net={mode === "local" ? null : net}
+        onExit={() => {
+          tabLock.release();
+          setScreen("menu");
+        }}
+      />
     );
   }
 
@@ -111,7 +112,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#0b0c22]">
       {/* 首页背景图（不叠加暗化遮罩，保持原图亮度） */}
       <img
         src={homeBg}
