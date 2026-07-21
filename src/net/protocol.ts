@@ -35,6 +35,7 @@ export interface InputFrame {
   weaponSwitch: boolean; // E pressed (one-shot)
   skill: boolean; // Q pressed (one-shot)
   reload: boolean; // R pressed (one-shot)
+  secondaryFiring?: boolean;
 }
 
 /** Compact player state for snapshots. */

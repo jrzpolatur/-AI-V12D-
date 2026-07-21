@@ -1,6 +1,6 @@
 # 🚨 AI Agents MUST READ Before You Work 🚨
 
-欢迎！如果你是一个即将对这个 2D 射击游戏代码库进行开发、重构或修 Bug 的 AI Agent，**请务必在开始动手前仔细阅读本文档**。这里记录了前任 Agent 们在血与泪的调试中总结出的架构陷阱、刁钻 Bug 以及排查指南。
+欢迎！如果你是一个即将对这个 2D 射击游戏代码库进行开发、重构或修 Bug 的 AI Agent，**请务必在开始动手前仔细阅读本文档**。这里记录了前任 Agent 们在token与泪的调试中总结出的架构陷阱、刁钻 Bug 以及排查指南。
 
 ## 1. 核心架构认知
 这是一个**权威服务器（Authoritative Server）+ 客户端预测（Client-side Prediction）**架构的游戏。
@@ -83,4 +83,103 @@
 * **Canvas 游戏循环挂载** (`lines ~170 - 240`)：创建 `GameEngine` 实例并绑定 `requestAnimationFrame`。
 * **“等待双方同步”蒙层 (`hud.connecting`)** (`lines ~608 - 622`)：当 `this.peerReady` 为 false 时弹出的加载动画。
 * **击杀与得分 Feed UI (Battlefield 风格)** (`lines ~670 - 740`)：显示 `淘汰 玩家名 $250` 以及 `淘汰数 X +250`。
+
+---
+
+## 6. 武器与道具建模 / 特效模式（务必分清两套绘制）
+
+游戏里每把武器有**两套完全独立的绘制入口**，改一处不影响另一处，别搞混：
+
+* **世界建模 `drawWeapon`（`src/game/draw.ts`，~700 行区间）**：角色手上握着的武器在游戏世界里的样子（会跟随玩家 `translate/rotate`）。每把枪一个 `case`。
+* **UI 图标 `drawWeaponIcon`（`src/game/draw.ts`，~2200 行区间，紧接 `case "lightning_whip":`）**：选装备界面 / HUD 里的小图标。**同样每把枪一个 `case`**。
+
+> [!CAUTION]
+> **血泪教训——武器图标变成一个圆**：
+> 若 `drawWeaponIcon` 里**缺了某把武器的 `case`**，会 fall through 到 `default` 分支，`default` 画的是一个圆。
+> 曾经 `dual_blades`（双刀）与 `thrust_sword`（长剑）在世界建模 `drawWeapon` 里明明有独立造型，但图标却是圆——就是因为 `drawWeaponIcon` 漏写了对应 `case`。
+> **结论：新增或改武器时，`drawWeapon` 和 `drawWeaponIcon` 两处 `case` 都要补齐，否则图标默认变圆。**
+
+### 图标绘制辅助函数模式
+`drawWeaponIcon` 内提供两个闭包辅助函数，统一造型风格，请沿用：
+* `body(() => { ...path... })`：绘制武器主体（填充+描边+发光）。
+* `cutout(() => { ...path... })`：在主体上"抠"出握把、缠绕线等细节（挖空/叠加描边）。
+坐标系以图标中心 `(0,0)` 为原点，尺寸大约在 ±8 像素内。参考已实现的 `dual_blades`（交叉 X 形双刃 + 圆握把）、`thrust_sword`（斜向长剑刃 + 护手 `rect` + 握把缠绕线）。
+
+### 屏幕范围/技能指示器模式（如长剑冲刺）
+需要在屏幕上给玩家显示技能范围（冲刺走廊、攻击范围）时，在 `engine.ts` **本地玩家渲染块**（`if (p === this.player)` 内、`drawCharacter` 之前，~8969 行）绘制：
+1. `ctx.save()` → `translate(p.x, p.y)` → `rotate(p.angle)` 进入玩家局部坐标系。
+2. 用 `this.gun.chargeDashDist` / `chargeDashRange` 等武器数据画走廊矩形 + 虚线轮廓（`setLineDash`）。
+3. 用 `0.5 + 0.5*Math.sin(this.time*12)` 做呼吸/脉冲透明度动画。
+4. 终点画命中圆（`arc`）+ 箭头（三角）指示方向，最后 `ctx.restore()`。
+只在本地玩家渲染块画，避免污染其他玩家/服务端。
+
+## 7. 计分系统陷阱：小数伤害每帧舍入丢分
+
+> [!WARNING]
+> **血泪教训——击中计分与实际伤害不符**：
+> 原逻辑在 `damagePlayerEntity` 里对每帧伤害做 `Math.round(hpDiff)` 后加分。对于**连续/DoT/高频低伤武器**（燃烧、鞭子、快速多段），单帧伤害往往是小于 0.5 的小数，`Math.round` 直接归零，**这些伤害永远拿不到分**，导致总分远低于实际造成的伤害。
+
+**正确做法——浮点累加器 `awardDamageScore`**：
+* `Player` 接口加 `scoreAcc?: number;`；engine 类加 `private localScoreAcc = 0;`。
+* 每次造成伤害调用 `this.awardDamageScore(attackerId, dealt)`：把浮点伤害累加进 `scoreAcc`，累计 `>= 1` 时才 `Math.floor` 取整加进 `score`，余数留到下一次。这样小数伤害不会丢失。
+* PvE（`damageEnemy`）也要按**实际伤害**（`before - Math.max(hp,0)`，截断 overkill）累计给分，别只在击杀时给分。
+* `biohazard`（生化）模式不计伤害分，函数开头直接 return。
+
+**通用原则：任何"按累计量给整数奖励"的地方，都要用浮点累加器 + 取整留余，绝不能每帧 `Math.round`/`Math.floor` 后相加。**
+
+## 8. HUD 操作提示（`src/components/GameScreen.tsx`）
+* 键位说明集中在常量 `HUD_HINTS`（数组）。**新增键位绑定时记得同步更新这里**，否则玩家看不到。
+* 提示 UI：右上角 `?` 按钮 / 按 `H` 键切换完整操作面板（覆盖层 `z-[60]` 双列网格）；开局自动淡出的提示条（约 8 秒）。
+* 实际键位以 `engine.ts` 的按键处理为准（WASD/方向、鼠标左右键、Q/空格、E、R、1/2/3、滚轮、F、长按 V、P/Esc），改说明前先去 `engine.ts` 核对真实绑定，别照抄旧文档。
+
+---
+
+## 9. 特殊武器/道具"特别效果"实现位置速查
+
+> [!IMPORTANT]
+> **一条铁律先记住**：`draw.ts` 只画**武器造型/图标**；所有**战斗特效**（爆炸、火焰场、毒云、鞭击、挥砍、冲刺轨迹等运行时视觉）都在 **`engine.ts` 的 `drawEffects()`（~9213 行）** 和主渲染循环（~8467 行的场地字段渲染），**不在 `draw.ts`**。找特效逻辑别去 draw.ts 白费功夫。
+> 行号为大致定位，代码改动后会漂移，请以函数名为准搜索。
+
+### 9.1 武器特殊字段（`data/guns.json`）
+| 字段 | 武器 | 含义 |
+|---|---|---|
+| `chargeMin`/`chargeDashDamage`/`chargeDashDist`/`chargeDashRange` | thrust_sword | 突刺长剑：最小蓄力秒/冲刺伤害/冲刺距离px/命中半径 |
+| `whip:true` + `slowOnHit` | lightning_whip | 鞭子标记 + 命中减速时长 |
+| `comboLength`/`comboDamage` | dual_blades、spear | 连段数 / 各段伤害数组 |
+| `reflectRange`/`reflectSelfDamage` | dual_blades | 右键举刀反弹子弹半径 / 反弹自身承伤比 |
+| `meleeRange`/`meleeArc` | 所有近战 | 挥砍半径 / 弧度 |
+| `flameCone`/`flameRange`/`heatPerShot`/`coolRate` | flamethrower、poison_mist | 锥角/射程/过热增量/冷却 |
+| `slamDamage`/`explosionRadius` | hammer | 右键砸地伤害/半径 |
+| `explosive:true`/`explosionRadius`/`bounces` | mortar、rocket、mgl32、grenade | 爆炸标记/半径/反弹次数 |
+| `burst`/`burstSpread`/`wallPierceChance` | plasma_rifle | 三连发/散布/穿墙概率 |
+| `parallel`/`parallelGap`/`drift` | shak50 | 并排弹丸数/间距/扩散 |
+| `pierce` | sniper、drone、fcar 等 | 穿透目标数（99≈高穿透） |
+| `maxChargeTime`/`minChargeMult`/`maxChargeMult`/`drawSlowMult` | recurve_bow | 蓄力乘数与拉弓减速 |
+| `spinup`/`spinDown`/`spinMinMult` | gatling | 预热/降温曲线 |
+| `beamRange` | pulse | 激光束射程 |
+| `shieldHp`/`shieldArc`/`shieldDuration`/`shieldRechargeTime` | riot_shield | 防爆盾数值 |
+
+> 特效调色板：`engine.ts` ~11-16 行（whip/fire/poison/explosive/pierce 五套色）；武器分类 `getGunKind` ~20-29 行。
+
+### 9.2 特效运行逻辑（`engine.ts` 函数名 + 大致行号）
+* **突刺冲刺（thrust_sword）**：`thrustRelease()` ~3205（抬右键触发，读 chargeDash* 参数推 `slash` 特效）；`stepThrustDash(dt)` ~3243（每帧推进位移 + 沿走廊结算伤害）；开始蓄力 `onMouseDown` ~2269。**屏幕范围指示器**见第 6 章（本地玩家渲染块 ~8969）。
+* **火焰 DoT（flamethrower / fire 场地）**：`updateFlamethrower()` ~3407（锥形灼烧，给 `burnT`/`burnDps`，推 `flamecone`）；场地伤害结算 ~4796-4832（每 0.25s）；`burnT` 衰减 ~4594。
+* **毒气 DoT（poison_mist / 毒云）**：`updatePoisonMist()` ~3493（喷毒雾推 `poisoncloud`）；`applyPoison()` ~4874（停留越久 DPS 越高）；场地结算同 ~4796-4832。
+* **闪电鞭（lightning_whip）**：`fireMelee()` ~3042-3136（`whipToggle` 左右交替挥、推 `whip` 特效、命中设 `slowT = slowOnHit`）。
+* **双刀多段（dual_blades）**：右键举刀反弹 `onMouseDown` ~2258（设 `bladeRaising`/`bladeReflectRange`）；连段伤害在 `fireMelee()`（用 comboLength/comboDamage）。
+* **部署物（炮塔/地雷）**：`updateDeployables()` ~4324；炮塔锁定开火 ~4330-4383；地雷触发爆炸 ~4447，毒/火地雷推 `poisoncloud`/`firefield` ~4475-4490。
+* **爆炸（手雷/火箭/榴弹）**：`explode()` ~6890（推 `explosion`+`shock`，空间网格范围伤害，对部署物溅射）；`updateBullets()` ~3816 各 explosive 分支调用；`updateGrenades()` ~4067（落地生成 firefield/poisoncloud 或爆炸）。
+* **减速对移动的影响**：`updatePlayer` ~2405/2495/2677/2717（`slowT` 时移速 ×0.5）。
+* **主循环调用顺序**：~6233-6239 `updateBullets → updateGrenades → updateDeployables → … → updateEffects`。
+
+### 9.3 特效渲染位置（`engine.ts`，非 draw.ts）
+* **`drawEffects()`** ~9213：`explosion`(9218)/`shock`(9228)/`spawn`(9235)/`debris`(9241)/`coinburst`(9247)/`slash`(9294)/`saberswing`(9312)/`whip`(9349)/`slam`(9373)/`flamecone`(9388)/`glue`(9399)/`skillcast`(9405)。
+* **场地云渲染**（主循环）：`poisoncloud` ~8467-8494（浮动气泡）、`firefield` ~8495（火焰渐变）。
+* **`drawFlameCone()`**（引擎私有）~8863（锥形火焰视觉）。
+* 鞭击击杀特效：`spawnCoinBurstFX` ~4930（`style:"whip"`）。
+
+### 9.4 武器造型/图标（`draw.ts`，仅静态外形）
+* 造型 `drawWeapon()`（~45 起 case 分支）：rocket ~209、lightning_whip ~507（闪烁能量尾）、poison_mist ~660、dual_blades ~722（交叉 X 双刃）、thrust_sword ~763、通用近战刀身 ~314、mgl32 ~406。
+* 武器图标 `drawWeaponIcon()`（~1421 起）：rocket ~1713、poison_mist ~2147、lightning_whip ~2212、dual_blades ~2238、thrust_sword ~2261。
+* 道具/部署物图标 `drawGadgetIcon()`（~2298 起）：turret_mg ~2339、turret_cannon ~2371、mine_explosive ~2398、mine_poison ~2418、mine_fire ~2463、glue_grenade ~2494、fire_grenade ~2525、poison_grenade ~2590。
 

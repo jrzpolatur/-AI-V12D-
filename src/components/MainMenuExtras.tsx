@@ -92,6 +92,26 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
               )}
             </section>
 
+            {/* ---- Quick start guide ---- */}
+            <section className="mb-5">
+              <h3 className="mb-2 text-sm font-bold tracking-wider text-cyan-300">
+                ❓ 快速上手
+              </h3>
+              <ul className="space-y-1.5 text-xs leading-relaxed text-slate-300">
+                <li><b className="text-slate-100">目标</b>：消灭敌人、累计击杀与赏金，撑到回合结束。</li>
+                <li><b className="text-slate-100">移动</b>：WASD / 方向键；<b className="text-slate-100">瞄准</b>：鼠标。</li>
+                <li><b className="text-slate-100">射击</b>：鼠标左键（按住连射）。</li>
+                <li><b className="text-slate-100">近战奥义</b>：鼠标右键（长剑蓄力突刺、双刀举刀反弹子弹、锤子砸地）。</li>
+                <li><b className="text-slate-100">技能/冲刺</b>：Q 或 空格。</li>
+                <li><b className="text-slate-100">换武器</b>：1 / 2 / 3 或 滚轮；<b className="text-slate-100">装填</b>：R；<b className="text-slate-100">交互</b>：F。</li>
+                <li><b className="text-slate-100">暂停/菜单</b>：P 或 Esc；游戏中按 <b className="text-slate-100">H</b> 看完整操作。</li>
+                <li><b className="text-slate-100">模式</b>：单人训练 · 死斗 · 生化 · 赏金占领。</li>
+                <li className="rounded-lg border border-cyan-300/20 bg-cyan-500/10 p-2 text-cyan-100">
+                  🔊 音效提示：听到 <b>kill confirm</b> = 你成功击杀；<b>death</b> = 你被淘汰。
+                </li>
+              </ul>
+            </section>
+
             <div className="mb-4 h-px bg-white/10" />
 
             {/* ---- Settings ---- */}

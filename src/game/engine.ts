@@ -214,6 +214,30 @@ interface Player {
   slowT?: number;
   /** deathmatch combatant id this Player belongs to (for kill credit) */
   cid?: number;
+  // ---- dual blades (双刃): raise state + reflect params ----
+  /** right-click held -> blades raised: reflect bullets + 15% slow */
+  bladeRaising?: boolean;
+  bladeReflectRange?: number;
+  bladeReflectSelf?: number;
+  bladeReflectGlow?: string;
+  // ---- thrust longsword (突刺长剑): charge dash ----
+  /** right-click held -> charging the dash */
+  thrustCharging?: boolean;
+  /** accumulated charge time in seconds */
+  thrustCharge?: number;
+  /** dash currently travelling (deals damage along the path) */
+  thrustDashActive?: boolean;
+  /** enemy/player ids already hit by the current dash */
+  thrustHitIds?: Set<number>;
+  /** dash travel velocity (px/s) */
+  thrustDashVx?: number;
+  thrustDashVy?: number;
+  /** remaining dash distance (px) */
+  thrustDashLeft?: number;
+  /** dash direction (radians) */
+  thrustDashAngle?: number;
+  /** damage applied per enemy hit during the dash */
+  thrustDashDmg?: number;
 }
 
 /** A deathmatch combatant: a human or an AI bot, each carrying its own
@@ -243,6 +267,8 @@ interface Combatant {
   lastGadget: number;
   kills: number;
   score: number;
+  /** fractional score accumulator so continuous/DoT damage isn't rounded away */
+  scoreAcc?: number;
   // ---- bot brain state ----
   wander?: number;
   strafeDir?: number;
@@ -316,6 +342,8 @@ interface Bullet {
   lobPeak?: number;
   /** current height above ground for the z-axis arc (drawing only) */
   z?: number;
+  /** already reflected by a blade (so it won't be re-reflected) */
+  reflected?: boolean;
 }
 
 interface Enemy {
@@ -380,6 +408,9 @@ interface Enemy {
   cloudDamage?: number;
   /** what landed the killing blow — used to style the coin-burst FX (non-biohazard) */
   lastSrc?: { weapon: string; dx: number; dy: number };
+  name?: string;
+  burnOwnerId?: number;
+  poisonOwnerId?: number;
 }
 
 interface EnemyBullet {
@@ -419,7 +450,7 @@ interface Particle {
 }
 
 interface Effect {
-  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip" | "skillcast";
+  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip" | "skillcast" | "dual_slash";
   x: number;
   y: number;
   t: number;
@@ -590,6 +621,7 @@ const EMPTY_FRAME: InputFrame = {
   weaponSwitch: false,
   skill: false,
   reload: false,
+  secondaryFiring: false,
 };
 /** PvP: seconds a downed player waits before respawning */
 const RESPAWN_TIME = 4;
@@ -806,9 +838,11 @@ export class GameEngine {
 
   public activeScoreFeed: { totalScore: number; timer: number; events: { id: number; text: string; victimName?: string; subScore: number }[]; totalKills: number } | null = null;
   private nextScoreFeedEventId = 0;
+  /** fractional score accumulator for the local (non-combatant) player */
+  private localScoreAcc = 0;
 
   addScoreFeed(text: string, score: number, victimName?: string, subScore?: number, totalKills?: number) {
-    if (this.gameMode === "biohazard") return;
+    if (this.gameMode === "biohazard" && text === "伤害击中") return;
     
     if (!this.activeScoreFeed || this.activeScoreFeed.timer <= 0) {
       this.activeScoreFeed = {
@@ -837,6 +871,41 @@ export class GameEngine {
     }
     
     this.emit(true);
+  }
+
+  /**
+   * Award score equal to the ACTUAL damage dealt. Damage is accumulated as a
+   * float and flushed to the integer score feed only once it reaches >= 1, so
+   * continuous / damage-over-time weapons (beam, flame, poison, ...) no longer
+   * lose their per-frame fractional damage to Math.round() and end up scoring
+   * almost nothing despite dealing real damage.
+   */
+  private awardDamageScore(attackerId: number | undefined, dealt: number) {
+    if (this.gameMode === "biohazard") return;
+    if (dealt <= 0 || attackerId === undefined || attackerId < 0) return;
+    const killerC = this.combatants.find((c) => c.id === attackerId);
+    let acc: number;
+    if (killerC) {
+      killerC.scoreAcc = (killerC.scoreAcc ?? 0) + dealt;
+      acc = killerC.scoreAcc;
+    } else {
+      this.localScoreAcc += dealt;
+      acc = this.localScoreAcc;
+    }
+    if (acc >= 1) {
+      const whole = Math.floor(acc);
+      if (killerC) {
+        killerC.score += whole;
+        killerC.scoreAcc = acc - whole;
+      } else {
+        this.score += whole;
+        this.localScoreAcc = acc - whole;
+      }
+      const isLocal =
+        (this.mode === "local" && attackerId === 0) ||
+        (this.mode !== "local" && attackerId === this.selfPid);
+      if (isLocal) this.addScoreFeed("伤害击中", whole);
+    }
   }
 
   addKillFeed(killerName: string, victimName: string, weaponId?: string, killerC?: Combatant) {
@@ -1083,6 +1152,12 @@ export class GameEngine {
       // set shield HP to max when switching to a shield weapon
       if (this.gun.shieldMaxHp && this.player.shieldHp <= 0 && this.player.shieldCd <= 0) {
         this.player.shieldHp = this.gun.shieldMaxHp;
+      }
+      // sync to local combatant in deathmatch/cashout
+      const localPid = this.mode === "local" ? 0 : this.selfPid;
+      const localC = this.combatants.find((c) => c.id === localPid);
+      if (localC) {
+        localC.gunIndex = i;
       }
       this.emit(true);
     }
@@ -2182,6 +2257,25 @@ export class GameEngine {
     }
     if (e.button === 2) {
       this.secondaryFiring = true;
+      // ---- new melee weapons: custom right-click behaviors ----
+      if (this.gun.id === "dual_blades" && !this.paused && !this.gameOver) {
+        const p = this.player;
+        const g = this.gun;
+        p.bladeRaising = true;
+        p.bladeReflectRange = g.reflectRange ?? 96;
+        p.bladeReflectSelf = g.reflectSelfDamage ?? 0.05;
+        p.bladeReflectGlow = g.glow;
+        sound.swing();
+        e.preventDefault();
+        return;
+      }
+      if (this.gun.id === "thrust_sword" && !this.paused && !this.gameOver) {
+        const p = this.player;
+        p.thrustCharging = true;
+        p.thrustCharge = 0;
+        e.preventDefault();
+        return;
+      }
       // guest only records intent; host simulates the skill/shield/slam
       if (this.mode === "guest") {
         this.pendSkill = true;
@@ -2189,6 +2283,7 @@ export class GameEngine {
         e.preventDefault();
         return;
       }
+      // ---- default right-click behaviors ----
       if (this.gun.id === "hammer" &&
         this.player.slamCd <= 0 &&
         !this.paused &&
@@ -2209,6 +2304,10 @@ export class GameEngine {
       this.semiAutoLatch = false;
     } else if (e.button === 2) {
       this.secondaryFiring = false;
+      // release the thrust longsword dash (if it was charging)
+      if (this.player.thrustCharging) this.thrustRelease();
+      // lower the dual blades
+      this.player.bladeRaising = false;
     }
   }
 
@@ -2307,15 +2406,21 @@ export class GameEngine {
       dy /= vlen;
 
       const p = this.player;
+      if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
           p.dashTime -= dt;
           p.x += p.dashVx * dt;
           p.y += p.dashVy * dt;
+        } else if (p.thrustDashActive) {
+          this.stepThrustDash(dt);
         } else {
+          const meleeMoveMult =
+            (this.gun.weaponClass === "melee" ? 1.23 : 1) *
+            (p.bladeRaising ? 0.85 : 1);
           const slow = (p.bowDrawing ? (this.gun.drawSlowMult ?? 1) : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
-          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
-          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
         }
         const m = p.size;
         p.x = Math.max(m, Math.min(this.worldW - m, p.x));
@@ -2397,15 +2502,21 @@ export class GameEngine {
       dy /= vlen;
 
       const p = this.player;
+      if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
           p.dashTime -= dt;
           p.x += p.dashVx * dt;
           p.y += p.dashVy * dt;
+        } else if (p.thrustDashActive) {
+          this.stepThrustDash(dt);
         } else {
+          const meleeMoveMult =
+            (this.gun.weaponClass === "melee" ? 1.23 : 1) *
+            (p.bladeRaising ? 0.85 : 1);
           const slow = (p.bowDrawing ? (this.gun.drawSlowMult ?? 1) : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
-          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
-          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
         }
         const m = p.size;
         p.x = Math.max(m, Math.min(this.worldW - m, p.x));
@@ -2592,6 +2703,39 @@ export class GameEngine {
     }
     if (p.lunge > 0) p.lunge = Math.max(0, p.lunge - dt * 120);
     if (p.electrifiedTime && p.electrifiedTime > 0) p.electrifiedTime -= dt;
+    // thrust longsword charge / release management
+    if (this.gun.id === "thrust_sword") {
+      if (this.secondaryFiring && !p.thrustDashActive) {
+        if (!p.thrustCharging) {
+          p.thrustCharging = true;
+          p.thrustCharge = 0;
+        }
+      } else {
+        if (p.thrustCharging) {
+          this.thrustRelease();
+        }
+      }
+    } else {
+      p.thrustCharging = false;
+    }
+
+    if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
+
+    // dual blades parry / reflect management
+    if (this.gun.id === "dual_blades") {
+      if (this.secondaryFiring) {
+        if (!p.bladeRaising) {
+          p.bladeRaising = true;
+          p.bladeReflectRange = this.gun.reflectRange ?? 96;
+          p.bladeReflectSelf = this.gun.reflectSelfDamage ?? 0.05;
+          p.bladeReflectGlow = this.gun.glow;
+        }
+      } else {
+        p.bladeRaising = false;
+      }
+    } else {
+      p.bladeRaising = false;
+    }
 
     let dx = 0;
     let dy = 0;
@@ -2614,12 +2758,18 @@ export class GameEngine {
       p.x += p.dashVx * dt;
       p.y += p.dashVy * dt;
       this.spawnParticles(p.x, p.y, this.character.bodyColor, 2, 60);
+    } else if (p.thrustDashActive) {
+      this.stepThrustDash(dt);
     } else {
+      // melee weapons get +23% move speed; raising the dual blades costs -15%
+      const meleeMoveMult =
+        (this.gun.weaponClass === "melee" ? 1.23 : 1) *
+        (p.bladeRaising ? 0.85 : 1);
       const slow =
         (p.bowDrawing ? (this.gun.drawSlowMult ?? 1) : 1) *
         (p.slowT && p.slowT > 0 ? 0.5 : 1);
-      p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
-      p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+      p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
+      p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
     }
 
     const m = p.size;
@@ -2936,10 +3086,11 @@ export class GameEngine {
     const p = this.player;
     const range = g.meleeRange ?? 60;
     const arc = g.meleeArc ?? 2;
-    const dmg = g.damage * this.character.damageMult;
+    let dmg = g.damage * this.character.damageMult;
     const isSpear = g.id === "spear";
     const isSaber = g.id === "lightsaber";
     const isWhip = !!g.whip;
+    const isDual = g.id === "dual_blades";
     const slowOnHit = g.slowOnHit ?? 0;
     sound.swing();
     p.swingTimer = p.swingDur;
@@ -2966,19 +3117,41 @@ export class GameEngine {
       p.iframes = Math.max(p.iframes, 0.12);
     }
 
+    // dual blades combo: flashy flurry with segmented damage per step
+    // (steps: 1-2 = 55, 3-4 = 70, 5 = 200). Alternates swing side for flair.
+    if (isDual) {
+      p.comboStep += 1;
+      if (p.comboStep > (g.comboLength ?? 5)) p.comboStep = 1;
+      p.comboTimer = 1.0;
+      const arr = g.comboDamage ?? [g.damage];
+      const step = Math.min(p.comboStep, arr.length);
+      dmg = arr[step - 1] * this.character.damageMult;
+      this.whipToggle = !this.whipToggle;
+      swingAngle = p.angle + (this.whipToggle ? 0.5 : -0.5);
+      // visual lunge on the heavy finisher
+      if (p.comboStep >= (g.comboLength ?? 5)) {
+        p.lunge = 16;
+      }
+    }
+
     const dmgMult = isSpear ? 1 + p.comboStep * 0.35 : 1;
     this.effects.push({
-      type: isWhip ? "whip" : isSaber ? "saberswing" : "slash",
+      type: isWhip ? "whip" : isSaber ? "saberswing" : isDual ? "dual_slash" : "slash",
       x: p.x,
       y: p.y,
       angle: swingAngle,
       arc: isWhip ? this.whipToggle ? 0.6 : -0.6 : arc,
-      range,
+      range: range * (isDual && p.comboStep === 5 ? 1.3 : 1.0),
       t: 0,
-      duration: isWhip ? 0.18 : isSaber ? 0.32 : 0.22,
-      radius: range,
+      duration: isDual ? (p.comboStep === 5 ? 0.36 : 0.18) : isWhip ? 0.18 : isSaber ? 0.32 : 0.22,
+      radius: range * (isDual && p.comboStep === 5 ? 1.3 : 1.0),
       color: g.glow,
+      style: isDual ? String(p.comboStep) : undefined,
+      dirX: isDual ? (this.whipToggle ? 1 : -1) : undefined,
     });
+    if (isDual && p.comboStep === 5 && !this.simulatingOther) {
+      this.shake = Math.min(20, this.shake + 14);
+    }
     for (const e of this.enemies) {
       const dx = e.x - p.x;
       const dy = e.y - p.y;
@@ -3078,6 +3251,89 @@ export class GameEngine {
       if (w.destructible && this.rectCircleOverlap(w, p.x, p.y, radius)) {
         this.breakWall(w, i);
       }
+    }
+  }
+
+  // ------------------------------------------------------------- thrust longsword (突刺长剑)
+  /** Release the charged dash for the thrust sword (called on right-click up). */
+  private thrustRelease() {
+    const p = this.player;
+    const g = this.gun;
+    p.thrustCharging = false;
+    const charge = p.thrustCharge ?? 0;
+    p.thrustCharge = 0;
+    if (g.id !== "thrust_sword") return;
+    // require at least chargeMin seconds of charge before the dash can fire
+    if (charge < (g.chargeMin ?? 0.5)) return;
+    const ang = p.angle;
+    const dist = g.chargeDashDist ?? 200;
+    const dmg = (g.chargeDashDamage ?? 140) * this.character.damageMult;
+    const sp = 900; // dash speed (px/s)
+    p.thrustDashActive = true;
+    p.thrustDashAngle = ang;
+    p.thrustDashLeft = dist;
+    p.thrustDashVx = Math.cos(ang) * sp;
+    p.thrustDashVy = Math.sin(ang) * sp;
+    p.thrustDashDmg = dmg;
+    p.thrustHitIds = new Set();
+    p.iframes = Math.max(p.iframes, 0.18);
+    sound.swing();
+    this.spawnParticles(p.x, p.y, g.glow, 14, 280, 0.4);
+    this.effects.push({
+      type: "slash",
+      x: p.x,
+      y: p.y,
+      angle: ang,
+      arc: 0.5,
+      range: g.chargeDashRange ?? 34,
+      t: 0,
+      duration: 0.18,
+      radius: g.chargeDashRange ?? 34,
+      color: g.glow,
+    });
+  }
+
+  /** Advance the thrust-sword dash each frame, hitting enemies along the path. */
+  private stepThrustDash(dt: number) {
+    const p = this.player;
+    const g = this.gun;
+    const ang = p.thrustDashAngle ?? p.angle;
+    const ca = Math.cos(ang);
+    const sa = Math.sin(ang);
+    const step = Math.hypot(p.thrustDashVx ?? 0, p.thrustDashVy ?? 0) * dt;
+    p.x += (p.thrustDashVx ?? 0) * dt;
+    p.y += (p.thrustDashVy ?? 0) * dt;
+    p.thrustDashLeft = (p.thrustDashLeft ?? 0) - step;
+    const range = g.chargeDashRange ?? 34;
+    const dmg = p.thrustDashDmg ?? 0;
+    // damage enemies inside the dash corridor
+    for (const e of this.enemies) {
+      if (p.thrustHitIds?.has(e.id)) continue;
+      const rx = e.x - p.x;
+      const ry = e.y - p.y;
+      const d = Math.hypot(rx, ry);
+      const fwd = rx * ca + ry * sa;
+      if (d <= range + e.size && fwd > -range) {
+        p.thrustHitIds?.add(e.id);
+        this.damageEnemy(e, dmg, 0, 0, false, { weapon: "thrust_sword", dx: ca, dy: sa });
+      }
+    }
+    // player-vs-player dash
+    const opp = this.meleeOpponent();
+    if (opp && !(opp.deadTimer && opp.deadTimer > 0) && !p.thrustHitIds?.has(opp.id)) {
+      const rx = opp.x - p.x;
+      const ry = opp.y - p.y;
+      const d = Math.hypot(rx, ry);
+      const fwd = rx * ca + ry * sa;
+      if (d <= range + opp.size && fwd > -range) {
+        p.thrustHitIds?.add(opp.id);
+        this.damagePlayerEntity(opp, dmg, undefined, ca * 240, sa * 240, this.activeId);
+      }
+    }
+    this.spawnParticles(p.x, p.y, g.glow, 2, 140, 0.2);
+    if (p.thrustDashLeft <= 0) {
+      p.thrustDashActive = false;
+      p.thrustDashLeft = 0;
     }
   }
 
@@ -3623,7 +3879,7 @@ export class GameEngine {
         b.y = (b.lobSy ?? b.y) + ((b.lobTy ?? b.y) - (b.lobSy ?? b.y)) * prog;
         b.z = (b.lobPeak ?? 0) * Math.sin(prog * Math.PI);
         if (prog >= 1) {
-          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, "mortar");
+          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, "mortar", b.ownerId);
           continue; // landed → dead, not carried forward
         }
         next.push(b);
@@ -3675,10 +3931,10 @@ export class GameEngine {
             this.spawnParticles(b.x, b.y, b.glow, 4, 100, 0.2);
           } else if (b.explosive && b.bounced) {
             // MGL32: explode on second wall hit
-            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
             dead = true;
           } else {
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
             else this.spawnParticles(b.x, b.y, b.glow, 4, 120, 0.22);
             dead = true;
           }
@@ -3716,7 +3972,7 @@ export class GameEngine {
           if (ddx * ddx + ddy * ddy <= rr * rr) {
             b.hit.add(e.id);
             if (b.explosive) {
-              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
               dead = true;
               break;
             }
@@ -3727,13 +3983,48 @@ export class GameEngine {
               0,
               0,
               false,
-              { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
+              { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) },
+              b.ownerId
             );
             if (b.pierce <= 0) {
               dead = true;
               break;
             }
             b.pierce -= 1;
+          }
+        }
+      }
+
+      // ---- dual blades reflect: raised blades bounce nearby incoming bullets ----
+      if (!dead && b.owner !== "player" && !b.reflected) {
+        const reflectors =
+          this.combatants.length > 0
+            ? this.combatants
+                .map((c) => c.player)
+                .filter((q) => q && !(q.deadTimer && q.deadTimer > 0) && q.bladeRaising)
+            : this.player.bladeRaising &&
+              !(this.player.deadTimer && this.player.deadTimer > 0)
+            ? [this.player]
+            : [];
+        for (const q of reflectors) {
+          const rr = (q.bladeReflectRange ?? 96) + b.size;
+          const rdx = b.x - q.x;
+          const rdy = b.y - q.y;
+          if (rdx * rdx + rdy * rdy <= rr * rr) {
+            // parrying a bullet still costs 5% of its damage to the blademaster
+            const selfDmg = b.damage * (q.bladeReflectSelf ?? 0.05);
+            if (selfDmg > 0)
+              this.damagePlayerEntity(q, selfDmg, undefined, 0, 0, b.ownerId ?? 2);
+            // bounce the bullet back and re-own it to the reflector
+            b.vx = -b.vx;
+            b.vy = -b.vy;
+            b.owner = "player";
+            b.ownerId = this.combatants.length > 0 ? q.cid ?? 1 : this.activeId;
+            b.reflected = true;
+            b.hit.clear();
+            this.spawnParticles(b.x, b.y, q.bladeReflectGlow ?? "#22d3ee", 6, 160, 0.25);
+            sound.swing();
+            break;
           }
         }
       }
@@ -3821,7 +4112,7 @@ export class GameEngine {
       }
 
       if (dead && b.explosive && b.life <= 0 && b.hit.size === 0 && !b.bounced) {
-        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
       }
       if (!dead) next.push(b);
     }
@@ -4572,12 +4863,13 @@ export class GameEngine {
           if ((e.x - fx.x) ** 2 + (e.y - fx.y) ** 2 < (fx.radius + e.size) ** 2) {
             if (fx.type === "poisoncloud") {
               // ramp poison so lingering enemies take ever-increasing damage
-              this.applyPoison(e, ((fx.dps ?? 20) * 0.25) * 0.8);
+              this.applyPoison(e, ((fx.dps ?? 20) * 0.25) * 0.8, fx.ownerId);
               e.slowT = Math.max(e.slowT, 0.3);
             } else {
-              this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true);
+              this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true, undefined, fx.ownerId);
               e.burnT = Math.max(e.burnT, 1);
               e.burnDps = Math.max(e.burnDps, 20);
+              e.burnOwnerId = fx.ownerId;
             }
           }
         }
@@ -4602,11 +4894,17 @@ export class GameEngine {
     kbx: number,
     kby: number,
     silent = false,
-    src?: { weapon: string; dx?: number; dy?: number }
+    src?: { weapon: string; dx?: number; dy?: number },
+    attackerId?: number
   ) {
     if (e.hp <= 0) return;
     dmg *= RUNTIME.playerDamageMult;
+    const before = e.hp;
     e.hp -= dmg;
+    // score reflects the ACTUAL damage dealt (overkill is capped to remaining hp)
+    const dealt = before - Math.max(e.hp, 0);
+    const finalAttackerId = attackerId !== undefined ? attackerId : (this.activeId ?? 0);
+    if (dealt > 0) this.awardDamageScore(finalAttackerId, dealt);
     if (!silent) e.hitFlash = 1;
     if (!silent && this.hitSndCd <= 0) {
       sound.hit();
@@ -4626,15 +4924,16 @@ export class GameEngine {
       e.x - kbx * 0.1,
       e.y - kby * 0.1
     );
-    if (e.hp <= 0) this.killEnemy(e);
+    if (e.hp <= 0) this.killEnemy(e, finalAttackerId);
   }
 
   /** Apply (and ramp) poison on an enemy. The longer it stays in gas, the
    *  higher its poison dps climbs — so lingering hurts more and more. */
-  private applyPoison(e: Enemy, ramp: number) {
+  private applyPoison(e: Enemy, ramp: number, ownerId?: number) {
     if (e.hp <= 0) return;
     e.poisonT = Math.max(e.poisonT ?? 0, 0.9);
     e.poisonDps = Math.min(260, (e.poisonDps ?? 0) + ramp);
+    if (ownerId !== undefined) e.poisonOwnerId = ownerId;
   }
 
   /** Enhanced, weapon- & direction-aware coin burst FX (everywhere except
@@ -4700,9 +4999,49 @@ export class GameEngine {
     }
   }
 
-  private killEnemy(e: Enemy) {
+  private killEnemy(e: Enemy, attackerId?: number) {
     this.score += e.score;
     this.kills += 1;
+
+    // Determine killer identity
+    let killerName = "未知";
+    let isLocal = false;
+    let killerC: Combatant | undefined;
+
+    if (attackerId !== undefined) {
+      isLocal = (this.mode === "local" && attackerId === 0) ||
+                (this.mode !== "local" && attackerId === this.selfPid);
+
+      if (isLocal) {
+        killerName = "你";
+      } else if (attackerId === this.peerPid) {
+        killerName = this.peerName || "队友";
+      } else {
+        killerC = this.combatants.find(c => c.id === attackerId);
+        if (killerC) {
+          killerC.kills += 1;
+          killerName = killerC.name;
+        }
+      }
+    } else {
+      const active = this.activeId ?? 0;
+      isLocal = (this.mode === "local" && active === 0) ||
+                (this.mode !== "local" && active === this.selfPid);
+      killerName = isLocal ? "你" : (this.peerName || "队友");
+    }
+
+    const victimName = e.name || (e.type === "monster" ? "怪物" : "敌人");
+
+    // Add to kill feed
+    this.addKillFeed(killerName, victimName, e.lastSrc?.weapon, killerC);
+
+    // Trigger local score feedback & banner if the local player is the killer
+    if (isLocal) {
+      this.addScoreFeed("淘汰", e.score, victimName, e.score, this.kills);
+      this.banner = { text: `击杀 ${victimName}！`, t: 1.6 };
+      sound.playKillConfirm();
+    }
+
     // ============ IMPACTFUL COIN BURST ============
     const big = e.type === "boss" || e.behavior === "abomination";
     const med = e.type === "tank" || e.behavior === "brute" || e.behavior === "bloater";
@@ -4800,6 +5139,7 @@ export class GameEngine {
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
     if (p.hp <= 0) {
       p.hp = 0;
+      sound.playDeath();
       if (this.mode === "local") {
         this.endGame("你倒下了");
       } else {
@@ -4912,18 +5252,9 @@ export class GameEngine {
         if (isLocalVictimShield) this.shake = 12;
         sound.explosion();
       }
-      // Track score for shield damage
+      // Track score for shield damage (actual absorbed damage)
       const shieldDiff = prevShield - p.shieldHp;
-      if (shieldDiff > 0 && this.gameMode !== "biohazard") {
-        const scoreGained = Math.round(shieldDiff);
-        if (scoreGained > 0 && attackerId !== undefined && attackerId >= 0) {
-          const killerC = this.combatants.find((c) => c.id === attackerId);
-          if (killerC) killerC.score += scoreGained;
-          else this.score += scoreGained;
-          const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
-          if (isLocalAttacker) this.addScoreFeed("伤害击中", scoreGained);
-        }
-      }
+      this.awardDamageScore(attackerId, shieldDiff);
       return;
     }
     p.hp -= dmg;
@@ -4948,18 +5279,9 @@ export class GameEngine {
       p.y = Math.max(p.size, Math.min(this.worldH - p.size, p.y + knockY));
     }
 
-    // Track score for health damage
+    // Track score for health damage (actual damage dealt)
     const hpDiff = prevHp - p.hp;
-    if (hpDiff > 0 && this.gameMode !== "biohazard") {
-      const scoreGained = Math.round(hpDiff);
-      if (scoreGained > 0 && attackerId !== undefined && attackerId >= 0) {
-        const killerC = this.combatants.find((c) => c.id === attackerId);
-        if (killerC) killerC.score += scoreGained;
-        else this.score += scoreGained;
-        const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
-        if (isLocalAttacker) this.addScoreFeed("伤害击中", scoreGained);
-      }
-    }
+    this.awardDamageScore(attackerId, hpDiff);
 
     if (p.hp <= 0) {
       p.hp = 0;
@@ -4967,6 +5289,12 @@ export class GameEngine {
       p.bowDrawing = false;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
       
+      const isLocal = (this.mode === "local" && p.cid === 0) ||
+                      (this.mode !== "local" && p.cid === this.selfPid);
+      if (isLocal) {
+        sound.playDeath();
+      }
+
       if (this.gameMode === "cashout") {
         const c = this.combatants.find(comb => comb.id === p.cid);
         if (c) {
@@ -5026,6 +5354,7 @@ export class GameEngine {
             if (this.gameMode === "cashout") {
               this.addScoreFeed("淘汰赏金", 500); // UI feedback for the cash
             }
+            sound.playKillConfirm();
           }
 
           if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
@@ -5047,6 +5376,7 @@ export class GameEngine {
         this.addKillFeed("你", this.peerName || "对手", _b?.weapon);
         this.addScoreFeed("淘汰", 250, this.peerName || "对手", 250, this.kills);
         this.banner = { text: `击杀 ${this.peerName || "对手"}！`, t: 1.6 };
+        sound.playKillConfirm();
       } else {
         this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
       }
@@ -5194,6 +5524,7 @@ export class GameEngine {
       sSemi = this.semiAutoLatch,
       sActive = this.activeId,
       sWs = this.weaponStates;
+    const sSec = this.secondaryFiring;
     // save the host's own joystick vector so it can be restored after simulating
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
@@ -5251,6 +5582,7 @@ export class GameEngine {
     this.semiAutoLatch = sSemi;
     this.activeId = sActive;
     this.weaponStates = sWs;
+    this.secondaryFiring = sSec;
     // restore the host's own joystick vector
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
@@ -5277,6 +5609,7 @@ export class GameEngine {
     const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge,
       sLastG = this.lastGadget, sSemi = this.semiAutoLatch, sChar = this.character,
       sOut = this.outfit, sSkillDef = this.skill, sActive = this.activeId;
+    const sSec = this.secondaryFiring;
     const svmx = this.virtualMove.x, svmy = this.virtualMove.y;
     // load bot context
     this.player = c.player;
@@ -5373,6 +5706,7 @@ export class GameEngine {
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
     this.activeId = sActive;
+    this.secondaryFiring = sSec;
     this.simulatingOther = false;
   }
 
@@ -5942,6 +6276,7 @@ export class GameEngine {
       sSemi = this.semiAutoLatch,
       sActive = this.activeId,
       sWs = this.weaponStates;
+    const sSec = this.secondaryFiring;
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
     // load this peer's state into the engine's single simulation context
@@ -5953,6 +6288,7 @@ export class GameEngine {
     this.virtualMove.x = inp.vmx;
     this.virtualMove.y = inp.vmy;
     this.firing = inp.firing;
+    this.secondaryFiring = !!inp.secondaryFiring;
     this.skillCd = player.skillCd ?? 0;
     this.dashCharges = player.dashCharges ?? MAX_DASH_CHARGES;
     this.dashRecharge = player.dashRecharge ?? 0;
@@ -5996,6 +6332,7 @@ export class GameEngine {
     this.semiAutoLatch = sSemi;
     this.activeId = sActive;
     this.weaponStates = sWs;
+    this.secondaryFiring = sSec;
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
   }
@@ -6158,6 +6495,7 @@ export class GameEngine {
       skill: this.pendSkill,
       reload: this.pendReload,
       weaponSwitch: this.pendWeapon,
+      secondaryFiring: this.secondaryFiring,
     };
     this.pendGadget = -1;
     this.pendSkill = false;
@@ -6238,6 +6576,7 @@ export class GameEngine {
       const diff = this.score - oldScore;
       if (this.kills > oldKills) {
         this.addScoreFeed("淘汰", diff, this.peerName || "对手", diff, this.kills);
+        sound.playKillConfirm();
       } else {
         this.addScoreFeed(diff >= 200 ? "金币收集" : "伤害击中", diff);
       }
@@ -6511,6 +6850,9 @@ export class GameEngine {
       const r = isMe ? { x: this.player.x, y: this.player.y } : ease(p.id, p.x, p.y);
       const gunList = isMe ? this.guns : this.foeGuns;
       const size = isMe ? this.player.size : getCharacter(p.character).size;
+      if (isMe) {
+        this.drawThrustSwordChargeIndicator(ctx, this.player);
+      }
       this.drawNetCharacter(
         ctx,
         r.x,
@@ -6713,7 +7055,8 @@ export class GameEngine {
             Math.cos(a) * 260 * fall,
             Math.sin(a) * 260 * fall,
             false,
-            { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) }
+            { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) },
+            ownerId
           );
         }
       }
@@ -6965,6 +7308,7 @@ export class GameEngine {
       outfit,
       gun,
       bowCharge: 0,
+      name: (isElite ? "精英 " : "") + char.name,
     });
     this.effects.push({
       type: "spawn",
@@ -7044,6 +7388,7 @@ export class GameEngine {
       id: this.enemyId++,
       type: "monster",
       behavior: def.behavior,
+      name: def.name,
       x,
       y,
       vx: 0,
@@ -7463,6 +7808,11 @@ export class GameEngine {
           ctx.restore();
         }
 
+        const isLocalC = this.mode === "local" ? c.id === 0 : c.id === this.selfPid;
+        if (isLocalC) {
+          this.drawThrustSwordChargeIndicator(ctx, q);
+        }
+
         this.drawNetCharacter(
           ctx,
           q.x,
@@ -7470,7 +7820,7 @@ export class GameEngine {
           q.angle,
           c.character.id,
           c.outfit.id,
-          c.gunIndex,
+          q.gunIndex ?? c.gunIndex ?? 0,
           c.guns,
           c.name,
           q.hp / q.maxHp,
@@ -8744,6 +9094,9 @@ export class GameEngine {
       ctx.restore();
     }
 
+    // thrust longsword: dash distance + hit-range indicator + charge status while charging
+    this.drawThrustSwordChargeIndicator(ctx, p);
+
     const glow =
       p.overdriveTime > 0
         ? "#fbbf24"
@@ -8784,6 +9137,91 @@ export class GameEngine {
       ctx.stroke();
       ctx.restore();
     }
+  }
+
+  private drawThrustSwordChargeIndicator(ctx: CanvasRenderingContext2D, p: Player) {
+    if (this.gun.id !== "thrust_sword" || !p.thrustCharging) return;
+    const g = this.gun;
+    const dist = g.chargeDashDist ?? 200;
+    const rng = g.chargeDashRange ?? 34;
+    const pulse = 0.5 + 0.5 * Math.sin(this.time * 12);
+    const charge = p.thrustCharge ?? 0;
+    const minCharge = g.chargeMin ?? 0.5;
+    const pct = Math.min(1, charge / minCharge);
+    const isReady = pct >= 1;
+
+    // 1. Draw dash range corridors in world coordinates
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    
+    // hit corridor (width = 2 * range) along the aim direction
+    ctx.fillStyle = rgba(g.glow, 0.12 + 0.06 * pulse);
+    ctx.fillRect(0, -rng, dist, rng * 2);
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = rgba(g.glow, isReady ? 0.85 : 0.45);
+    ctx.lineWidth = isReady ? 2.0 : 1.2;
+    ctx.strokeRect(0, -rng, dist, rng * 2);
+    ctx.setLineDash([]);
+    
+    // center guide line (the dash trajectory)
+    ctx.strokeStyle = rgba(g.glow, isReady ? 0.95 : 0.65);
+    ctx.lineWidth = isReady ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(dist, 0);
+    ctx.stroke();
+    
+    // endpoint hit circle (final range at max distance)
+    ctx.fillStyle = rgba(g.glow, 0.18 + 0.1 * pulse);
+    ctx.beginPath();
+    ctx.arc(dist, 0, rng, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = rgba(g.glow, isReady ? 0.95 : 0.65);
+    ctx.lineWidth = isReady ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.arc(dist, 0, rng, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // arrowhead marking the dash endpoint
+    ctx.fillStyle = rgba(g.glow, isReady ? 1.0 : 0.7);
+    ctx.beginPath();
+    ctx.moveTo(dist + 9, 0);
+    ctx.lineTo(dist - 5, -6);
+    ctx.lineTo(dist - 5, 6);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+
+    // 2. Draw charge status bar above player's head
+    ctx.save();
+    const barW = 44;
+    const barH = 6;
+    const bx = p.x - barW / 2;
+    const by = p.y - p.size - 26; // above the head
+    
+    // Background bar
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(bx, by, barW, barH);
+    
+    // Filled bar
+    ctx.fillStyle = isReady ? "#22c55e" : "#eab308"; // green if ready, yellow if charging
+    ctx.fillRect(bx, by, barW * pct, barH);
+    
+    // Border
+    ctx.strokeStyle = isReady ? "#ffffff" : "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, barW, barH);
+    
+    // Text label
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 9px sans-serif";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowBlur = 3;
+    ctx.fillText(isReady ? "RELEASE TO DASH" : "CHARGING", p.x, by - 4);
+    ctx.restore();
   }
 
   /** Jagged, flickering ring used for explosive coin-bursts. */
@@ -9041,6 +9479,133 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(0, 0, range * (0.6 + k * 0.5), -arc / 2, arc / 2);
         ctx.stroke();
+        ctx.restore();
+      } else if (e.type === "dual_slash") {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.angle ?? 0);
+        ctx.globalCompositeOperation = "lighter";
+        
+        const comboStep = parseInt(e.style ?? "1", 10);
+        const swingDir = e.dirX ?? 1;
+        const arc = e.arc ?? 2.0;
+        const range = e.range ?? 78;
+
+        if (comboStep === 5) {
+          // Double crossing slash finisher (X shape)
+          // Slash 1 (clockwise)
+          {
+            const sweepPercent = k * 1.25;
+            const head = Math.min(1, sweepPercent);
+            const tail = Math.max(0, sweepPercent - 0.45);
+            const startA = -arc / 2;
+            const endA = arc / 2;
+            const a1 = startA + tail * (endA - startA);
+            const a2 = startA + head * (endA - startA);
+            
+            if (head > tail) {
+              const curRange = range * (0.9 + 0.1 * Math.sin(k * Math.PI));
+              
+              // Outer glow
+              ctx.lineWidth = 18 * (1 - k) + 4;
+              ctx.strokeStyle = rgba(e.color, (1 - k) * 0.9);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, false);
+              ctx.stroke();
+              
+              // White core
+              ctx.lineWidth = 5 * (1 - k) + 1.5;
+              ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.95);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, false);
+              ctx.stroke();
+            }
+          }
+          // Slash 2 (counter-clockwise)
+          {
+            const sweepPercent = k * 1.25;
+            const head = Math.min(1, sweepPercent);
+            const tail = Math.max(0, sweepPercent - 0.45);
+            const startA = arc / 2;
+            const endA = -arc / 2;
+            const a1 = startA + tail * (endA - startA);
+            const a2 = startA + head * (endA - startA);
+            
+            if (head > tail) {
+              const curRange = range * (0.9 + 0.1 * Math.sin(k * Math.PI));
+              
+              // Outer glow
+              ctx.lineWidth = 18 * (1 - k) + 4;
+              ctx.strokeStyle = rgba(e.color, (1 - k) * 0.9);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, true);
+              ctx.stroke();
+              
+              // White core
+              ctx.lineWidth = 5 * (1 - k) + 1.5;
+              ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.95);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, true);
+              ctx.stroke();
+            }
+          }
+          
+          // Additional shockwave effect for finisher
+          ctx.strokeStyle = rgba(e.color, (1 - k) * 0.45);
+          ctx.lineWidth = 3 * (1 - k) + 0.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, range * (0.3 + k * 0.8), 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Alternating normal slash (slashes 1-4)
+          // Sweeps clockwise if swingDir === 1, counter-clockwise if swingDir === -1
+          const sweepPercent = k * 1.35;
+          const head = Math.min(1, sweepPercent);
+          const tail = Math.max(0, sweepPercent - 0.4);
+          
+          const startA = swingDir === 1 ? -arc / 2 : arc / 2;
+          const endA = swingDir === 1 ? arc / 2 : -arc / 2;
+          const a1 = startA + tail * (endA - startA);
+          const a2 = startA + head * (endA - startA);
+          
+          if (head > tail) {
+            const curRange = range * (0.85 + 0.15 * Math.sin(k * Math.PI));
+            const anticlockwise = swingDir === -1;
+            
+            // Background motion trail
+            ctx.fillStyle = rgba(e.color, (1 - k) * 0.18);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, curRange, a1, a2, anticlockwise);
+            ctx.lineTo(0, 0);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Outer glow line
+            ctx.lineWidth = 14 * (1 - k) + 3;
+            ctx.strokeStyle = rgba(e.color, (1 - k) * 0.85);
+            ctx.beginPath();
+            ctx.arc(0, 0, curRange, a1, a2, anticlockwise);
+            ctx.stroke();
+            
+            // White core line
+            ctx.lineWidth = 4 * (1 - k) + 1;
+            ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.95);
+            ctx.beginPath();
+            ctx.arc(0, 0, curRange, a1, a2, anticlockwise);
+            ctx.stroke();
+            
+            // Spark effect at the front tip
+            const tipAngle = startA + head * (endA - startA);
+            const sparkX = Math.cos(tipAngle) * curRange;
+            const sparkY = Math.sin(tipAngle) * curRange;
+            
+            ctx.fillStyle = rgba("#ffffff", (1 - k) * 0.9);
+            ctx.beginPath();
+            ctx.arc(sparkX, sparkY, 4 * (1 - k) + 1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
       } else if (e.type === "saberswing") {
         // bright energy sweep of the blade, fading as it completes

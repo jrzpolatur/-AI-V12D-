@@ -615,6 +615,62 @@ var guns_default = [
     rangeTier: "\u8FD1"
   },
   {
+    id: "dual_blades",
+    name: "\u53CC\u5203",
+    desc: "\u5DE6\u952E\u8FDE\u6BB5(55/55/70/70/200)\xB7\u53F3\u952E\u4E3E\u5200\u53CD\u5F39\u5B50\u5F39(\u627F5%\u4F24,\u964D15%\u79FB\u901F)",
+    weaponClass: "melee",
+    shape: "dual_blades",
+    iconShape: "dual_blades",
+    damage: 55,
+    fireRate: 4.5,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 160,
+    color: "#a5f3fc",
+    glow: "#22d3ee",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 78,
+    meleeArc: 2,
+    comboLength: 5,
+    comboDamage: [55, 55, 70, 70, 200],
+    reflectRange: 96,
+    reflectSelfDamage: 0.05,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "thrust_sword",
+    name: "\u7A81\u523A\u957F\u5251",
+    desc: "\u5DE6\u952E\u6325\u51FB84\xB7\u53F3\u952E\u84C4\u529B(\u22650.5s)\u51B2\u523A\u9020\u6210140\u4F24\u5BB3",
+    weaponClass: "melee",
+    shape: "thrust_sword",
+    iconShape: "thrust_sword",
+    damage: 84,
+    fireRate: 2.2,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 220,
+    color: "#fbcfe8",
+    glow: "#f472b6",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 88,
+    meleeArc: 1.6,
+    chargeMin: 0.5,
+    chargeDashDamage: 140,
+    chargeDashDist: 210,
+    chargeDashRange: 34,
+    rangeTier: "\u8FD1"
+  },
+  {
     id: "plasma_rifle",
     name: "\u7535\u6D46\u6B65\u67AA",
     desc: "\u534A\u81EA\u52A8\u4E09\u8FDE\u53D1\u7B49\u79BB\u5B50\u6B65\u67AA\uFF1A\u5F39\u4F53\u7855\u5927\u547D\u4E2D\u7387\u9AD8\uFF0C\u7EA6 1/4 \u5B50\u5F39\u53EF\u8D2F\u7A7F\u5899\u4F53",
@@ -1226,584 +1282,567 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
     ctx.rotate(-swingArc / 2 + swing * swingArc);
   }
   switch (gun.shape) {
-    // ---------------- PISTOL ----------------
+    // ---------------- PISTOL (手枪) ----------------
     case "pistol": {
-      body(-4, -4, 16, 8, STEEL_X, STEEL, 2.5);
-      body(10, -2, 6, 4, STEEL_L, STEEL_D, 1.5);
-      block(-7, -1.6, 3.5, 3.4, STEEL_D, 1);
-      block(4, -5, 2, 1.6, STEEL_D, 0.5);
+      body(-3, -3.5, 12, 7, STEEL_X, STEEL, 2);
+      body(9, -1.8, 4, 3.6, STEEL_L, STEEL_D, 1);
+      block(-5, -1.5, 2.5, 3, STEEL_D, 1);
       ctx.fillStyle = gun.glow;
-      roundRect(ctx, 15.5, -1.4, 2.6, 2.8, 1);
+      roundRect(ctx, 4, 2, 4.5, 1.2, 0.4);
       ctx.fill();
       break;
     }
-    // ---------------- MAC11 ----------------
+    // ---------------- MAC11 (微冲) ----------------
     case "mac11": {
-      body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
-      body(10, -1.8, 7, 3.6, STEEL_L, STEEL_D, 1.5);
-      block(-11, -2.4, 6, 4.8, STEEL_D, 1.5);
+      body(-5, -3.5, 14, 7, STEEL_X, STEEL, 2);
+      body(9, -1.8, 8, 3.6, "#1e293b", "#0f172a", 1.5);
+      block(-9, -2, 4, 4, STEEL_D, 1);
       ctx.save();
-      ctx.translate(2, 3);
-      ctx.rotate(0.5);
-      block(-1.6, 0, 4, 11, STEEL_D, 1.5);
+      ctx.translate(1, 3.5);
+      ctx.rotate(0.3);
+      block(-1.5, 0, 3, 9, STEEL_D, 1);
       ctx.restore();
-      block(5, -5, 3, 1.6, STEEL_D, 0.5);
+      ctx.strokeStyle = STEEL_D;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-9, 0);
+      ctx.lineTo(-14, 2);
+      ctx.lineTo(-14, 6);
+      ctx.stroke();
+      break;
+    }
+    // ---------------- MP5 (MP5) ----------------
+    case "mp5": {
+      body(-6, -4, 16, 8, STEEL_X, STEEL, 2.5);
+      body(10, -1.8, 9, 3.6, STEEL_L, STEEL_D, 1.5);
+      block(-12, -2.4, 6, 4.8, STEEL_D, 1.5);
+      block(0, -3.4, 8, 6.8, "#334155", 1.5);
+      ctx.save();
+      ctx.translate(3, 3.5);
+      ctx.rotate(0.42);
+      block(-1.6, 0, 3.2, 10, "#0f172a", 1.2);
+      ctx.restore();
       ctx.fillStyle = gun.glow;
       roundRect(ctx, 16, -1.2, 2.4, 2.4, 1);
       ctx.fill();
       break;
     }
-    // ---------------- MP5 ----------------
-    case "mp5": {
-      body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
-      body(10, -1.8, 8, 3.6, STEEL_L, STEEL_D, 1.5);
-      block(-11, -2.4, 6, 4.8, STEEL_D, 1.5);
-      ctx.save();
-      ctx.translate(2, 3);
-      ctx.rotate(0.5);
-      block(-1.6, 0, 4, 12, STEEL_D, 1.5);
-      ctx.restore();
-      block(5, -5, 3, 1.6, STEEL_D, 0.5);
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 17, -1.2, 2.4, 2.4, 1);
-      ctx.fill();
-      break;
-    }
     // ---------------- MORTAR (投射榴弹炮) ----------------
     case "mortar": {
-      block(-3, -3, 8, 6, STEEL_D, 2);
-      body(2, -3.2, 20, 6.4, STEEL_X, STEEL, 2.5);
-      body(20, -3.6, 3, 7.2, STEEL_L, STEEL_D, 1.5);
-      block(-9, -2, 6, 4, STEEL_D, 1.5);
+      block(-4, -4, 9, 8, STEEL_D, 2.5);
+      body(5, -4.5, 18, 9, STEEL_X, STEEL, 3);
+      body(23, -5, 3.5, 10, STEEL_L, STEEL_D, 1.5);
+      block(-10, -2.6, 6, 5.2, STEEL_D, 1.5);
+      ctx.save();
+      ctx.strokeStyle = "#eab308";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(9, -4);
+      ctx.lineTo(12, 4);
+      ctx.moveTo(15, -4);
+      ctx.lineTo(18, 4);
+      ctx.stroke();
+      ctx.restore();
       ctx.fillStyle = gun.glow;
-      roundRect(ctx, 21, -2, 2.4, 4, 1);
+      roundRect(ctx, 24, -2, 2.4, 4, 1);
       ctx.fill();
       break;
     }
-    // ---------------- SHOTGUN ----------------
+    // ---------------- SHOTGUN (霰弹枪) ----------------
     case "shotgun": {
-      body(-4, -4, 11, 8, STEEL_X, STEEL, 2);
-      block(-11, -2.6, 7, 5.2, WOOD, 1.5);
-      body(2, -3.2, 15, 2.4, STEEL_L, STEEL_D, 1);
-      body(2, 0.8, 15, 2.4, STEEL_L, STEEL_D, 1);
-      block(6, -4.2, 6, 8.4, WOOD_D, 1.5);
+      body(-4, -4.2, 10, 8.4, STEEL_X, STEEL, 2.5);
+      block(-12, -2.8, 8, 5.6, WOOD, 2);
+      body(6, -3.4, 16, 2.8, STEEL_L, STEEL_D, 1);
+      body(6, 0.6, 16, 2.8, STEEL_L, STEEL_D, 1);
+      block(4, -4.4, 9, 8.8, WOOD_D, 1.5);
       ctx.fillStyle = gun.glow;
       roundRect(ctx, 16.5, -2.6, 2.4, 5.2, 1);
       ctx.fill();
       break;
     }
-    // ---------------- RIFLE ----------------
+    // ---------------- RIFLE (突击步枪) ----------------
     case "rifle": {
-      body(-6, -4, 22, 8, STEEL_X, STEEL, 2.5);
-      body(14, -1.8, 11, 3.6, STEEL_L, STEEL_D, 1.5);
-      block(6, -3.4, 9, 6.8, STEEL_D, 1.5);
-      block(2, -5.6, 8, 1.6, STEEL_D, 0.6);
-      block(-12, -2.4, 7, 4.8, STEEL_D, 1.5);
-      ctx.save();
-      ctx.translate(0, 3);
-      ctx.rotate(0.42);
-      block(-2, 0, 5, 10, STEEL_D, 2);
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 24, -1.2, 2.6, 2.4, 1);
+      body(-6, -4, 20, 8, STEEL_X, STEEL, 2);
+      body(14, -1.8, 12, 3.6, STEEL_L, STEEL_D, 1.5);
+      block(-12, -2.6, 7, 5.2, "#d97706", 1.5);
+      block(4, -3.6, 9, 7.2, "#b45309", 1.5);
+      block(-1, -6.6, 6, 2.6, STEEL_D, 0.8);
+      ctx.fillStyle = rgba(gun.glow, 0.9);
+      roundRect(ctx, 4.5, -5.6, 1.2, 1.2, 0.4);
       ctx.fill();
+      ctx.save();
+      ctx.translate(1, 3.5);
+      ctx.rotate(0.35);
+      block(-2, 0, 4.6, 11, "#1e293b", 1.5);
+      ctx.restore();
       break;
     }
-    // ---------------- SNIPER ----------------
+    // ---------------- SNIPER (狙击枪) ----------------
     case "sniper": {
-      body(-6, -4, 15, 8, STEEL_X, STEEL, 2.5);
-      body(7, -2, 22, 4, STEEL_L, STEEL_D, 1.5);
-      block(-13, -2.6, 7, 5.2, WOOD, 1.5);
-      ctx.fillStyle = STEEL_D;
-      roundRect(ctx, -4, -7.6, 9, 2.2, 1);
-      ctx.fill();
+      body(-6, -4, 14, 8, STEEL_X, STEEL, 2.5);
+      body(8, -1.6, 28, 3.2, STEEL_L, STEEL_D, 1);
+      block(-13, -2.8, 8, 5.6, STEEL_D, 1.5);
+      body(32, -2.6, 4, 5.2, STEEL_D, STEEL_X, 0.8);
+      block(-3, -7.8, 10, 2.8, STEEL_D, 1);
       ctx.strokeStyle = DARK;
       ctx.lineWidth = 1;
-      ctx.stroke();
       ctx.beginPath();
-      ctx.arc(0.5, -6.4, 2.6, 0, Math.PI * 2);
+      ctx.arc(0.5, -6.4, 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
-      ctx.arc(0.5, -6.4, 1.2, 0, Math.PI * 2);
+      ctx.arc(0.5, -6.4, 1.4, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = DARK;
+      ctx.strokeStyle = STEEL_D;
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(22, 2);
-      ctx.lineTo(25, 7);
-      ctx.moveTo(22, 2);
-      ctx.lineTo(25, -3);
+      ctx.moveTo(20, 1.6);
+      ctx.lineTo(24, 7);
+      ctx.moveTo(20, -1.6);
+      ctx.lineTo(24, -7);
       ctx.stroke();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 28, -1.2, 2.6, 2.4, 1);
-      ctx.fill();
       break;
     }
-    // ---------------- ROCKET LAUNCHER ----------------
+    // ---------------- ROCKET LAUNCHER (火箭筒) ----------------
     case "rocket": {
-      body(-7, -5.5, 22, 11, STEEL_X, STEEL, 3);
-      ctx.fillStyle = STEEL_L;
+      body(-9, -5.5, 23, 11, "#166534", "#14532d", 2.5);
+      ctx.fillStyle = "#022c22";
       ctx.beginPath();
-      ctx.moveTo(15, -4);
-      ctx.lineTo(24, 0);
-      ctx.lineTo(15, 4);
+      ctx.moveTo(-9, -5.5);
+      ctx.lineTo(-15, -9);
+      ctx.lineTo(-9, -2);
+      ctx.moveTo(-9, 5.5);
+      ctx.lineTo(-15, 9);
+      ctx.lineTo(-9, 2);
+      ctx.fill();
+      ctx.fillStyle = "#854d0e";
+      ctx.beginPath();
+      ctx.moveTo(14, -5.5);
+      ctx.lineTo(22, -1.5);
+      ctx.lineTo(26, 0);
+      ctx.lineTo(22, 1.5);
+      ctx.lineTo(14, 5.5);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = DARK;
       ctx.lineWidth = 1.2;
       ctx.stroke();
-      ctx.fillStyle = STEEL_D;
-      ctx.beginPath();
-      ctx.moveTo(-7, -5.5);
-      ctx.lineTo(-12, -8);
-      ctx.lineTo(-7, -2.5);
-      ctx.closePath();
-      ctx.moveTo(-7, 5.5);
-      ctx.lineTo(-12, 8);
-      ctx.lineTo(-7, 2.5);
-      ctx.closePath();
-      ctx.fill();
       ctx.fillStyle = rgba(gun.glow, 0.9);
       ctx.beginPath();
-      ctx.arc(19, 0, 2.4, 0, Math.PI * 2);
+      ctx.arc(20, 0, 2.4, 0, Math.PI * 2);
       ctx.fill();
       break;
     }
-    // ---------------- AKM ----------------
+    // ---------------- AKM (AKM) ----------------
     case "akm": {
       body(-4, -4, 17, 8, STEEL_X, STEEL, 2);
       block(8, -3.4, 9, 6.8, WOOD, 1.5);
-      body(14, -1.4, 8, 2.8, STEEL_L, STEEL_D, 1);
-      block(8, -4.6, 11, 1.8, STEEL_D, 0.6);
+      body(14, -1.4, 10, 2.8, STEEL_L, STEEL_D, 1);
       block(-11, -2.6, 7, 5.2, WOOD, 1.5);
       ctx.save();
       ctx.translate(1.5, 3);
-      ctx.rotate(0.4);
-      block(-2, 0, 4.6, 11, WOOD_D, 1.5);
+      ctx.rotate(0.44);
+      block(-2.2, 0, 4.6, 12, STEEL_D, 1.5);
       ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 21, -1, 2.4, 2, 0.8);
-      ctx.fill();
       break;
     }
-    // ---------------- FCAR (heavy) ----------------
+    // ---------------- FCAR (FCAR) ----------------
     case "fcar": {
-      body(-5, -5, 19, 10, STEEL, STEEL_D, 2.5);
-      body(13, -2.4, 10, 4.8, STEEL_L, STEEL_D, 1.5);
-      block(-12, -3, 7, 6, STEEL_D, 1.5);
-      block(-1, 3, 6, 9, STEEL_D, 1.5);
-      block(2, -6.4, 9, 1.8, STEEL_D, 0.6);
-      ctx.fillStyle = rgba(gun.glow, 0.55);
-      roundRect(ctx, -3, -1, 15, 1.4, 0.6);
-      ctx.fill();
-      ctx.fillStyle = STEEL_D;
-      for (let i = 0; i < 3; i++) {
-        roundRect(ctx, 18 + i * 2, -2.2, 1.1, 4.4, 0.4);
-        ctx.fill();
-      }
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 25, -1.4, 2.4, 2.8, 1);
+      body(-5, -5, 20, 10, "#ca8a04", "#854d0e", 2.5);
+      body(15, -2, 9, 4, STEEL_L, STEEL_D, 1.5);
+      block(-12, -3, 7, 6, "#a16207", 1.5);
+      block(-1, 3.5, 5, 8.5, STEEL_D, 1.2);
+      block(2, -7.5, 6, 2.5, STEEL_D, 0.8);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 4, -6.5, 2, 1.5, 0.4);
       ctx.fill();
       break;
     }
-    // ---------------- PULSE (beam emitter) ----------------
+    // ---------------- PULSE (电浆脉冲枪) ----------------
     case "pulse": {
-      body(-5, -4.5, 16, 9, "#2c3350", "#1a1f33", 3);
-      block(-9, -2.6, 4.5, 5.2, "#15192a", 1);
-      ctx.fillStyle = rgba(gun.glow, 0.8);
-      roundRect(ctx, 0, -5.8, 3, 2, 0.6);
-      roundRect(ctx, 5, -5.8, 3, 2, 0.6);
+      body(-6, -4.5, 17, 9, "#312e81", "#1e1b4b", 3);
+      block(-10, -2.6, 4.5, 5.2, "#1e1b4b", 1);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, -1, -5.6, 3.2, 2.2, 0.6);
+      roundRect(ctx, 4, -5.6, 3.2, 2.2, 0.6);
       ctx.fill();
-      const cg = ctx.createRadialGradient(1, 0, 0, 1, 0, 5.5);
-      cg.addColorStop(0, "#ffffff");
-      cg.addColorStop(0.4, rgba(gun.glow, 0.9));
-      cg.addColorStop(1, rgba(gun.glow, 0));
-      ctx.fillStyle = cg;
+      ctx.strokeStyle = rgba(gun.glow, 0.9);
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.arc(1, 0, 5.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = rgba(gun.glow, 0.85);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(13, 0, 3 + Math.sin(t * 12) * 0.6, 0, Math.PI * 2);
+      ctx.arc(12, 0, 4, 0, Math.PI * 2);
+      ctx.arc(16, 0, 3, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = rgba(gun.glow, 0.9);
-      ctx.beginPath();
-      ctx.arc(15.5, 0, 2, 0, Math.PI * 2);
-      ctx.fill();
       break;
     }
-    // ---------------- LIGHTSABER ----------------
+    // ---------------- LIGHTSABER (激光剑) ----------------
     case "lightsaber": {
-      const bladeLen = (gun.meleeRange ?? 60) * 0.62;
-      body(-7, -3, 14, 6, STEEL_X, STEEL_D, 2);
-      block(-5, -2.4, 2, 4.8, STEEL_D, 0.5);
-      block(-1, -2.4, 2, 4.8, STEEL_D, 0.5);
-      block(3, -2.4, 2, 4.8, STEEL_D, 0.5);
-      block(7, -2.6, 3, 5.2, STEEL_L, 1);
+      const bladeLen = (gun.meleeRange ?? 60) * 0.7;
+      body(-8, -3, 15, 6, STEEL_X, STEEL_D, 2);
+      ctx.fillStyle = "#1e293b";
+      roundRect(ctx, -6, -2.6, 2, 5.2, 0.4);
+      roundRect(ctx, -2, -2.6, 2, 5.2, 0.4);
+      roundRect(ctx, 2, -2.6, 2, 5.2, 0.4);
+      ctx.fill();
+      ctx.fillStyle = "#ef4444";
+      roundRect(ctx, -4, -4, 1.5, 1.2, 0.3);
+      ctx.fill();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const flick = 1 + Math.sin(t * 30) * 0.05;
-      ctx.strokeStyle = rgba(gun.glow, 0.22);
-      ctx.lineWidth = 9 * flick;
+      const flick = 1 + Math.sin(t * 32) * 0.06;
+      ctx.strokeStyle = rgba(gun.glow, 0.25);
+      ctx.lineWidth = 10 * flick;
       ctx.beginPath();
-      ctx.moveTo(10, 0);
-      ctx.lineTo(10 + bladeLen, 0);
+      ctx.moveTo(7, 0);
+      ctx.lineTo(7 + bladeLen, 0);
       ctx.stroke();
-      ctx.strokeStyle = rgba(gun.glow, 0.5);
-      ctx.lineWidth = 5 * flick;
+      ctx.strokeStyle = rgba(gun.glow, 0.55);
+      ctx.lineWidth = 6 * flick;
       ctx.stroke();
       ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2.4 * flick;
+      ctx.lineWidth = 2.6 * flick;
       ctx.stroke();
       ctx.restore();
       break;
     }
-    // ---------------- HAMMER ----------------
+    // ---------------- HAMMER (雷神之锤) ----------------
     case "hammer": {
-      body(-1, -2, 21, 4, WOOD_D, "#4a3318", 1.5);
-      block(-1, -2.4, 3, 4.8, STEEL_D, 0.6);
-      block(3, -2.4, 2, 4.8, STEEL_D, 0.4);
-      body(19, -8, 13, 16, STEEL_X, STEEL, 3);
-      block(20, -7, 3, 14, STEEL_L, 1);
-      block(28, -6, 3, 12, STEEL_D, 1);
-      ctx.fillStyle = rgba(gun.glow, 0.8);
-      roundRect(ctx, 22, -1.4, 7, 2.8, 1);
-      ctx.fill();
-      break;
-    }
-    // ---------------- FLAMETHROWER ----------------
-    case "flamethrower": {
-      body(-6, -5, 18, 10, STEEL_X, STEEL_D, 2.5);
-      block(-10, -2.4, 5, 4.8, STEEL_D, 1.2);
-      block(0, -8, 12, 4, "#7f1d1d", 1.5);
-      block(2, -7.4, 8, 1, "#fca5a5", 0.5);
-      body(12, -3, 9, 6, STEEL_L, STEEL_D, 1.5);
-      block(20, -4.5, 3, 9, STEEL_D, 1);
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      const fg = ctx.createRadialGradient(22, 0, 0, 22, 0, 5);
-      fg.addColorStop(0, "#ffffff");
-      fg.addColorStop(0.4, rgba(gun.glow, 0.9));
-      fg.addColorStop(1, rgba(gun.glow, 0));
-      ctx.fillStyle = fg;
+      body(-1, -1.8, 22, 3.6, WOOD_D, "#3f2b15", 1.2);
+      body(18, -9, 14, 18, STEEL_D, "#0f172a", 3);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
-      ctx.arc(22, 0, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      break;
-    }
-    // ---------------- SA1216 (auto shotgun) ----------------
-    case "sa1216": {
-      body(-5, -4.5, 16, 9, STEEL_X, STEEL, 2.5);
-      body(10, -2, 10, 4, STEEL_L, STEEL_D, 1.5);
-      block(-11, -2.8, 6, 5.6, WOOD, 1.5);
-      ctx.save();
-      ctx.translate(2, 3.5);
-      ctx.rotate(0.3);
-      for (let i = 0; i < 4; i++) {
-        const a = i / 4 * Math.PI * 2;
-        ctx.fillStyle = i === 0 ? STEEL_L : STEEL_D;
-        roundRect(ctx, -1.5 + Math.cos(a) * 3, Math.sin(a) * 3 - 4, 3, 10, 1);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-      }
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 19, -1.6, 2.4, 3.2, 1);
-      ctx.fill();
-      break;
-    }
-    // ---------------- MGL32 (grenade revolver) ----------------
-    case "mgl32": {
-      body(-6, -4, 14, 8, STEEL_X, STEEL, 2);
-      block(-11, -2.6, 6, 5.2, STEEL_D, 1.5);
-      body(8, -2.5, 10, 5, STEEL_L, STEEL_D, 1.5);
-      ctx.save();
-      ctx.translate(4, 0);
-      for (let i = 0; i < 6; i++) {
-        const a = i / 6 * Math.PI * 2;
-        ctx.fillStyle = i % 2 === 0 ? STEEL_L : STEEL_D;
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * 5, Math.sin(a) * 5, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-      }
-      ctx.fillStyle = rgba(gun.glow, 0.7);
-      ctx.beginPath();
-      ctx.arc(0, 0, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      block(17, -4.5, 2, 2, STEEL_D, 0.5);
-      break;
-    }
-    // ---------------- SPEAR ----------------
-    case "spear": {
-      const len = (gun.meleeRange ?? 90) * 0.85;
-      ctx.strokeStyle = WOOD_D;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(-2, 0);
-      ctx.lineTo(len - 14, 0);
-      ctx.stroke();
-      ctx.strokeStyle = "#4a3318";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.fillStyle = STEEL_D;
-      for (let i = 0; i < 3; i++) {
-        roundRect(ctx, -2 + i * 3, -2.4, 2, 4.8, 0.4);
-        ctx.fill();
-      }
-      ctx.fillStyle = STEEL_X;
-      ctx.beginPath();
-      ctx.moveTo(len - 14, -5);
-      ctx.lineTo(len, 0);
-      ctx.lineTo(len - 14, 5);
+      ctx.moveTo(25, -4);
+      ctx.lineTo(29, 0);
+      ctx.lineTo(25, 4);
+      ctx.lineTo(21, 0);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 1.2;
+      break;
+    }
+    // ---------------- FLAMETHROWER (喷火器) ----------------
+    case "flamethrower": {
+      body(-6, -4.5, 16, 9, STEEL_D, "#0f172a", 2.5);
+      block(-10, -2.4, 4.5, 4.8, STEEL_D, 1);
+      block(-2, 4, 11, 6.5, "#991b1b", 2.5);
+      body(10, -2.8, 9, 5.6, STEEL_L, STEEL_D, 1.5);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.beginPath();
+      ctx.arc(20, 0, 4.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+    // ---------------- SA1216 (回转式弹仓霰弹枪) ----------------
+    case "sa1216": {
+      body(-5, -4.5, 15, 9, STEEL_X, STEEL, 2.5);
+      body(10, -1.8, 10, 3.6, STEEL_L, STEEL_D, 1.5);
+      block(-11, -2.8, 6, 5.6, WOOD, 1.5);
+      ctx.fillStyle = STEEL_D;
+      roundRect(ctx, 0, 3, 10, 4.2, 1);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 16, -1.2, 2.4, 2.4, 0.8);
+      ctx.fill();
+      break;
+    }
+    // ---------------- MGL32 (转轮榴弹发射器) ----------------
+    case "mgl32": {
+      body(-6, -4, 12, 8, STEEL_X, STEEL, 2);
+      block(-11, -2.6, 5.5, 5.2, STEEL_D, 1.5);
+      body(12, -2.6, 9, 5.2, STEEL_L, STEEL_D, 1.5);
+      ctx.fillStyle = STEEL_D;
+      ctx.beginPath();
+      ctx.arc(3, 0, 7.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#0f172a";
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(3 + Math.cos(a) * 4.5, Math.sin(a) * 4.5, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    // ---------------- SPEAR (长矛) ----------------
+    case "spear": {
+      const len = (gun.meleeRange ?? 90) * 0.9;
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(-6, 0);
+      ctx.lineTo(len - 15, 0);
+      ctx.stroke();
+      ctx.strokeStyle = "#b91c1c";
+      ctx.lineWidth = 4.2;
+      ctx.beginPath();
+      ctx.moveTo(10, 0);
+      ctx.lineTo(16, 0);
+      ctx.moveTo(35, 0);
+      ctx.lineTo(41, 0);
+      ctx.stroke();
+      ctx.fillStyle = STEEL_X;
+      ctx.beginPath();
+      ctx.moveTo(len - 15, -5.5);
+      ctx.lineTo(len - 8, -6.5);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(len - 8, 6.5);
+      ctx.lineTo(len - 15, 5.5);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = rgba(gun.glow, 0.7);
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
-      ctx.moveTo(len - 12, -3.5);
-      ctx.lineTo(len - 1, 0);
-      ctx.lineTo(len - 12, 3.5);
-      ctx.stroke();
+      ctx.arc(len - 2, 0, 2.8, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
       break;
     }
     // ---------------- DRONE (浮游炮) ----------------
     case "drone": {
-      body(-6, -4, 12, 8, "#2c3350", "#1a1f33", 3);
-      ctx.fillStyle = rgba(gun.glow, 0.8);
+      body(-6, -6, 12, 12, "#1e293b", "#0f172a", 4);
+      ctx.fillStyle = "#334155";
       ctx.beginPath();
-      ctx.arc(-6, -5, 2, 0, Math.PI * 2);
-      ctx.arc(6, -5, 2, 0, Math.PI * 2);
-      ctx.arc(-6, 5, 2, 0, Math.PI * 2);
-      ctx.arc(6, 5, 2, 0, Math.PI * 2);
+      ctx.moveTo(-3, -6);
+      ctx.lineTo(-8, -12);
+      ctx.lineTo(-4, -12);
+      ctx.lineTo(1, -6);
+      ctx.moveTo(-3, 6);
+      ctx.lineTo(-8, 12);
+      ctx.lineTo(-4, 12);
+      ctx.lineTo(1, 6);
       ctx.fill();
-      const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, 5);
-      cg.addColorStop(0, "#ffffff");
-      cg.addColorStop(0.4, rgba(gun.glow, 0.9));
-      cg.addColorStop(1, rgba(gun.glow, 0));
-      ctx.fillStyle = cg;
-      ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = rgba(gun.glow, 0.85);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(8, 0, 2.5 + Math.sin(t * 10) * 0.4, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 1, -1.8, 5, 3.6, 0.8);
+      ctx.fill();
       break;
     }
     // ---------------- LIGHTNING WHIP (闪电鞭) ----------------
     case "lightning_whip": {
-      body(-8, -2.4, 12, 4.8, STEEL_X, STEEL_D, 1.5);
-      block(-8, -2.4, 4, 4.8, STEEL_D, 1);
-      block(2, -2.6, 2, 5.2, STEEL_L, 0.8);
+      body(-7, -2.2, 11, 4.4, "#451a03", "#78350f", 1.2);
+      block(4, -2.6, 2, 5.2, STEEL_L, 0.6);
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const len = (gun.meleeRange ?? 90) * 0.9;
-      const flick = 1 + Math.sin(t * 22) * 0.12;
-      const tail = (w, col) => {
-        ctx.strokeStyle = col;
-        ctx.lineWidth = w;
-        ctx.beginPath();
-        ctx.moveTo(4, 0);
-        let x = 4;
-        let y = 0;
-        const segs = 5;
-        for (let i = 1; i <= segs; i++) {
-          const f = i / segs;
-          const nx = 4 + len * f;
-          const ny = Math.sin(f * Math.PI * 2.5 + t * 6) * (10 * (1 - f)) * flick;
-          ctx.lineTo(nx, ny);
-          x = nx;
-          y = ny;
-        }
-        ctx.stroke();
-        return { x, y };
-      };
-      tail(8 * flick, rgba(gun.glow, 0.28));
-      tail(3 * flick, rgba("#ffffff", 0.9));
+      const len = (gun.meleeRange ?? 90) * 0.95;
+      const flick = 1 + Math.sin(t * 24) * 0.15;
+      ctx.strokeStyle = rgba(gun.glow, 0.85);
+      ctx.lineWidth = 2.2 * flick;
+      ctx.beginPath();
+      ctx.moveTo(6, 0);
+      let x = 6;
+      let y = 0;
+      for (let i = 1; i <= 6; i++) {
+        const f = i / 6;
+        const nx = 6 + len * f;
+        const ny = (Math.sin(f * Math.PI * 3 + t * 9) * (8 * (1 - f)) + (Math.random() - 0.5) * 4) * flick;
+        ctx.lineTo(nx, ny);
+        x = nx;
+        y = ny;
+      }
+      ctx.stroke();
       ctx.restore();
       break;
     }
-    // ---------------- RECURVE BOW ----------------
+    // ---------------- RECURVE BOW (反曲弓) ----------------
     case "recurve_bow": {
-      block(-2, -2, 4, 4, WOOD_D, 1);
-      ctx.strokeStyle = WOOD;
-      ctx.lineWidth = 2.5;
+      const charge = swing;
+      const pull = charge * 6.5;
+      block(-2.5, -3, 5, 6, "#0f172a", 1.5);
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(0, -2);
-      ctx.quadraticCurveTo(14, -18, 2, -26);
+      ctx.moveTo(0, -3);
+      ctx.quadraticCurveTo(12 - pull * 0.3, -15, 2 - pull * 0.6, -25);
+      ctx.moveTo(0, 3);
+      ctx.quadraticCurveTo(12 - pull * 0.3, 15, 2 - pull * 0.6, 25);
       ctx.stroke();
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.moveTo(0, 2);
-      ctx.quadraticCurveTo(14, 18, 2, 26);
+      ctx.moveTo(2 - pull * 0.6, -25);
+      ctx.lineTo(-pull, 0);
+      ctx.lineTo(2 - pull * 0.6, 25);
       ctx.stroke();
-      ctx.strokeStyle = WOOD_D;
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(2, -26);
-      ctx.lineTo(-3, -29);
-      ctx.moveTo(2, 26);
-      ctx.lineTo(-3, 29);
+      ctx.moveTo(-pull, 0);
+      ctx.lineTo(16 - pull, 0);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(240,240,255,0.8)";
-      ctx.lineWidth = 1;
+      ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
-      ctx.moveTo(2, -26);
-      ctx.lineTo(2, 26);
-      ctx.stroke();
-      ctx.fillStyle = rgba(gun.glow, 0.8);
-      roundRect(ctx, 6, -1, 4, 2, 0.5);
+      ctx.moveTo(16 - pull, -3);
+      ctx.lineTo(21 - pull, 0);
+      ctx.lineTo(16 - pull, 3);
       ctx.fill();
       break;
     }
-    // ---------------- RIOT SHIELD ----------------
+    // ---------------- RIOT SHIELD (防暴盾牌) ----------------
     case "riot_shield": {
-      const sg = ctx.createLinearGradient(-2, -14, -2, 14);
-      sg.addColorStop(0, "#60a5fa");
-      sg.addColorStop(0.5, "#3b82f6");
-      sg.addColorStop(1, "#1d4ed8");
-      ctx.fillStyle = sg;
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = rgba("#2563eb", 0.45);
+      ctx.strokeStyle = "#1d4ed8";
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(-4, -13);
-      ctx.lineTo(8, -16);
-      ctx.lineTo(11, 0);
-      ctx.lineTo(8, 16);
-      ctx.lineTo(-4, 13);
+      ctx.moveTo(-4, -14);
+      ctx.lineTo(9, -17);
+      ctx.lineTo(12, 0);
+      ctx.lineTo(9, 17);
+      ctx.lineTo(-4, 14);
       ctx.lineTo(-6, 0);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = rgba("#dbeafe", 0.6);
-      roundRect(ctx, -1, -4, 9, 8, 2);
+      ctx.fillStyle = rgba("#e0f2fe", 0.7);
+      roundRect(ctx, 0, -4.5, 8, 9, 1.8);
       ctx.fill();
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.strokeStyle = rgba(gun.glow, 0.7);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(8, -16);
-      ctx.lineTo(11, 0);
-      ctx.lineTo(8, 16);
       ctx.stroke();
       break;
     }
-    // ---------------- SHAK-50 ----------------
+    // ---------------- SHAK-50 (重突击枪) ----------------
     case "shak50": {
-      body(-5, -3.5, 15, 7, STEEL_X, STEEL, 2.5);
-      body(9, -1.5, 8, 3, STEEL_L, STEEL_D, 1);
-      block(-10, -2, 5, 4.5, WOOD, 1.5);
-      block(-1, -4.5, 8, 1.5, STEEL_D, 0.5);
-      ctx.save();
-      ctx.translate(0, 2.5);
-      ctx.rotate(0.38);
-      block(-2, 0, 4.5, 9, STEEL_D, 1.5);
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 16, -1, 2.2, 2, 0.8);
+      body(-10, -5, 22, 10, STEEL_D, "#0f172a", 2);
+      body(12, -2.4, 11, 4.8, STEEL_L, STEEL_D, 1.5);
+      block(2, -4, 9, 8, "#334155", 1.5);
+      block(-8, 3.5, 4.5, 8.5, STEEL, 1);
+      block(-4, -7.5, 8, 2.5, STEEL_D, 0.8);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 1, -6.5, 2, 1.5, 0.4);
       ctx.fill();
       break;
     }
-    // ---------------- GATLING ----------------
+    // ---------------- GATLING (加特林) ----------------
     case "gatling": {
-      body(-7, -5, 13, 10, STEEL_X, STEEL, 2.5);
-      block(-12, -3, 6, 6, STEEL_D, 1.5);
+      body(-8, -6, 14, 12, STEEL_X, STEEL, 3);
+      block(-14, -3, 6, 6, STEEL_D, 1.5);
+      ctx.strokeStyle = "#eab308";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(-6, 6);
+      ctx.lineTo(-4, 14);
+      ctx.stroke();
       ctx.save();
-      ctx.translate(8, 0);
-      block(-4, -5, 13, 10, STEEL, 2);
-      ctx.rotate(t * 9);
+      ctx.translate(6, 0);
+      ctx.rotate(t * 11);
       for (let i = 0; i < 6; i++) {
         const a = i / 6 * Math.PI * 2;
-        const bx = Math.cos(a) * 3.2;
-        const by = Math.sin(a) * 3.2;
-        ctx.fillStyle = i % 2 ? STEEL_X : STEEL_L;
-        roundRect(ctx, 2 + bx - 1.3, by - 1.6, 11, 3.2, 1);
+        const bx = Math.cos(a) * 3.6;
+        const by = Math.sin(a) * 3.6;
+        ctx.fillStyle = i % 2 ? STEEL_L : STEEL_D;
+        roundRect(ctx, 0, by - 1.5, 14, 3, 0.8);
         ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 0.8;
         ctx.stroke();
       }
       ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 23, -2, 2.4, 4, 1);
-      ctx.fill();
       break;
     }
-    // ---------------- POISON MIST ----------------
+    // ---------------- POISON MIST (毒雾器) ----------------
     case "poison_mist": {
-      body(-7, -5, 16, 10, STEEL_X, STEEL_D, 2.5);
-      block(-11, -2.6, 5, 5.2, STEEL_D, 1.2);
-      block(0, -8, 11, 4, "#4d7c0f", 1.5);
-      block(2, -7.4, 7, 1, "#bef264", 0.5);
-      body(9, -3, 8, 6, STEEL_L, STEEL_D, 1.5);
-      block(16, -4.5, 3, 9, STEEL_D, 1);
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 5; i++) {
-        const ph = (t * 1.4 + i * 0.4) % 1;
-        const rr = 3 + ph * 8;
-        const px = 19 + ph * 11;
-        ctx.fillStyle = rgba("#a3e635", 0.32 * (1 - ph));
-        ctx.beginPath();
-        ctx.arc(px, Math.sin(i * 2 + t * 2) * 4, rr, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
+      body(-6, -4.5, 16, 9, STEEL_D, "#151c0c", 2.5);
+      block(-10, -2.6, 4.5, 5.2, STEEL_D, 1);
+      ctx.fillStyle = "#22c55e";
+      roundRect(ctx, -2, -7.5, 4, 3, 1);
+      roundRect(ctx, 3, -7.5, 4, 3, 1);
+      ctx.fill();
+      ctx.stroke();
+      body(10, -3.2, 8, 6.4, STEEL_L, STEEL_D, 1.5);
       break;
     }
-    // ---------------- LEWIS MACHINE GUN ----------------
+    // ---------------- LEWIS (路易斯机枪) ----------------
     case "lewis": {
-      body(-9, -4.5, 20, 9, STEEL_X, STEEL, 2.5);
-      body(9, -2, 14, 4, STEEL_L, STEEL_D, 1.5);
-      block(11, -4, 10, 2, STEEL_D, 1);
-      block(-4, -6.5, 9, 5, STEEL_D, 1.5);
-      block(-13, -2.4, 7, 4.8, STEEL_D, 1.5);
-      ctx.save();
-      ctx.translate(0, 3);
-      ctx.rotate(0.42);
-      block(-2, 0, 5, 10, STEEL_D, 2);
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 24, -1, 2.6, 2.4, 1);
+      body(-8, -4.5, 19, 9, STEEL_X, STEEL, 2.5);
+      body(11, -3, 12, 6, STEEL_L, STEEL_D, 2);
+      block(-14, -2.4, 7, 4.8, WOOD, 1.5);
+      ctx.fillStyle = STEEL_D;
+      ctx.beginPath();
+      ctx.ellipse(-2, -6.5, 8.5, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    // ---------------- PLASMA RIFLE (电浆步枪) ----------------
+    case "plasma_rifle": {
+      body(-6, -4.5, 18, 9, "#faf5ff", "#c084fc", 2.5);
+      body(12, -2.6, 9, 5.2, "#a855f7", "#7e22ce", 1.5);
+      block(-12, -2.4, 7, 4.8, "#6b21a8", 1.5);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 1, 3.5, 4.5, 7.5, 1);
       ctx.fill();
       break;
     }
-    // ---------------- PLASMA RIFLE ----------------
-    case "plasma_rifle": {
-      body(-6, -4.5, 18, 9, STEEL_X, STEEL, 2.5);
-      body(10, -2.4, 12, 4.8, STEEL_L, STEEL_D, 1.5);
-      block(3, -7, 10, 3, "#6d28d9", 1.5);
-      block(5, -6.4, 6, 1, "#c4b5fd", 0.5);
-      block(-12, -2.4, 7, 4.8, STEEL_D, 1.5);
+    // ---------------- DUAL BLADES (双刃) ----------------
+    case "dual_blades": {
+      const glow = rgba(gun.glow, 0.85);
+      const flick = 1 + Math.sin(t * 26) * 0.06;
+      const len = (gun.meleeRange ?? 78) * 0.52;
       ctx.save();
-      ctx.translate(0, 3);
-      ctx.rotate(0.42);
-      block(-2, 0, 5, 9, STEEL_D, 2);
-      ctx.restore();
+      ctx.rotate(-0.55);
+      block(-3, -2.2, 6, 4.4, "#1e293b", 1);
+      block(-4, -3, 1.5, 6, STEEL_D, 0.5);
+      ctx.strokeStyle = STEEL_X;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(2, 0);
+      ctx.quadraticCurveTo(len * 0.6, -len * 0.22, len, -len * 0.04);
+      ctx.stroke();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1.6 * flick;
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+      ctx.save();
+      ctx.rotate(0.55);
+      block(-3, -2.2, 6, 4.4, "#1e293b", 1);
+      block(-4, -3, 1.5, 6, STEEL_D, 0.5);
+      ctx.strokeStyle = STEEL_X;
+      ctx.lineWidth = 3.2;
       ctx.beginPath();
-      ctx.arc(23, 0, 3.4, 0, Math.PI * 2);
+      ctx.moveTo(2, 0);
+      ctx.quadraticCurveTo(len * 0.6, len * 0.22, len, len * 0.04);
+      ctx.stroke();
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1.6 * flick;
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+      break;
+    }
+    // ---------------- THRUST LONGSWORD (突刺长剑) ----------------
+    case "thrust_sword": {
+      const len = (gun.meleeRange ?? 88) * 0.85;
+      block(-10, -2.2, 7, 4.4, "#4c1d95", 1.2);
+      block(-12, -2.6, 2, 5.2, "#ca8a04", 0.6);
+      block(-3, -5, 2.5, 10, STEEL_D, 1);
+      ctx.fillStyle = STEEL_X;
+      ctx.beginPath();
+      ctx.moveTo(0, -3.2);
+      ctx.lineTo(len - 4, -2.4);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(len - 4, 2.4);
+      ctx.lineTo(0, 3.2);
+      ctx.closePath();
       ctx.fill();
+      ctx.strokeStyle = STEEL_D;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const flick = 1 + Math.sin(t * 18) * 0.08;
+      ctx.strokeStyle = rgba(gun.glow, 0.85);
+      ctx.lineWidth = 2.4 * flick;
+      ctx.beginPath();
+      ctx.moveTo(1, 0);
+      ctx.lineTo(len - 3, 0);
+      ctx.stroke();
       ctx.restore();
       break;
     }
@@ -2586,6 +2625,8 @@ var SoundManager = class _SoundManager {
   ctx = null;
   master = null;
   noise = null;
+  killSounds = [];
+  deathSound = null;
   enabled = true;
   /** master volume 0..1 (scaled by BASE so the default 0.5 matches the old 0.3 gain) */
   volume = 0.5;
@@ -2593,6 +2634,17 @@ var SoundManager = class _SoundManager {
   /** Create / resume the audio context. Call from a user gesture. */
   ensure() {
     try {
+      if (!this.killSounds.length) {
+        console.log("[Audio] Preloading WAV sound files...");
+        this.killSounds = [
+          new Audio("killConfirm01.wav"),
+          new Audio("killconfirm02.wav")
+        ];
+        this.deathSound = new Audio("DeathSound.wav");
+        this.killSounds.forEach((s) => s.volume = this.volume);
+        if (this.deathSound) this.deathSound.volume = this.volume;
+        console.log("[Audio] WAV preloaded successfully. Paths:", this.killSounds.map((x) => x.src), this.deathSound.src);
+      }
       if (!this.ctx) {
         const Ctor = window.AudioContext || window.webkitAudioContext;
         this.ctx = new Ctor();
@@ -2618,6 +2670,23 @@ var SoundManager = class _SoundManager {
     if (this.master) {
       this.master.gain.value = this.volume * _SoundManager.BASE;
     }
+    this.killSounds.forEach((s) => s.volume = this.volume);
+    if (this.deathSound) this.deathSound.volume = this.volume;
+  }
+  playKillConfirm() {
+    console.log("[Audio] playKillConfirm invoked. enabled:", this.enabled, "count:", this.killSounds.length);
+    if (!this.enabled || !this.killSounds.length) return;
+    const s = this.killSounds[Math.floor(Math.random() * this.killSounds.length)];
+    s.volume = this.volume;
+    s.currentTime = 0;
+    s.play().then(() => console.log("[Audio] playKillConfirm playing:", s.src)).catch((err) => console.error("[Audio] playKillConfirm playback failed:", err));
+  }
+  playDeath() {
+    console.log("[Audio] playDeath invoked. enabled:", this.enabled, "hasSound:", !!this.deathSound);
+    if (!this.enabled || !this.deathSound) return;
+    this.deathSound.volume = this.volume;
+    this.deathSound.currentTime = 0;
+    this.deathSound.play().then(() => console.log("[Audio] playDeath playing:", this.deathSound?.src)).catch((err) => console.error("[Audio] playDeath playback failed:", err));
   }
   now() {
     return this.ctx ? this.ctx.currentTime : 0;
@@ -2839,7 +2908,8 @@ var EMPTY_FRAME = {
   gadget: -1,
   weaponSwitch: false,
   skill: false,
-  reload: false
+  reload: false,
+  secondaryFiring: false
 };
 var RESPAWN_TIME = 4;
 var GameEngine = class {
@@ -2997,8 +3067,10 @@ var GameEngine = class {
   nextKillFeedId = 0;
   activeScoreFeed = null;
   nextScoreFeedEventId = 0;
+  /** fractional score accumulator for the local (non-combatant) player */
+  localScoreAcc = 0;
   addScoreFeed(text, score, victimName, subScore, totalKills) {
-    if (this.gameMode === "biohazard") return;
+    if (this.gameMode === "biohazard" && text === "\u4F24\u5BB3\u51FB\u4E2D") return;
     if (!this.activeScoreFeed || this.activeScoreFeed.timer <= 0) {
       this.activeScoreFeed = {
         totalScore: score,
@@ -3021,6 +3093,38 @@ var GameEngine = class {
       }
     }
     this.emit(true);
+  }
+  /**
+   * Award score equal to the ACTUAL damage dealt. Damage is accumulated as a
+   * float and flushed to the integer score feed only once it reaches >= 1, so
+   * continuous / damage-over-time weapons (beam, flame, poison, ...) no longer
+   * lose their per-frame fractional damage to Math.round() and end up scoring
+   * almost nothing despite dealing real damage.
+   */
+  awardDamageScore(attackerId, dealt) {
+    if (this.gameMode === "biohazard") return;
+    if (dealt <= 0 || attackerId === void 0 || attackerId < 0) return;
+    const killerC = this.combatants.find((c) => c.id === attackerId);
+    let acc;
+    if (killerC) {
+      killerC.scoreAcc = (killerC.scoreAcc ?? 0) + dealt;
+      acc = killerC.scoreAcc;
+    } else {
+      this.localScoreAcc += dealt;
+      acc = this.localScoreAcc;
+    }
+    if (acc >= 1) {
+      const whole = Math.floor(acc);
+      if (killerC) {
+        killerC.score += whole;
+        killerC.scoreAcc = acc - whole;
+      } else {
+        this.score += whole;
+        this.localScoreAcc = acc - whole;
+      }
+      const isLocal = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
+      if (isLocal) this.addScoreFeed("\u4F24\u5BB3\u51FB\u4E2D", whole);
+    }
   }
   addKillFeed(killerName, victimName, weaponId, killerC) {
     if (this.gameMode === "biohazard") return;
@@ -3226,6 +3330,11 @@ var GameEngine = class {
       this.player.shieldBlockTime = 0;
       if (this.gun.shieldMaxHp && this.player.shieldHp <= 0 && this.player.shieldCd <= 0) {
         this.player.shieldHp = this.gun.shieldMaxHp;
+      }
+      const localPid = this.mode === "local" ? 0 : this.selfPid;
+      const localC = this.combatants.find((c) => c.id === localPid);
+      if (localC) {
+        localC.gunIndex = i;
       }
       this.emit(true);
     }
@@ -4213,6 +4322,24 @@ var GameEngine = class {
     }
     if (e.button === 2) {
       this.secondaryFiring = true;
+      if (this.gun.id === "dual_blades" && !this.paused && !this.gameOver) {
+        const p = this.player;
+        const g = this.gun;
+        p.bladeRaising = true;
+        p.bladeReflectRange = g.reflectRange ?? 96;
+        p.bladeReflectSelf = g.reflectSelfDamage ?? 0.05;
+        p.bladeReflectGlow = g.glow;
+        sound.swing();
+        e.preventDefault();
+        return;
+      }
+      if (this.gun.id === "thrust_sword" && !this.paused && !this.gameOver) {
+        const p = this.player;
+        p.thrustCharging = true;
+        p.thrustCharge = 0;
+        e.preventDefault();
+        return;
+      }
       if (this.mode === "guest") {
         this.pendSkill = true;
         this.localSkillCooldown();
@@ -4234,6 +4361,8 @@ var GameEngine = class {
       this.semiAutoLatch = false;
     } else if (e.button === 2) {
       this.secondaryFiring = false;
+      if (this.player.thrustCharging) this.thrustRelease();
+      this.player.bladeRaising = false;
     }
   }
   onWheel(e) {
@@ -4314,15 +4443,19 @@ var GameEngine = class {
       dx /= vlen;
       dy /= vlen;
       const p = this.player;
+      if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
           p.dashTime -= dt;
           p.x += p.dashVx * dt;
           p.y += p.dashVy * dt;
+        } else if (p.thrustDashActive) {
+          this.stepThrustDash(dt);
         } else {
+          const meleeMoveMult = (this.gun.weaponClass === "melee" ? 1.23 : 1) * (p.bladeRaising ? 0.85 : 1);
           const slow = (p.bowDrawing ? this.gun.drawSlowMult ?? 1 : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
-          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
-          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
         }
         const m = p.size;
         p.x = Math.max(m, Math.min(this.worldW - m, p.x));
@@ -4392,15 +4525,19 @@ var GameEngine = class {
       dx /= vlen;
       dy /= vlen;
       const p = this.player;
+      if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
           p.dashTime -= dt;
           p.x += p.dashVx * dt;
           p.y += p.dashVy * dt;
+        } else if (p.thrustDashActive) {
+          this.stepThrustDash(dt);
         } else {
+          const meleeMoveMult = (this.gun.weaponClass === "melee" ? 1.23 : 1) * (p.bladeRaising ? 0.85 : 1);
           const slow = (p.bowDrawing ? this.gun.drawSlowMult ?? 1 : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
-          p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
-          p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+          p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
+          p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
         }
         const m = p.size;
         p.x = Math.max(m, Math.min(this.worldW - m, p.x));
@@ -4548,6 +4685,35 @@ var GameEngine = class {
     }
     if (p.lunge > 0) p.lunge = Math.max(0, p.lunge - dt * 120);
     if (p.electrifiedTime && p.electrifiedTime > 0) p.electrifiedTime -= dt;
+    if (this.gun.id === "thrust_sword") {
+      if (this.secondaryFiring && !p.thrustDashActive) {
+        if (!p.thrustCharging) {
+          p.thrustCharging = true;
+          p.thrustCharge = 0;
+        }
+      } else {
+        if (p.thrustCharging) {
+          this.thrustRelease();
+        }
+      }
+    } else {
+      p.thrustCharging = false;
+    }
+    if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
+    if (this.gun.id === "dual_blades") {
+      if (this.secondaryFiring) {
+        if (!p.bladeRaising) {
+          p.bladeRaising = true;
+          p.bladeReflectRange = this.gun.reflectRange ?? 96;
+          p.bladeReflectSelf = this.gun.reflectSelfDamage ?? 0.05;
+          p.bladeReflectGlow = this.gun.glow;
+        }
+      } else {
+        p.bladeRaising = false;
+      }
+    } else {
+      p.bladeRaising = false;
+    }
     let dx = 0;
     let dy = 0;
     if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) dy -= 1;
@@ -4567,10 +4733,13 @@ var GameEngine = class {
       p.x += p.dashVx * dt;
       p.y += p.dashVy * dt;
       this.spawnParticles(p.x, p.y, this.character.bodyColor, 2, 60);
+    } else if (p.thrustDashActive) {
+      this.stepThrustDash(dt);
     } else {
+      const meleeMoveMult = (this.gun.weaponClass === "melee" ? 1.23 : 1) * (p.bladeRaising ? 0.85 : 1);
       const slow = (p.bowDrawing ? this.gun.drawSlowMult ?? 1 : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
-      p.x += dx * p.speed * slow * RUNTIME.playerSpeedMult * dt;
-      p.y += dy * p.speed * slow * RUNTIME.playerSpeedMult * dt;
+      p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
+      p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
     }
     const m = p.size;
     p.x = Math.max(m, Math.min(this.worldW - m, p.x));
@@ -4842,10 +5011,11 @@ var GameEngine = class {
     const p = this.player;
     const range = g.meleeRange ?? 60;
     const arc = g.meleeArc ?? 2;
-    const dmg = g.damage * this.character.damageMult;
+    let dmg = g.damage * this.character.damageMult;
     const isSpear = g.id === "spear";
     const isSaber = g.id === "lightsaber";
     const isWhip = !!g.whip;
+    const isDual = g.id === "dual_blades";
     const slowOnHit = g.slowOnHit ?? 0;
     sound.swing();
     p.swingTimer = p.swingDur;
@@ -4865,19 +5035,37 @@ var GameEngine = class {
       p.lunge = 14;
       p.iframes = Math.max(p.iframes, 0.12);
     }
+    if (isDual) {
+      p.comboStep += 1;
+      if (p.comboStep > (g.comboLength ?? 5)) p.comboStep = 1;
+      p.comboTimer = 1;
+      const arr = g.comboDamage ?? [g.damage];
+      const step = Math.min(p.comboStep, arr.length);
+      dmg = arr[step - 1] * this.character.damageMult;
+      this.whipToggle = !this.whipToggle;
+      swingAngle = p.angle + (this.whipToggle ? 0.5 : -0.5);
+      if (p.comboStep >= (g.comboLength ?? 5)) {
+        p.lunge = 16;
+      }
+    }
     const dmgMult = isSpear ? 1 + p.comboStep * 0.35 : 1;
     this.effects.push({
-      type: isWhip ? "whip" : isSaber ? "saberswing" : "slash",
+      type: isWhip ? "whip" : isSaber ? "saberswing" : isDual ? "dual_slash" : "slash",
       x: p.x,
       y: p.y,
       angle: swingAngle,
       arc: isWhip ? this.whipToggle ? 0.6 : -0.6 : arc,
-      range,
+      range: range * (isDual && p.comboStep === 5 ? 1.3 : 1),
       t: 0,
-      duration: isWhip ? 0.18 : isSaber ? 0.32 : 0.22,
-      radius: range,
-      color: g.glow
+      duration: isDual ? p.comboStep === 5 ? 0.36 : 0.18 : isWhip ? 0.18 : isSaber ? 0.32 : 0.22,
+      radius: range * (isDual && p.comboStep === 5 ? 1.3 : 1),
+      color: g.glow,
+      style: isDual ? String(p.comboStep) : void 0,
+      dirX: isDual ? this.whipToggle ? 1 : -1 : void 0
     });
+    if (isDual && p.comboStep === 5 && !this.simulatingOther) {
+      this.shake = Math.min(20, this.shake + 14);
+    }
     for (const e of this.enemies) {
       const dx = e.x - p.x;
       const dy = e.y - p.y;
@@ -4970,6 +5158,84 @@ var GameEngine = class {
       if (w.destructible && this.rectCircleOverlap(w, p.x, p.y, radius)) {
         this.breakWall(w, i);
       }
+    }
+  }
+  // ------------------------------------------------------------- thrust longsword (突刺长剑)
+  /** Release the charged dash for the thrust sword (called on right-click up). */
+  thrustRelease() {
+    const p = this.player;
+    const g = this.gun;
+    p.thrustCharging = false;
+    const charge = p.thrustCharge ?? 0;
+    p.thrustCharge = 0;
+    if (g.id !== "thrust_sword") return;
+    if (charge < (g.chargeMin ?? 0.5)) return;
+    const ang = p.angle;
+    const dist = g.chargeDashDist ?? 200;
+    const dmg = (g.chargeDashDamage ?? 140) * this.character.damageMult;
+    const sp = 900;
+    p.thrustDashActive = true;
+    p.thrustDashAngle = ang;
+    p.thrustDashLeft = dist;
+    p.thrustDashVx = Math.cos(ang) * sp;
+    p.thrustDashVy = Math.sin(ang) * sp;
+    p.thrustDashDmg = dmg;
+    p.thrustHitIds = /* @__PURE__ */ new Set();
+    p.iframes = Math.max(p.iframes, 0.18);
+    sound.swing();
+    this.spawnParticles(p.x, p.y, g.glow, 14, 280, 0.4);
+    this.effects.push({
+      type: "slash",
+      x: p.x,
+      y: p.y,
+      angle: ang,
+      arc: 0.5,
+      range: g.chargeDashRange ?? 34,
+      t: 0,
+      duration: 0.18,
+      radius: g.chargeDashRange ?? 34,
+      color: g.glow
+    });
+  }
+  /** Advance the thrust-sword dash each frame, hitting enemies along the path. */
+  stepThrustDash(dt) {
+    const p = this.player;
+    const g = this.gun;
+    const ang = p.thrustDashAngle ?? p.angle;
+    const ca = Math.cos(ang);
+    const sa = Math.sin(ang);
+    const step = Math.hypot(p.thrustDashVx ?? 0, p.thrustDashVy ?? 0) * dt;
+    p.x += (p.thrustDashVx ?? 0) * dt;
+    p.y += (p.thrustDashVy ?? 0) * dt;
+    p.thrustDashLeft = (p.thrustDashLeft ?? 0) - step;
+    const range = g.chargeDashRange ?? 34;
+    const dmg = p.thrustDashDmg ?? 0;
+    for (const e of this.enemies) {
+      if (p.thrustHitIds?.has(e.id)) continue;
+      const rx = e.x - p.x;
+      const ry = e.y - p.y;
+      const d = Math.hypot(rx, ry);
+      const fwd = rx * ca + ry * sa;
+      if (d <= range + e.size && fwd > -range) {
+        p.thrustHitIds?.add(e.id);
+        this.damageEnemy(e, dmg, 0, 0, false, { weapon: "thrust_sword", dx: ca, dy: sa });
+      }
+    }
+    const opp = this.meleeOpponent();
+    if (opp && !(opp.deadTimer && opp.deadTimer > 0) && !p.thrustHitIds?.has(opp.id)) {
+      const rx = opp.x - p.x;
+      const ry = opp.y - p.y;
+      const d = Math.hypot(rx, ry);
+      const fwd = rx * ca + ry * sa;
+      if (d <= range + opp.size && fwd > -range) {
+        p.thrustHitIds?.add(opp.id);
+        this.damagePlayerEntity(opp, dmg, void 0, ca * 240, sa * 240, this.activeId);
+      }
+    }
+    this.spawnParticles(p.x, p.y, g.glow, 2, 140, 0.2);
+    if (p.thrustDashLeft <= 0) {
+      p.thrustDashActive = false;
+      p.thrustDashLeft = 0;
     }
   }
   // ------------------------------------------------------------- beam
@@ -5445,7 +5711,7 @@ var GameEngine = class {
         b.y = (b.lobSy ?? b.y) + ((b.lobTy ?? b.y) - (b.lobSy ?? b.y)) * prog;
         b.z = (b.lobPeak ?? 0) * Math.sin(prog * Math.PI);
         if (prog >= 1) {
-          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, "mortar");
+          this.explode(b.lobTx ?? b.x, b.lobTy ?? b.y, b.explosionRadius, b.damage, b.glow, "mortar", b.ownerId);
           continue;
         }
         next.push(b);
@@ -5488,10 +5754,10 @@ var GameEngine = class {
             b.bounced = true;
             this.spawnParticles(b.x, b.y, b.glow, 4, 100, 0.2);
           } else if (b.explosive && b.bounced) {
-            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
             dead = true;
           } else {
-            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+            if (b.explosive) this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
             else this.spawnParticles(b.x, b.y, b.glow, 4, 120, 0.22);
             dead = true;
           }
@@ -5534,7 +5800,7 @@ var GameEngine = class {
           if (ddx * ddx + ddy * ddy <= rr * rr) {
             b.hit.add(e.id);
             if (b.explosive) {
-              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+              this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
               dead = true;
               break;
             }
@@ -5544,13 +5810,36 @@ var GameEngine = class {
               0,
               0,
               false,
-              { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) }
+              { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) },
+              b.ownerId
             );
             if (b.pierce <= 0) {
               dead = true;
               break;
             }
             b.pierce -= 1;
+          }
+        }
+      }
+      if (!dead && b.owner !== "player" && !b.reflected) {
+        const reflectors = this.combatants.length > 0 ? this.combatants.map((c) => c.player).filter((q) => q && !(q.deadTimer && q.deadTimer > 0) && q.bladeRaising) : this.player.bladeRaising && !(this.player.deadTimer && this.player.deadTimer > 0) ? [this.player] : [];
+        for (const q of reflectors) {
+          const rr = (q.bladeReflectRange ?? 96) + b.size;
+          const rdx = b.x - q.x;
+          const rdy = b.y - q.y;
+          if (rdx * rdx + rdy * rdy <= rr * rr) {
+            const selfDmg = b.damage * (q.bladeReflectSelf ?? 0.05);
+            if (selfDmg > 0)
+              this.damagePlayerEntity(q, selfDmg, void 0, 0, 0, b.ownerId ?? 2);
+            b.vx = -b.vx;
+            b.vy = -b.vy;
+            b.owner = "player";
+            b.ownerId = this.combatants.length > 0 ? q.cid ?? 1 : this.activeId;
+            b.reflected = true;
+            b.hit.clear();
+            this.spawnParticles(b.x, b.y, q.bladeReflectGlow ?? "#22d3ee", 6, 160, 0.25);
+            sound.swing();
+            break;
           }
         }
       }
@@ -5622,7 +5911,7 @@ var GameEngine = class {
         }
       }
       if (dead && b.explosive && b.life <= 0 && b.hit.size === 0 && !b.bounced) {
-        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow);
+        this.explode(b.x, b.y, b.explosionRadius, b.damage, b.glow, b.weapon, b.ownerId);
       }
       if (!dead) next.push(b);
     }
@@ -6297,12 +6586,13 @@ var GameEngine = class {
           const e = it.ref;
           if ((e.x - fx.x) ** 2 + (e.y - fx.y) ** 2 < (fx.radius + e.size) ** 2) {
             if (fx.type === "poisoncloud") {
-              this.applyPoison(e, (fx.dps ?? 20) * 0.25 * 0.8);
+              this.applyPoison(e, (fx.dps ?? 20) * 0.25 * 0.8, fx.ownerId);
               e.slowT = Math.max(e.slowT, 0.3);
             } else {
-              this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true);
+              this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true, void 0, fx.ownerId);
               e.burnT = Math.max(e.burnT, 1);
               e.burnDps = Math.max(e.burnDps, 20);
+              e.burnOwnerId = fx.ownerId;
             }
           }
         }
@@ -6319,10 +6609,14 @@ var GameEngine = class {
       }
     }
   }
-  damageEnemy(e, dmg, kbx, kby, silent = false, src) {
+  damageEnemy(e, dmg, kbx, kby, silent = false, src, attackerId) {
     if (e.hp <= 0) return;
     dmg *= RUNTIME.playerDamageMult;
+    const before = e.hp;
     e.hp -= dmg;
+    const dealt = before - Math.max(e.hp, 0);
+    const finalAttackerId = attackerId !== void 0 ? attackerId : this.activeId ?? 0;
+    if (dealt > 0) this.awardDamageScore(finalAttackerId, dealt);
     if (!silent) e.hitFlash = 1;
     if (!silent && this.hitSndCd <= 0) {
       sound.hit();
@@ -6342,14 +6636,15 @@ var GameEngine = class {
       e.x - kbx * 0.1,
       e.y - kby * 0.1
     );
-    if (e.hp <= 0) this.killEnemy(e);
+    if (e.hp <= 0) this.killEnemy(e, finalAttackerId);
   }
   /** Apply (and ramp) poison on an enemy. The longer it stays in gas, the
    *  higher its poison dps climbs — so lingering hurts more and more. */
-  applyPoison(e, ramp) {
+  applyPoison(e, ramp, ownerId) {
     if (e.hp <= 0) return;
     e.poisonT = Math.max(e.poisonT ?? 0, 0.9);
     e.poisonDps = Math.min(260, (e.poisonDps ?? 0) + ramp);
+    if (ownerId !== void 0) e.poisonOwnerId = ownerId;
   }
   /** Enhanced, weapon- & direction-aware coin burst FX (everywhere except
    *  biohazard). Reused for enemy kills AND deathmatch/PvP combatant kills so
@@ -6416,9 +6711,37 @@ var GameEngine = class {
       this.spawnParticles(x, y, "#a3e635", 16, 240, 0.6);
     }
   }
-  killEnemy(e) {
+  killEnemy(e, attackerId) {
     this.score += e.score;
     this.kills += 1;
+    let killerName = "\u672A\u77E5";
+    let isLocal = false;
+    let killerC;
+    if (attackerId !== void 0) {
+      isLocal = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
+      if (isLocal) {
+        killerName = "\u4F60";
+      } else if (attackerId === this.peerPid) {
+        killerName = this.peerName || "\u961F\u53CB";
+      } else {
+        killerC = this.combatants.find((c) => c.id === attackerId);
+        if (killerC) {
+          killerC.kills += 1;
+          killerName = killerC.name;
+        }
+      }
+    } else {
+      const active = this.activeId ?? 0;
+      isLocal = this.mode === "local" && active === 0 || this.mode !== "local" && active === this.selfPid;
+      killerName = isLocal ? "\u4F60" : this.peerName || "\u961F\u53CB";
+    }
+    const victimName = e.name || (e.type === "monster" ? "\u602A\u7269" : "\u654C\u4EBA");
+    this.addKillFeed(killerName, victimName, e.lastSrc?.weapon, killerC);
+    if (isLocal) {
+      this.addScoreFeed("\u6DD8\u6C70", e.score, victimName, e.score, this.kills);
+      this.banner = { text: `\u51FB\u6740 ${victimName}\uFF01`, t: 1.6 };
+      sound.playKillConfirm();
+    }
     const big = e.type === "boss" || e.behavior === "abomination";
     const med = e.type === "tank" || e.behavior === "brute" || e.behavior === "bloater";
     const goldAmount = big ? 80 : med ? 18 : e.type === "shooter" || e.behavior === "spitter" ? 10 : 6;
@@ -6508,6 +6831,7 @@ var GameEngine = class {
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
     if (p.hp <= 0) {
       p.hp = 0;
+      sound.playDeath();
       if (this.mode === "local") {
         this.endGame("\u4F60\u5012\u4E0B\u4E86");
       } else {
@@ -6598,16 +6922,7 @@ var GameEngine = class {
         sound.explosion();
       }
       const shieldDiff = prevShield - p.shieldHp;
-      if (shieldDiff > 0 && this.gameMode !== "biohazard") {
-        const scoreGained = Math.round(shieldDiff);
-        if (scoreGained > 0 && attackerId !== void 0 && attackerId >= 0) {
-          const killerC = this.combatants.find((c) => c.id === attackerId);
-          if (killerC) killerC.score += scoreGained;
-          else this.score += scoreGained;
-          const isLocalAttacker = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
-          if (isLocalAttacker) this.addScoreFeed("\u4F24\u5BB3\u51FB\u4E2D", scoreGained);
-        }
-      }
+      this.awardDamageScore(attackerId, shieldDiff);
       return;
     }
     p.hp -= dmg;
@@ -6625,21 +6940,16 @@ var GameEngine = class {
       p.y = Math.max(p.size, Math.min(this.worldH - p.size, p.y + knockY));
     }
     const hpDiff = prevHp - p.hp;
-    if (hpDiff > 0 && this.gameMode !== "biohazard") {
-      const scoreGained = Math.round(hpDiff);
-      if (scoreGained > 0 && attackerId !== void 0 && attackerId >= 0) {
-        const killerC = this.combatants.find((c) => c.id === attackerId);
-        if (killerC) killerC.score += scoreGained;
-        else this.score += scoreGained;
-        const isLocalAttacker = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
-        if (isLocalAttacker) this.addScoreFeed("\u4F24\u5BB3\u51FB\u4E2D", scoreGained);
-      }
-    }
+    this.awardDamageScore(attackerId, hpDiff);
     if (p.hp <= 0) {
       p.hp = 0;
       p.deadTimer = RESPAWN_TIME;
       p.bowDrawing = false;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
+      const isLocal = this.mode === "local" && p.cid === 0 || this.mode !== "local" && p.cid === this.selfPid;
+      if (isLocal) {
+        sound.playDeath();
+      }
       if (this.gameMode === "cashout") {
         const c = this.combatants.find((comb) => comb.id === p.cid);
         if (c) {
@@ -6688,6 +6998,7 @@ var GameEngine = class {
             if (this.gameMode === "cashout") {
               this.addScoreFeed("\u6DD8\u6C70\u8D4F\u91D1", 500);
             }
+            sound.playKillConfirm();
           }
           if (killer.id === this.selfPid || this.mode === "local" && killer.id === 0) {
             this.banner = { text: `\u51FB\u6740 ${vName}\uFF01`, t: 1.6 };
@@ -6706,6 +7017,7 @@ var GameEngine = class {
         this.addKillFeed("\u4F60", this.peerName || "\u5BF9\u624B", _b?.weapon);
         this.addScoreFeed("\u6DD8\u6C70", 250, this.peerName || "\u5BF9\u624B", 250, this.kills);
         this.banner = { text: `\u51FB\u6740 ${this.peerName || "\u5BF9\u624B"}\uFF01`, t: 1.6 };
+        sound.playKillConfirm();
       } else {
         this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${RESPAWN_TIME} \u79D2\u540E\u590D\u6D3B`, t: 1.6 };
       }
@@ -6817,6 +7129,7 @@ var GameEngine = class {
     if (foe.deadTimer && foe.deadTimer > 0) return;
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse, sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets, sGadgetCd = this.gadgetCd;
     const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch, sActive = this.activeId, sWs = this.weaponStates;
+    const sSec = this.secondaryFiring;
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
     this.player = foe;
@@ -6866,6 +7179,7 @@ var GameEngine = class {
     this.semiAutoLatch = sSemi;
     this.activeId = sActive;
     this.weaponStates = sWs;
+    this.secondaryFiring = sSec;
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
     this.simulatingOther = false;
@@ -6884,6 +7198,7 @@ var GameEngine = class {
     this.simulatingOther = true;
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse, sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets, sGadgetCd = this.gadgetCd, sWs = this.weaponStates;
     const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch, sChar = this.character, sOut = this.outfit, sSkillDef = this.skill, sActive = this.activeId;
+    const sSec = this.secondaryFiring;
     const svmx = this.virtualMove.x, svmy = this.virtualMove.y;
     this.player = c.player;
     this.guns = c.guns;
@@ -6962,6 +7277,7 @@ var GameEngine = class {
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
     this.activeId = sActive;
+    this.secondaryFiring = sSec;
     this.simulatingOther = false;
   }
   /** Effective engagement range of a gun (px), used by bot target-range logic. */
@@ -7472,6 +7788,7 @@ var GameEngine = class {
     if (player.deadTimer && player.deadTimer > 0) return;
     const sp = this.player, sg = this.gunIndex, sk = this.keys, sm = this.mouse, sf = this.firing, sGuns = this.guns, sGadgets = this.gadgets, sGadgetCd = this.gadgetCd;
     const sSkill = this.skillCd, sDash = this.dashCharges, sDashR = this.dashRecharge, sLastG = this.lastGadget, sSemi = this.semiAutoLatch, sActive = this.activeId, sWs = this.weaponStates;
+    const sSec = this.secondaryFiring;
     const svmx = this.virtualMove.x;
     const svmy = this.virtualMove.y;
     this.player = player;
@@ -7482,6 +7799,7 @@ var GameEngine = class {
     this.virtualMove.x = inp.vmx;
     this.virtualMove.y = inp.vmy;
     this.firing = inp.firing;
+    this.secondaryFiring = !!inp.secondaryFiring;
     this.skillCd = player.skillCd ?? 0;
     this.dashCharges = player.dashCharges ?? MAX_DASH_CHARGES;
     this.dashRecharge = player.dashRecharge ?? 0;
@@ -7522,6 +7840,7 @@ var GameEngine = class {
     this.semiAutoLatch = sSemi;
     this.activeId = sActive;
     this.weaponStates = sWs;
+    this.secondaryFiring = sSec;
     this.virtualMove.x = svmx;
     this.virtualMove.y = svmy;
   }
@@ -7685,7 +8004,8 @@ var GameEngine = class {
       gadget: this.pendGadget,
       skill: this.pendSkill,
       reload: this.pendReload,
-      weaponSwitch: this.pendWeapon
+      weaponSwitch: this.pendWeapon,
+      secondaryFiring: this.secondaryFiring
     };
     this.pendGadget = -1;
     this.pendSkill = false;
@@ -7755,6 +8075,7 @@ var GameEngine = class {
       const diff = this.score - oldScore;
       if (this.kills > oldKills) {
         this.addScoreFeed("\u6DD8\u6C70", diff, this.peerName || "\u5BF9\u624B", diff, this.kills);
+        sound.playKillConfirm();
       } else {
         this.addScoreFeed(diff >= 200 ? "\u91D1\u5E01\u6536\u96C6" : "\u4F24\u5BB3\u51FB\u4E2D", diff);
       }
@@ -7983,6 +8304,9 @@ var GameEngine = class {
       const r = isMe ? { x: this.player.x, y: this.player.y } : ease(p.id, p.x, p.y);
       const gunList = isMe ? this.guns : this.foeGuns;
       const size = isMe ? this.player.size : getCharacter(p.character).size;
+      if (isMe) {
+        this.drawThrustSwordChargeIndicator(ctx, this.player);
+      }
       this.drawNetCharacter(
         ctx,
         r.x,
@@ -8161,7 +8485,8 @@ var GameEngine = class {
             Math.cos(a) * 260 * fall,
             Math.sin(a) * 260 * fall,
             false,
-            { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) }
+            { weapon: srcWpn ?? "explosive", dx: Math.cos(a), dy: Math.sin(a) },
+            ownerId
           );
         }
       }
@@ -8374,7 +8699,8 @@ var GameEngine = class {
       character: char,
       outfit,
       gun,
-      bowCharge: 0
+      bowCharge: 0,
+      name: (isElite ? "\u7CBE\u82F1 " : "") + char.name
     });
     this.effects.push({
       type: "spawn",
@@ -8444,6 +8770,7 @@ var GameEngine = class {
       id: this.enemyId++,
       type: "monster",
       behavior: def.behavior,
+      name: def.name,
       x,
       y,
       vx: 0,
@@ -8816,6 +9143,10 @@ var GameEngine = class {
           }
           ctx.restore();
         }
+        const isLocalC = this.mode === "local" ? c.id === 0 : c.id === this.selfPid;
+        if (isLocalC) {
+          this.drawThrustSwordChargeIndicator(ctx, q);
+        }
         this.drawNetCharacter(
           ctx,
           q.x,
@@ -8823,7 +9154,7 @@ var GameEngine = class {
           q.angle,
           c.character.id,
           c.outfit.id,
-          c.gunIndex,
+          q.gunIndex ?? c.gunIndex ?? 0,
           c.guns,
           c.name,
           q.hp / q.maxHp,
@@ -9932,6 +10263,7 @@ var GameEngine = class {
       }
       ctx.restore();
     }
+    this.drawThrustSwordChargeIndicator(ctx, p);
     const glow = p.overdriveTime > 0 ? "#fbbf24" : p.dashTime > 0 ? "#22d3ee" : void 0;
     const swing = p.swingTimer > 0 ? 1 - p.swingTimer / p.swingDur : 0;
     drawCharacter(ctx, {
@@ -9961,6 +10293,69 @@ var GameEngine = class {
       ctx.stroke();
       ctx.restore();
     }
+  }
+  drawThrustSwordChargeIndicator(ctx, p) {
+    if (this.gun.id !== "thrust_sword" || !p.thrustCharging) return;
+    const g = this.gun;
+    const dist = g.chargeDashDist ?? 200;
+    const rng = g.chargeDashRange ?? 34;
+    const pulse = 0.5 + 0.5 * Math.sin(this.time * 12);
+    const charge = p.thrustCharge ?? 0;
+    const minCharge = g.chargeMin ?? 0.5;
+    const pct = Math.min(1, charge / minCharge);
+    const isReady = pct >= 1;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    ctx.fillStyle = rgba(g.glow, 0.12 + 0.06 * pulse);
+    ctx.fillRect(0, -rng, dist, rng * 2);
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = rgba(g.glow, isReady ? 0.85 : 0.45);
+    ctx.lineWidth = isReady ? 2 : 1.2;
+    ctx.strokeRect(0, -rng, dist, rng * 2);
+    ctx.setLineDash([]);
+    ctx.strokeStyle = rgba(g.glow, isReady ? 0.95 : 0.65);
+    ctx.lineWidth = isReady ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(dist, 0);
+    ctx.stroke();
+    ctx.fillStyle = rgba(g.glow, 0.18 + 0.1 * pulse);
+    ctx.beginPath();
+    ctx.arc(dist, 0, rng, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = rgba(g.glow, isReady ? 0.95 : 0.65);
+    ctx.lineWidth = isReady ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.arc(dist, 0, rng, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = rgba(g.glow, isReady ? 1 : 0.7);
+    ctx.beginPath();
+    ctx.moveTo(dist + 9, 0);
+    ctx.lineTo(dist - 5, -6);
+    ctx.lineTo(dist - 5, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    const barW = 44;
+    const barH = 6;
+    const bx = p.x - barW / 2;
+    const by = p.y - p.size - 26;
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(bx, by, barW, barH);
+    ctx.fillStyle = isReady ? "#22c55e" : "#eab308";
+    ctx.fillRect(bx, by, barW * pct, barH);
+    ctx.strokeStyle = isReady ? "#ffffff" : "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, barW, barH);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 9px sans-serif";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowBlur = 3;
+    ctx.fillText(isReady ? "RELEASE TO DASH" : "CHARGING", p.x, by - 4);
+    ctx.restore();
   }
   /** Jagged, flickering ring used for explosive coin-bursts. */
   drawJaggedRing(ctx, x, y, r, color, alpha, lw) {
@@ -10175,6 +10570,103 @@ var GameEngine = class {
         ctx.beginPath();
         ctx.arc(0, 0, range * (0.6 + k * 0.5), -arc / 2, arc / 2);
         ctx.stroke();
+        ctx.restore();
+      } else if (e.type === "dual_slash") {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.angle ?? 0);
+        ctx.globalCompositeOperation = "lighter";
+        const comboStep = parseInt(e.style ?? "1", 10);
+        const swingDir = e.dirX ?? 1;
+        const arc = e.arc ?? 2;
+        const range = e.range ?? 78;
+        if (comboStep === 5) {
+          {
+            const sweepPercent = k * 1.25;
+            const head = Math.min(1, sweepPercent);
+            const tail = Math.max(0, sweepPercent - 0.45);
+            const startA = -arc / 2;
+            const endA = arc / 2;
+            const a1 = startA + tail * (endA - startA);
+            const a2 = startA + head * (endA - startA);
+            if (head > tail) {
+              const curRange = range * (0.9 + 0.1 * Math.sin(k * Math.PI));
+              ctx.lineWidth = 18 * (1 - k) + 4;
+              ctx.strokeStyle = rgba(e.color, (1 - k) * 0.9);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, false);
+              ctx.stroke();
+              ctx.lineWidth = 5 * (1 - k) + 1.5;
+              ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.95);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, false);
+              ctx.stroke();
+            }
+          }
+          {
+            const sweepPercent = k * 1.25;
+            const head = Math.min(1, sweepPercent);
+            const tail = Math.max(0, sweepPercent - 0.45);
+            const startA = arc / 2;
+            const endA = -arc / 2;
+            const a1 = startA + tail * (endA - startA);
+            const a2 = startA + head * (endA - startA);
+            if (head > tail) {
+              const curRange = range * (0.9 + 0.1 * Math.sin(k * Math.PI));
+              ctx.lineWidth = 18 * (1 - k) + 4;
+              ctx.strokeStyle = rgba(e.color, (1 - k) * 0.9);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, true);
+              ctx.stroke();
+              ctx.lineWidth = 5 * (1 - k) + 1.5;
+              ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.95);
+              ctx.beginPath();
+              ctx.arc(0, 0, curRange, a1, a2, true);
+              ctx.stroke();
+            }
+          }
+          ctx.strokeStyle = rgba(e.color, (1 - k) * 0.45);
+          ctx.lineWidth = 3 * (1 - k) + 0.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, range * (0.3 + k * 0.8), 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          const sweepPercent = k * 1.35;
+          const head = Math.min(1, sweepPercent);
+          const tail = Math.max(0, sweepPercent - 0.4);
+          const startA = swingDir === 1 ? -arc / 2 : arc / 2;
+          const endA = swingDir === 1 ? arc / 2 : -arc / 2;
+          const a1 = startA + tail * (endA - startA);
+          const a2 = startA + head * (endA - startA);
+          if (head > tail) {
+            const curRange = range * (0.85 + 0.15 * Math.sin(k * Math.PI));
+            const anticlockwise = swingDir === -1;
+            ctx.fillStyle = rgba(e.color, (1 - k) * 0.18);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, curRange, a1, a2, anticlockwise);
+            ctx.lineTo(0, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.lineWidth = 14 * (1 - k) + 3;
+            ctx.strokeStyle = rgba(e.color, (1 - k) * 0.85);
+            ctx.beginPath();
+            ctx.arc(0, 0, curRange, a1, a2, anticlockwise);
+            ctx.stroke();
+            ctx.lineWidth = 4 * (1 - k) + 1;
+            ctx.strokeStyle = rgba("#ffffff", (1 - k) * 0.95);
+            ctx.beginPath();
+            ctx.arc(0, 0, curRange, a1, a2, anticlockwise);
+            ctx.stroke();
+            const tipAngle = startA + head * (endA - startA);
+            const sparkX = Math.cos(tipAngle) * curRange;
+            const sparkY = Math.sin(tipAngle) * curRange;
+            ctx.fillStyle = rgba("#ffffff", (1 - k) * 0.9);
+            ctx.beginPath();
+            ctx.arc(sparkX, sparkY, 4 * (1 - k) + 1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
       } else if (e.type === "saberswing") {
         ctx.save();

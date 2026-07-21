@@ -68,6 +68,22 @@ const initialHud: HudState = {
   matchTimeLeft: null,
 };
 
+/** Keyboard / mouse controls shown in the in-game HUD hints panel. */
+const HUD_HINTS: { keys: string; label: string }[] = [
+  { keys: "WASD / 方向键", label: "移动" },
+  { keys: "鼠标", label: "瞄准" },
+  { keys: "左键", label: "射击 / 部署选中道具" },
+  { keys: "右键", label: "技能 / 武器特殊动作" },
+  { keys: "Q / 空格", label: "释放技能" },
+  { keys: "E", label: "切换武器" },
+  { keys: "R", label: "换弹" },
+  { keys: "1 / 2 / 3", label: "选择道具" },
+  { keys: "滚轮", label: "循环道具" },
+  { keys: "F", label: "互动 / 拾取" },
+  { keys: "长按 V", label: "复活队友" },
+  { keys: "P / Esc", label: "暂停 / 设置" },
+];
+
 /** Small canvas that renders a weapon's vector silhouette icon. */
 function WeaponIcon({
   iconShape,
@@ -149,6 +165,33 @@ export default function GameScreen({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFull, setIsFull] = useState(false);
   const isTouch = useMemo(() => isTouchDevice(), []);
+  // ---- HUD hints (controls help) ----
+  const [hintsOpen, setHintsOpen] = useState(false);
+  const [showStartHints, setShowStartHints] = useState(true);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const ae = document.activeElement as HTMLElement | null;
+      if (
+        ae &&
+        (ae.tagName === "INPUT" ||
+          ae.tagName === "TEXTAREA" ||
+          ae.tagName === "SELECT" ||
+          ae.isContentEditable)
+      )
+        return;
+      if (e.code === "KeyH") {
+        setHintsOpen((o) => !o);
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    // auto-dismiss the onboarding hint after a while
+    const t = setTimeout(() => setShowStartHints(false), 8000);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      clearTimeout(t);
+    };
+  }, []);
 
   // ---- screen shake on hit ----
   const [shake, setShake] = useState({ x: 0, y: 0 });
@@ -460,6 +503,18 @@ export default function GameScreen({
               ⚙
             </button>
             <button
+              onClick={() => setHintsOpen((o) => !o)}
+              className={cn(
+                "pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border text-sm font-bold backdrop-blur hover:bg-white/10",
+                hintsOpen
+                  ? "border-indigo-400/60 bg-indigo-500/20 text-indigo-200"
+                  : "border-white/10 bg-black/40 text-slate-300"
+              )}
+              title="操作说明 (H)"
+            >
+              ?
+            </button>
+            <button
               onClick={onExit}
               className="pointer-events-auto grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-black/40 text-xs font-semibold text-slate-300 backdrop-blur hover:bg-white/10"
             >
@@ -473,6 +528,29 @@ export default function GameScreen({
           </div>
         </div>
       </div>
+
+      {/* ============ START HINT (auto-fade onboarding) ============ */}
+      {showStartHints && !hud.gameOver && !hintsOpen && (
+        <div className="pointer-events-none absolute inset-x-0 top-[11%] flex flex-col items-center gap-2">
+          <div className="rounded-xl border border-white/15 bg-black/55 px-5 py-2.5 text-center text-sm text-slate-200 backdrop-blur">
+            移动{" "}
+            <span className="font-mono text-indigo-300">WASD</span> · 射击{" "}
+            <span className="font-mono text-indigo-300">左键</span> · 技能{" "}
+            <span className="font-mono text-indigo-300">Q</span> · 换弹{" "}
+            <span className="font-mono text-indigo-300">R</span> · 切换武器{" "}
+            <span className="font-mono text-indigo-300">E</span>
+          </div>
+          <button
+            onClick={() => {
+              setHintsOpen(true);
+              setShowStartHints(false);
+            }}
+            className="pointer-events-auto rounded-full border border-indigo-400/40 bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-200 hover:bg-indigo-500/30"
+          >
+            查看完整操作说明 (?)
+          </button>
+        </div>
+      )}
 
       {/* ============ BANNER ============ */}
       {hud.banner && !hud.gameOver && (
@@ -680,6 +758,46 @@ export default function GameScreen({
           })}
         </div>
       </div>
+
+      {/* ============ HUD HINTS (controls help overlay) ============ */}
+      {hintsOpen && (
+        <div
+          className="pointer-events-auto absolute inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setHintsOpen(false)}
+        >
+          <div
+            className="relative max-h-[82vh] w-[min(92vw,560px)] overflow-auto rounded-2xl border border-white/15 bg-slate-900/90 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">操作说明</h2>
+              <button
+                onClick={() => setHintsOpen(false)}
+                className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                title="关闭"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {HUD_HINTS.map((h) => (
+                <div
+                  key={h.label}
+                  className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2"
+                >
+                  <span className="min-w-[88px] shrink-0 text-center font-mono text-xs font-bold text-indigo-300">
+                    {h.keys}
+                  </span>
+                  <span className="text-sm text-slate-200">{h.label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-center text-xs text-slate-400">
+              按 <span className="font-mono text-slate-200">H</span> 或点击空白处关闭
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ============ MOBILE CONTROLS (touch only) ============ */}
       {isTouch && <MobileControls engineRef={engineRef} />}

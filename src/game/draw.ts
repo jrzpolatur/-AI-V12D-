@@ -86,635 +86,607 @@ export function drawWeapon(
   if (gun.weaponClass === "melee") {
     const swingArc = (gun.meleeArc ?? 2) * 0.8;
     ctx.rotate(-swingArc / 2 + swing * swingArc);
-  }
-
-  switch (gun.shape) {
-    // ---------------- PISTOL ----------------
+  }  switch (gun.shape) {
+    // ---------------- PISTOL (手枪) ----------------
     case "pistol": {
-      body(-4, -4, 16, 8, STEEL_X, STEEL, 2.5);
-      body(10, -2, 6, 4, STEEL_L, STEEL_D, 1.5); // barrel
-      block(-7, -1.6, 3.5, 3.4, STEEL_D, 1); // rear
-      block(4, -5, 2, 1.6, STEEL_D, 0.5); // sight
+      // Sleek cyberpunk pistol with under-barrel laser sight
+      body(-3, -3.5, 12, 7, STEEL_X, STEEL, 2);
+      body(9, -1.8, 4, 3.6, STEEL_L, STEEL_D, 1); // short slide barrel
+      block(-5, -1.5, 2.5, 3, STEEL_D, 1); // hammer guard
+      // glowing laser sight
       ctx.fillStyle = gun.glow;
-      roundRect(ctx, 15.5, -1.4, 2.6, 2.8, 1);
+      roundRect(ctx, 4, 2, 4.5, 1.2, 0.4);
       ctx.fill();
       break;
     }
-    // ---------------- MAC11 ----------------
+    // ---------------- MAC11 (微冲) ----------------
     case "mac11": {
-      body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
-      body(10, -1.8, 7, 3.6, STEEL_L, STEEL_D, 1.5); // barrel
-      block(-11, -2.4, 6, 4.8, STEEL_D, 1.5); // stock
+      // Ultra-compact SMG with short receiver, silencer barrel, and wire stock
+      body(-5, -3.5, 14, 7, STEEL_X, STEEL, 2);
+      body(9, -1.8, 8, 3.6, "#1e293b", "#0f172a", 1.5); // long suppressor barrel
+      block(-9, -2, 4, 4, STEEL_D, 1); // rear receiver block
+      // Magazine protruding sloped
       ctx.save();
-      ctx.translate(2, 3);
-      ctx.rotate(0.5);
-      block(-1.6, 0, 4, 11, STEEL_D, 1.5); // magazine
+      ctx.translate(1, 3.5);
+      ctx.rotate(0.3);
+      block(-1.5, 0, 3, 9, STEEL_D, 1);
       ctx.restore();
-      block(5, -5, 3, 1.6, STEEL_D, 0.5); // sight
+      // wire frame stock fold
+      ctx.strokeStyle = STEEL_D;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-9, 0);
+      ctx.lineTo(-14, 2);
+      ctx.lineTo(-14, 6);
+      ctx.stroke();
+      break;
+    }
+    // ---------------- MP5 (MP5) ----------------
+    case "mp5": {
+      // Classic tactical submachine gun with handguard, curved magazine, and solid stock
+      body(-6, -4, 16, 8, STEEL_X, STEEL, 2.5);
+      body(10, -1.8, 9, 3.6, STEEL_L, STEEL_D, 1.5); // barrel
+      block(-12, -2.4, 6, 4.8, STEEL_D, 1.5); // solid stock
+      block(0, -3.4, 8, 6.8, "#334155", 1.5); // forearm handguard
+      // Curved 9mm magazine
+      ctx.save();
+      ctx.translate(3, 3.5);
+      ctx.rotate(0.42);
+      block(-1.6, 0, 3.2, 10, "#0f172a", 1.2);
+      ctx.restore();
       ctx.fillStyle = gun.glow;
       roundRect(ctx, 16, -1.2, 2.4, 2.4, 1);
       ctx.fill();
       break;
     }
-    // ---------------- MP5 ----------------
-    case "mp5": {
-      body(-6, -4, 18, 8, STEEL_X, STEEL, 2.5);
-      body(10, -1.8, 8, 3.6, STEEL_L, STEEL_D, 1.5); // longer barrel
-      block(-11, -2.4, 6, 4.8, STEEL_D, 1.5); // stock
-      ctx.save();
-      ctx.translate(2, 3);
-      ctx.rotate(0.5);
-      block(-1.6, 0, 4, 12, STEEL_D, 1.5); // magazine
-      ctx.restore();
-      block(5, -5, 3, 1.6, STEEL_D, 0.5); // sight
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 17, -1.2, 2.4, 2.4, 1);
-      ctx.fill();
-      break;
-    }
     // ---------------- MORTAR (投射榴弹炮) ----------------
     case "mortar": {
-      block(-3, -3, 8, 6, STEEL_D, 2); // breech
-      body(2, -3.2, 20, 6.4, STEEL_X, STEEL, 2.5); // long launch tube
-      body(20, -3.6, 3, 7.2, STEEL_L, STEEL_D, 1.5); // muzzle ring
-      block(-9, -2, 6, 4, STEEL_D, 1.5); // grip/stock
+      // Bulky single-shot rocket mortar with yellow hazard warning stripes
+      block(-4, -4, 9, 8, STEEL_D, 2.5); // breach
+      body(5, -4.5, 18, 9, STEEL_X, STEEL, 3); // thick launcher barrel
+      body(23, -5, 3.5, 10, STEEL_L, STEEL_D, 1.5); // muzzle ring flared
+      block(-10, -2.6, 6, 5.2, STEEL_D, 1.5); // grip
+      // Yellow-black warning stripes on the barrel
+      ctx.save();
+      ctx.strokeStyle = "#eab308";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(9, -4); ctx.lineTo(12, 4);
+      ctx.moveTo(15, -4); ctx.lineTo(18, 4);
+      ctx.stroke();
+      ctx.restore();
       ctx.fillStyle = gun.glow;
-      roundRect(ctx, 21, -2, 2.4, 4, 1);
+      roundRect(ctx, 24, -2, 2.4, 4, 1);
       ctx.fill();
       break;
     }
-    // ---------------- SHOTGUN ----------------
+    // ---------------- SHOTGUN (霰弹枪) ----------------
     case "shotgun": {
-      body(-4, -4, 11, 8, STEEL_X, STEEL, 2);
-      block(-11, -2.6, 7, 5.2, WOOD, 1.5); // wooden stock
-      body(2, -3.2, 15, 2.4, STEEL_L, STEEL_D, 1); // barrel top
-      body(2, 0.8, 15, 2.4, STEEL_L, STEEL_D, 1); // barrel bottom
-      block(6, -4.2, 6, 8.4, WOOD_D, 1.5); // pump
+      // Pump-action tactical shotgun with double steel barrels and a wooden stock
+      body(-4, -4.2, 10, 8.4, STEEL_X, STEEL, 2.5);
+      block(-12, -2.8, 8, 5.6, WOOD, 2); // wooden stock
+      body(6, -3.4, 16, 2.8, STEEL_L, STEEL_D, 1); // top double-barrel
+      body(6, 0.6, 16, 2.8, STEEL_L, STEEL_D, 1); // bottom double-barrel
+      block(4, -4.4, 9, 8.8, WOOD_D, 1.5); // ribbed pump slide
       ctx.fillStyle = gun.glow;
       roundRect(ctx, 16.5, -2.6, 2.4, 5.2, 1);
       ctx.fill();
       break;
     }
-    // ---------------- RIFLE ----------------
+    // ---------------- RIFLE (突击步枪) ----------------
     case "rifle": {
-      body(-6, -4, 22, 8, STEEL_X, STEEL, 2.5);
-      body(14, -1.8, 11, 3.6, STEEL_L, STEEL_D, 1.5); // barrel
-      block(6, -3.4, 9, 6.8, STEEL_D, 1.5); // handguard
-      block(2, -5.6, 8, 1.6, STEEL_D, 0.6); // rail
-      block(-12, -2.4, 7, 4.8, STEEL_D, 1.5); // stock
-      ctx.save();
-      ctx.translate(0, 3);
-      ctx.rotate(0.42);
-      block(-2, 0, 5, 10, STEEL_D, 2); // magazine
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 24, -1.2, 2.6, 2.4, 1);
+      // Sleek tactical assault rifle with scope, red dot, and tan furniture
+      body(-6, -4, 20, 8, STEEL_X, STEEL, 2);
+      body(14, -1.8, 12, 3.6, STEEL_L, STEEL_D, 1.5); // muzzle barrel
+      block(-12, -2.6, 7, 5.2, "#d97706", 1.5); // tan stock
+      block(4, -3.6, 9, 7.2, "#b45309", 1.5); // tan handguard
+      // Red dot sight scope
+      block(-1, -6.6, 6, 2.6, STEEL_D, 0.8);
+      ctx.fillStyle = rgba(gun.glow, 0.9);
+      roundRect(ctx, 4.5, -5.6, 1.2, 1.2, 0.4);
       ctx.fill();
+      // Curved box magazine
+      ctx.save();
+      ctx.translate(1, 3.5);
+      ctx.rotate(0.35);
+      block(-2, 0, 4.6, 11, "#1e293b", 1.5);
+      ctx.restore();
       break;
     }
-    // ---------------- SNIPER ----------------
+    // ---------------- SNIPER (狙击枪) ----------------
     case "sniper": {
-      body(-6, -4, 15, 8, STEEL_X, STEEL, 2.5);
-      body(7, -2, 22, 4, STEEL_L, STEEL_D, 1.5); // long barrel
-      block(-13, -2.6, 7, 5.2, WOOD, 1.5); // stock
-      // scope
-      ctx.fillStyle = STEEL_D;
-      roundRect(ctx, -4, -7.6, 9, 2.2, 1);
-      ctx.fill();
+      // Ultra-long range sniper rifle with scope, muzzle brake, and bipod
+      body(-6, -4, 14, 8, STEEL_X, STEEL, 2.5);
+      body(8, -1.6, 28, 3.2, STEEL_L, STEEL_D, 1); // very long thin barrel
+      block(-13, -2.8, 8, 5.6, STEEL_D, 1.5); // tactical polymer stock
+      body(32, -2.6, 4, 5.2, STEEL_D, STEEL_X, 0.8); // heavy muzzle brake
+      // Large scope with glowing lens
+      block(-3, -7.8, 10, 2.8, STEEL_D, 1);
       ctx.strokeStyle = DARK;
       ctx.lineWidth = 1;
-      ctx.stroke();
       ctx.beginPath();
-      ctx.arc(0.5, -6.4, 2.6, 0, Math.PI * 2);
+      ctx.arc(0.5, -6.4, 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
-      ctx.arc(0.5, -6.4, 1.2, 0, Math.PI * 2);
+      ctx.arc(0.5, -6.4, 1.4, 0, Math.PI * 2);
       ctx.fill();
-      // bipod
-      ctx.strokeStyle = DARK;
+      // Bipod legs
+      ctx.strokeStyle = STEEL_D;
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(22, 2);
-      ctx.lineTo(25, 7);
-      ctx.moveTo(22, 2);
-      ctx.lineTo(25, -3);
+      ctx.moveTo(20, 1.6); ctx.lineTo(24, 7);
+      ctx.moveTo(20, -1.6); ctx.lineTo(24, -7);
       ctx.stroke();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 28, -1.2, 2.6, 2.4, 1);
-      ctx.fill();
       break;
     }
-    // ---------------- ROCKET LAUNCHER ----------------
+    // ---------------- ROCKET LAUNCHER (火箭筒) ----------------
     case "rocket": {
-      body(-7, -5.5, 22, 11, STEEL_X, STEEL, 3); // tube
-      // warhead
-      ctx.fillStyle = STEEL_L;
+      // Heavy shoulder launcher with large green tube and exposed warhead
+      body(-9, -5.5, 23, 11, "#166534", "#14532d", 2.5); // launcher tube green
+      // Stabilizer fins at the rear
+      ctx.fillStyle = "#022c22";
       ctx.beginPath();
-      ctx.moveTo(15, -4);
-      ctx.lineTo(24, 0);
-      ctx.lineTo(15, 4);
+      ctx.moveTo(-9, -5.5); ctx.lineTo(-15, -9); ctx.lineTo(-9, -2);
+      ctx.moveTo(-9, 5.5); ctx.lineTo(-15, 9); ctx.lineTo(-9, 2);
+      ctx.fill();
+      // Giant exposed warhead at muzzle tip
+      ctx.fillStyle = "#854d0e";
+      ctx.beginPath();
+      ctx.moveTo(14, -5.5);
+      ctx.lineTo(22, -1.5);
+      ctx.lineTo(26, 0);
+      ctx.lineTo(22, 1.5);
+      ctx.lineTo(14, 5.5);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = DARK;
       ctx.lineWidth = 1.2;
       ctx.stroke();
-      // rear fins
-      ctx.fillStyle = STEEL_D;
-      ctx.beginPath();
-      ctx.moveTo(-7, -5.5);
-      ctx.lineTo(-12, -8);
-      ctx.lineTo(-7, -2.5);
-      ctx.closePath();
-      ctx.moveTo(-7, 5.5);
-      ctx.lineTo(-12, 8);
-      ctx.lineTo(-7, 2.5);
-      ctx.closePath();
-      ctx.fill();
-      // muzzle glow
+      // glowing fuel core
       ctx.fillStyle = rgba(gun.glow, 0.9);
       ctx.beginPath();
-      ctx.arc(19, 0, 2.4, 0, Math.PI * 2);
+      ctx.arc(20, 0, 2.4, 0, Math.PI * 2);
       ctx.fill();
       break;
     }
-    // ---------------- AKM ----------------
+    // ---------------- AKM (AKM) ----------------
     case "akm": {
-      body(-4, -4, 17, 8, STEEL_X, STEEL, 2); // receiver
-      block(8, -3.4, 9, 6.8, WOOD, 1.5); // wooden handguard
-      body(14, -1.4, 8, 2.8, STEEL_L, STEEL_D, 1); // barrel
-      block(8, -4.6, 11, 1.8, STEEL_D, 0.6); // gas tube
-      block(-11, -2.6, 7, 5.2, WOOD, 1.5); // wooden stock
-      // curved magazine
+      // Classic curved banana magazine rifle with wooden stock and handguard
+      body(-4, -4, 17, 8, STEEL_X, STEEL, 2);
+      block(8, -3.4, 9, 6.8, WOOD, 1.5); // wooden forearm
+      body(14, -1.4, 10, 2.8, STEEL_L, STEEL_D, 1); // gas block barrel
+      block(-11, -2.6, 7, 5.2, WOOD, 1.5); // wooden buttstock
+      // Banana magazine
       ctx.save();
       ctx.translate(1.5, 3);
-      ctx.rotate(0.4);
-      block(-2, 0, 4.6, 11, WOOD_D, 1.5);
+      ctx.rotate(0.44);
+      block(-2.2, 0, 4.6, 12, STEEL_D, 1.5);
       ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 21, -1, 2.4, 2, 0.8);
-      ctx.fill();
       break;
     }
-    // ---------------- FCAR (heavy) ----------------
+    // ---------------- FCAR (FCAR) ----------------
     case "fcar": {
-      body(-5, -5, 19, 10, STEEL, STEEL_D, 2.5); // bulky receiver
-      body(13, -2.4, 10, 4.8, STEEL_L, STEEL_D, 1.5); // barrel
-      block(-12, -3, 7, 6, STEEL_D, 1.5); // stock
-      block(-1, 3, 6, 9, STEEL_D, 1.5); // box magazine
-      block(2, -6.4, 9, 1.8, STEEL_D, 0.6); // top rail
-      // accent glow line
-      ctx.fillStyle = rgba(gun.glow, 0.55);
-      roundRect(ctx, -3, -1, 15, 1.4, 0.6);
-      ctx.fill();
-      // compensator vents
-      ctx.fillStyle = STEEL_D;
-      for (let i = 0; i < 3; i++) {
-        roundRect(ctx, 18 + i * 2, -2.2, 1.1, 4.4, 0.4);
-        ctx.fill();
-      }
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 25, -1.4, 2.4, 2.8, 1);
+      // Heavy modular assault rifle in signature desert tan, box mag, holo scope
+      body(-5, -5, 20, 10, "#ca8a04", "#854d0e", 2.5); // tan receiver
+      body(15, -2, 9, 4, STEEL_L, STEEL_D, 1.5); // barrel
+      block(-12, -3, 7, 6, "#a16207", 1.5); // tan stock
+      block(-1, 3.5, 5, 8.5, STEEL_D, 1.2); // box magazine
+      // Holo sight mount
+      block(2, -7.5, 6, 2.5, STEEL_D, 0.8);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 4, -6.5, 2, 1.5, 0.4);
       ctx.fill();
       break;
     }
-    // ---------------- PULSE (beam emitter) ----------------
+    // ---------------- PULSE (电浆脉冲枪) ----------------
     case "pulse": {
-      body(-5, -4.5, 16, 9, "#2c3350", "#1a1f33", 3);
-      block(-9, -2.6, 4.5, 5.2, "#15192a", 1); // grip
-      // energy cells
-      ctx.fillStyle = rgba(gun.glow, 0.8);
-      roundRect(ctx, 0, -5.8, 3, 2, 0.6);
-      roundRect(ctx, 5, -5.8, 3, 2, 0.6);
+      // Sci-fi beam rifle with concentric energy nodes and neon pulse cells
+      body(-6, -4.5, 17, 9, "#312e81", "#1e1b4b", 3);
+      block(-10, -2.6, 4.5, 5.2, "#1e1b4b", 1); // grip
+      // Neon pulse energy nodes
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, -1, -5.6, 3.2, 2.2, 0.6);
+      roundRect(ctx, 4, -5.6, 3.2, 2.2, 0.6);
       ctx.fill();
-      // glowing core
-      const cg = ctx.createRadialGradient(1, 0, 0, 1, 0, 5.5);
-      cg.addColorStop(0, "#ffffff");
-      cg.addColorStop(0.4, rgba(gun.glow, 0.9));
-      cg.addColorStop(1, rgba(gun.glow, 0));
-      ctx.fillStyle = cg;
+      // Double focus rings at the muzzle
+      ctx.strokeStyle = rgba(gun.glow, 0.9);
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.arc(1, 0, 5.5, 0, Math.PI * 2);
-      ctx.fill();
-      // emitter ring (pulsing)
-      ctx.strokeStyle = rgba(gun.glow, 0.85);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(13, 0, 3 + Math.sin(t * 12) * 0.6, 0, Math.PI * 2);
+      ctx.arc(12, 0, 4, 0, Math.PI * 2);
+      ctx.arc(16, 0, 3, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = rgba(gun.glow, 0.9);
-      ctx.beginPath();
-      ctx.arc(15.5, 0, 2, 0, Math.PI * 2);
-      ctx.fill();
       break;
     }
-    // ---------------- LIGHTSABER ----------------
+    // ---------------- LIGHTSABER (激光剑) ----------------
     case "lightsaber": {
-      const bladeLen = (gun.meleeRange ?? 60) * 0.62;
-      // hilt
-      body(-7, -3, 14, 6, STEEL_X, STEEL_D, 2);
-      block(-5, -2.4, 2, 4.8, STEEL_D, 0.5);
-      block(-1, -2.4, 2, 4.8, STEEL_D, 0.5);
-      block(3, -2.4, 2, 4.8, STEEL_D, 0.5);
-      // emitter
-      block(7, -2.6, 3, 5.2, STEEL_L, 1);
-      // blade glow
+      // Metallic mechanical hilt with textured grip lines, red switch button, and glowing blade
+      const bladeLen = (gun.meleeRange ?? 60) * 0.7;
+      body(-8, -3, 15, 6, STEEL_X, STEEL_D, 2); // hilt casing
+      // grip ribs
+      ctx.fillStyle = "#1e293b";
+      roundRect(ctx, -6, -2.6, 2, 5.2, 0.4);
+      roundRect(ctx, -2, -2.6, 2, 5.2, 0.4);
+      roundRect(ctx, 2, -2.6, 2, 5.2, 0.4);
+      ctx.fill();
+      // Red power toggle
+      ctx.fillStyle = "#ef4444";
+      roundRect(ctx, -4, -4, 1.5, 1.2, 0.3);
+      ctx.fill();
+      // High-intensity blade glow
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const flick = 1 + Math.sin(t * 30) * 0.05;
-      ctx.strokeStyle = rgba(gun.glow, 0.22);
-      ctx.lineWidth = 9 * flick;
-      ctx.beginPath();
-      ctx.moveTo(10, 0);
-      ctx.lineTo(10 + bladeLen, 0);
-      ctx.stroke();
-      ctx.strokeStyle = rgba(gun.glow, 0.5);
-      ctx.lineWidth = 5 * flick;
+      const flick = 1 + Math.sin(t * 32) * 0.06;
+      ctx.strokeStyle = rgba(gun.glow, 0.25);
+      ctx.lineWidth = 10 * flick;
+      ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(7 + bladeLen, 0); ctx.stroke();
+      ctx.strokeStyle = rgba(gun.glow, 0.55);
+      ctx.lineWidth = 6 * flick;
       ctx.stroke();
       ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2.4 * flick;
+      ctx.lineWidth = 2.6 * flick;
       ctx.stroke();
       ctx.restore();
       break;
     }
-    // ---------------- HAMMER ----------------
+    // ---------------- HAMMER (雷神之锤) ----------------
     case "hammer": {
-      // handle
-      body(-1, -2, 21, 4, WOOD_D, "#4a3318", 1.5);
-      // grip wrap
-      block(-1, -2.4, 3, 4.8, STEEL_D, 0.6);
-      block(3, -2.4, 2, 4.8, STEEL_D, 0.4);
-      // head
-      body(19, -8, 13, 16, STEEL_X, STEEL, 3);
-      block(20, -7, 3, 14, STEEL_L, 1); // highlight
-      block(28, -6, 3, 12, STEEL_D, 1); // shadow edge
-      // glowing rune
-      ctx.fillStyle = rgba(gun.glow, 0.8);
-      roundRect(ctx, 22, -1.4, 7, 2.8, 1);
-      ctx.fill();
-      break;
-    }
-    // ---------------- FLAMETHROWER ----------------
-    case "flamethrower": {
-      body(-6, -5, 18, 10, STEEL_X, STEEL_D, 2.5); // body
-      block(-10, -2.4, 5, 4.8, STEEL_D, 1.2); // grip
-      // fuel tank (top)
-      block(0, -8, 12, 4, "#7f1d1d", 1.5);
-      block(2, -7.4, 8, 1, "#fca5a5", 0.5);
-      // nozzle
-      body(12, -3, 9, 6, STEEL_L, STEEL_D, 1.5);
-      block(20, -4.5, 3, 9, STEEL_D, 1); // flare tip
-      // pilot flame
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      const fg = ctx.createRadialGradient(22, 0, 0, 22, 0, 5);
-      fg.addColorStop(0, "#ffffff");
-      fg.addColorStop(0.4, rgba(gun.glow, 0.9));
-      fg.addColorStop(1, rgba(gun.glow, 0));
-      ctx.fillStyle = fg;
+      // Dark wooden shaft handle and a massive runic warhammer head
+      body(-1, -1.8, 22, 3.6, WOOD_D, "#3f2b15", 1.2); // wooden shaft handle
+      body(18, -9, 14, 18, STEEL_D, "#0f172a", 3); // massive heavy steel block
+      // Glowing thunder rune symbol (diamond)
+      ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
-      ctx.arc(22, 0, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      break;
-    }
-    // ---------------- SA1216 (auto shotgun) ----------------
-    case "sa1216": {
-      body(-5, -4.5, 16, 9, STEEL_X, STEEL, 2.5);
-      body(10, -2, 10, 4, STEEL_L, STEEL_D, 1.5); // barrel
-      block(-11, -2.8, 6, 5.6, WOOD, 1.5); // stock
-      // rotary magazine (4 tubes)
-      ctx.save();
-      ctx.translate(2, 3.5);
-      ctx.rotate(0.3);
-      for (let i = 0; i < 4; i++) {
-        const a = (i / 4) * Math.PI * 2;
-        ctx.fillStyle = i === 0 ? STEEL_L : STEEL_D;
-        roundRect(ctx, -1.5 + Math.cos(a) * 3, Math.sin(a) * 3 - 4, 3, 10, 1);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-      }
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 19, -1.6, 2.4, 3.2, 1);
-      ctx.fill();
-      break;
-    }
-    // ---------------- MGL32 (grenade revolver) ----------------
-    case "mgl32": {
-      body(-6, -4, 14, 8, STEEL_X, STEEL, 2); // receiver
-      block(-11, -2.6, 6, 5.2, STEEL_D, 1.5); // stock
-      body(8, -2.5, 10, 5, STEEL_L, STEEL_D, 1.5); // barrel
-      // revolving cylinder
-      ctx.save();
-      ctx.translate(4, 0);
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        ctx.fillStyle = i % 2 === 0 ? STEEL_L : STEEL_D;
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * 5, Math.sin(a) * 5, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-      }
-      ctx.fillStyle = rgba(gun.glow, 0.7);
-      ctx.beginPath();
-      ctx.arc(0, 0, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      // front sight
-      block(17, -4.5, 2, 2, STEEL_D, 0.5);
-      break;
-    }
-    // ---------------- SPEAR ----------------
-    case "spear": {
-      const len = (gun.meleeRange ?? 90) * 0.85;
-      // shaft
-      ctx.strokeStyle = WOOD_D;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(-2, 0);
-      ctx.lineTo(len - 14, 0);
-      ctx.stroke();
-      ctx.strokeStyle = "#4a3318";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      // grip wrap
-      ctx.fillStyle = STEEL_D;
-      for (let i = 0; i < 3; i++) {
-        roundRect(ctx, -2 + i * 3, -2.4, 2, 4.8, 0.4);
-        ctx.fill();
-      }
-      // spearhead
-      ctx.fillStyle = STEEL_X;
-      ctx.beginPath();
-      ctx.moveTo(len - 14, -5);
-      ctx.lineTo(len, 0);
-      ctx.lineTo(len - 14, 5);
+      ctx.moveTo(25, -4); ctx.lineTo(29, 0); ctx.lineTo(25, 4); ctx.lineTo(21, 0);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-      // glow edge
+      break;
+    }
+    // ---------------- FLAMETHROWER (喷火器) ----------------
+    case "flamethrower": {
+      // Flamethrower with a red fuel canister below, pilot flame, and burner nozzle
+      body(-6, -4.5, 16, 9, STEEL_D, "#0f172a", 2.5);
+      block(-10, -2.4, 4.5, 4.8, STEEL_D, 1);
+      // Large red gasoline tank mounted under-barrel
+      block(-2, 4, 11, 6.5, "#991b1b", 2.5); // red tank
+      // Nozzle shroud
+      body(10, -2.8, 9, 5.6, STEEL_L, STEEL_D, 1.5);
+      // Constant pilot flame spark
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = rgba(gun.glow, 0.7);
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(len - 12, -3.5);
-      ctx.lineTo(len - 1, 0);
-      ctx.lineTo(len - 12, 3.5);
+      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.beginPath(); ctx.arc(20, 0, 4.2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      break;
+    }
+    // ---------------- SA1216 (回转式弹仓霰弹枪) ----------------
+    case "sa1216": {
+      // Semi-auto shotgun with a 4-tube rotary magazine mounted below
+      body(-5, -4.5, 15, 9, STEEL_X, STEEL, 2.5);
+      body(10, -1.8, 10, 3.6, STEEL_L, STEEL_D, 1.5);
+      block(-11, -2.8, 6, 5.6, WOOD, 1.5);
+      // 4-tube rotary magazine cluster
+      ctx.fillStyle = STEEL_D;
+      roundRect(ctx, 0, 3, 10, 4.2, 1);
+      ctx.fill();
       ctx.stroke();
+      // Glowing battery indicator
+      ctx.fillStyle = gun.glow;
+      roundRect(ctx, 16, -1.2, 2.4, 2.4, 0.8);
+      ctx.fill();
+      break;
+    }
+    // ---------------- MGL32 (转轮榴弹发射器) ----------------
+    case "mgl32": {
+      // Grenade launcher with a giant revolving cylinder and folding stock
+      body(-6, -4, 12, 8, STEEL_X, STEEL, 2);
+      block(-11, -2.6, 5.5, 5.2, STEEL_D, 1.5); // stock
+      body(12, -2.6, 9, 5.2, STEEL_L, STEEL_D, 1.5); // wide barrel
+      // Giant revolving drum
+      ctx.fillStyle = STEEL_D;
+      ctx.beginPath();
+      ctx.arc(3, 0, 7.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Draw 6 chamber circles in the cylinder
+      ctx.fillStyle = "#0f172a";
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(3 + Math.cos(a) * 4.5, Math.sin(a) * 4.5, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    // ---------------- SPEAR (长矛) ----------------
+    case "spear": {
+      // Long tactical staff spear with red wraps and a winged blade tip
+      const len = (gun.meleeRange ?? 90) * 0.9;
+      // Staff shaft
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 3.6;
+      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(len - 15, 0); ctx.stroke();
+      // Red grip wraps
+      ctx.strokeStyle = "#b91c1c";
+      ctx.lineWidth = 4.2;
+      ctx.beginPath();
+      ctx.moveTo(10, 0); ctx.lineTo(16, 0);
+      ctx.moveTo(35, 0); ctx.lineTo(41, 0);
+      ctx.stroke();
+      // Winged spearhead blade
+      ctx.fillStyle = STEEL_X;
+      ctx.beginPath();
+      ctx.moveTo(len - 15, -5.5);
+      ctx.lineTo(len - 8, -6.5);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(len - 8, 6.5);
+      ctx.lineTo(len - 15, 5.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Glowing tip core
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      ctx.beginPath();
+      ctx.arc(len - 2, 0, 2.8, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
       break;
     }
     // ---------------- DRONE (浮游炮) ----------------
     case "drone": {
-      // The weapon is the drone itself, hovering beside the player.
-      // Body
-      body(-6, -4, 12, 8, "#2c3350", "#1a1f33", 3);
-      // thrusters
-      ctx.fillStyle = rgba(gun.glow, 0.8);
+      // Autonomous hovering drone with booster wings and glowing horizontal visor
+      body(-6, -6, 12, 12, "#1e293b", "#0f172a", 4); // main pod
+      // Diagonal booster wings
+      ctx.fillStyle = "#334155";
       ctx.beginPath();
-      ctx.arc(-6, -5, 2, 0, Math.PI * 2);
-      ctx.arc(6, -5, 2, 0, Math.PI * 2);
-      ctx.arc(-6, 5, 2, 0, Math.PI * 2);
-      ctx.arc(6, 5, 2, 0, Math.PI * 2);
+      ctx.moveTo(-3, -6); ctx.lineTo(-8, -12); ctx.lineTo(-4, -12); ctx.lineTo(1, -6);
+      ctx.moveTo(-3, 6); ctx.lineTo(-8, 12); ctx.lineTo(-4, 12); ctx.lineTo(1, 6);
       ctx.fill();
-      // core
-      const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, 5);
-      cg.addColorStop(0, "#ffffff");
-      cg.addColorStop(0.4, rgba(gun.glow, 0.9));
-      cg.addColorStop(1, rgba(gun.glow, 0));
-      ctx.fillStyle = cg;
-      ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, Math.PI * 2);
-      ctx.fill();
-      // emitter
-      ctx.strokeStyle = rgba(gun.glow, 0.85);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(8, 0, 2.5 + Math.sin(t * 10) * 0.4, 0, Math.PI * 2);
       ctx.stroke();
+      // Glowing horizontal visor eye
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 1, -1.8, 5, 3.6, 0.8);
+      ctx.fill();
       break;
     }
     // ---------------- LIGHTNING WHIP (闪电鞭) ----------------
     case "lightning_whip": {
-      // short handle
-      body(-8, -2.4, 12, 4.8, STEEL_X, STEEL_D, 1.5);
-      block(-8, -2.4, 4, 4.8, STEEL_D, 1); // grip
-      block(2, -2.6, 2, 5.2, STEEL_L, 0.8); // emitter
-      // crackling energy tail that flickers like a whip
+      // Leather wrapped handle with a crackling lightning whip filament
+      body(-7, -2.2, 11, 4.4, "#451a03", "#78350f", 1.2);
+      block(4, -2.6, 2, 5.2, STEEL_L, 0.6); // metal cap emitter
+      // crackling energy filament tail
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const len = (gun.meleeRange ?? 90) * 0.9;
-      const flick = 1 + Math.sin(t * 22) * 0.12;
-      const tail = (w: number, col: string) => {
-        ctx.strokeStyle = col;
-        ctx.lineWidth = w;
-        ctx.beginPath();
-        ctx.moveTo(4, 0);
-        let x = 4;
-        let y = 0;
-        const segs = 5;
-        for (let i = 1; i <= segs; i++) {
-          const f = i / segs;
-          const nx = 4 + len * f;
-          const ny =
-            Math.sin(f * Math.PI * 2.5 + t * 6) * (10 * (1 - f)) * flick;
-          ctx.lineTo(nx, ny);
-          x = nx;
-          y = ny;
-        }
-        ctx.stroke();
-        return { x, y };
-      };
-      tail(8 * flick, rgba(gun.glow, 0.28));
-      tail(3 * flick, rgba("#ffffff", 0.9));
+      const len = (gun.meleeRange ?? 90) * 0.95;
+      const flick = 1 + Math.sin(t * 24) * 0.15;
+      ctx.strokeStyle = rgba(gun.glow, 0.85);
+      ctx.lineWidth = 2.2 * flick;
+      ctx.beginPath();
+      ctx.moveTo(6, 0);
+      let x = 6;
+      let y = 0;
+      for (let i = 1; i <= 6; i++) {
+        const f = i / 6;
+        const nx = 6 + len * f;
+        const ny = (Math.sin(f * Math.PI * 3 + t * 9) * (8 * (1 - f)) + (Math.random() - 0.5) * 4) * flick;
+        ctx.lineTo(nx, ny);
+        x = nx; y = ny;
+      }
+      ctx.stroke();
       ctx.restore();
       break;
     }
-    // ---------------- RECURVE BOW ----------------
+    // ---------------- RECURVE BOW (反曲弓) ----------------
     case "recurve_bow": {
-      // grip
-      block(-2, -2, 4, 4, WOOD_D, 1);
-      // upper limb
-      ctx.strokeStyle = WOOD;
-      ctx.lineWidth = 2.5;
+      // Modern high-tech recurve compound bow with limbs, string, and arrow nocked
+      const charge = swing; // swing progress represents string pull amount (0..1)
+      const pull = charge * 6.5;
+      // Bow riser grip
+      block(-2.5, -3, 5, 6, "#0f172a", 1.5);
+      // Carbon fiber limbs bending dynamically
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(0, -2);
-      ctx.quadraticCurveTo(14, -18, 2, -26);
+      ctx.moveTo(0, -3); ctx.quadraticCurveTo(12 - pull * 0.3, -15, 2 - pull * 0.6, -25);
+      ctx.moveTo(0, 3); ctx.quadraticCurveTo(12 - pull * 0.3, 15, 2 - pull * 0.6, 25);
       ctx.stroke();
-      // lower limb
+      // Bow string
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.moveTo(0, 2);
-      ctx.quadraticCurveTo(14, 18, 2, 26);
+      ctx.moveTo(2 - pull * 0.6, -25);
+      ctx.lineTo(-pull, 0);
+      ctx.lineTo(2 - pull * 0.6, 25);
       ctx.stroke();
-      // recurve tips
-      ctx.strokeStyle = WOOD_D;
-      ctx.lineWidth = 1.5;
+      // Arrow shaft
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(2, -26);
-      ctx.lineTo(-3, -29);
-      ctx.moveTo(2, 26);
-      ctx.lineTo(-3, 29);
+      ctx.moveTo(-pull, 0);
+      ctx.lineTo(16 - pull, 0);
       ctx.stroke();
-      // string (drawn back slightly at full charge via accent tint)
-      ctx.strokeStyle = "rgba(240,240,255,0.8)";
-      ctx.lineWidth = 1;
+      // Arrowhead glowing tip
+      ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
-      ctx.moveTo(2, -26);
-      ctx.lineTo(2, 26);
-      ctx.stroke();
-      // arrow rest glow
-      ctx.fillStyle = rgba(gun.glow, 0.8);
-      roundRect(ctx, 6, -1, 4, 2, 0.5);
+      ctx.moveTo(16 - pull, -3); ctx.lineTo(21 - pull, 0); ctx.lineTo(16 - pull, 3);
       ctx.fill();
       break;
     }
-    // ---------------- RIOT SHIELD ----------------
+    // ---------------- RIOT SHIELD (防暴盾牌) ----------------
     case "riot_shield": {
-      // shield body (translucent)
-      const sg = ctx.createLinearGradient(-2, -14, -2, 14);
-      sg.addColorStop(0, "#60a5fa");
-      sg.addColorStop(0.5, "#3b82f6");
-      sg.addColorStop(1, "#1d4ed8");
-      ctx.fillStyle = sg;
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 1.5;
+      // Thick reinforced heavy riot shield with blue bulletproof glass visor window
+      ctx.fillStyle = rgba("#2563eb", 0.45); // Translucent blue shield body
+      ctx.strokeStyle = "#1d4ed8";
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(-4, -13);
-      ctx.lineTo(8, -16);
-      ctx.lineTo(11, 0);
-      ctx.lineTo(8, 16);
-      ctx.lineTo(-4, 13);
-      ctx.lineTo(-6, 0);
+      ctx.moveTo(-4, -14); ctx.lineTo(9, -17); ctx.lineTo(12, 0); ctx.lineTo(9, 17); ctx.lineTo(-4, 14); ctx.lineTo(-6, 0);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-      // viewport slit
-      ctx.fillStyle = rgba("#dbeafe", 0.6);
-      roundRect(ctx, -1, -4, 9, 8, 2);
+      // Bulletproof glass view slot
+      ctx.fillStyle = rgba("#e0f2fe", 0.7);
+      roundRect(ctx, 0, -4.5, 8, 9, 1.8);
       ctx.fill();
-      ctx.strokeStyle = DARK;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      // glow edge
-      ctx.strokeStyle = rgba(gun.glow, 0.7);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(8, -16);
-      ctx.lineTo(11, 0);
-      ctx.lineTo(8, 16);
       ctx.stroke();
       break;
     }
-    // ---------------- SHAK-50 ----------------
+    // ---------------- SHAK-50 (重突击枪) ----------------
     case "shak50": {
-      body(-5, -3.5, 15, 7, STEEL_X, STEEL, 2.5);
-      body(9, -1.5, 8, 3, STEEL_L, STEEL_D, 1); // barrel
-      block(-10, -2, 5, 4.5, WOOD, 1.5); // stock
-      block(-1, -4.5, 8, 1.5, STEEL_D, 0.5); // top rail
-      ctx.save();
-      ctx.translate(0, 2.5);
-      ctx.rotate(0.38);
-      block(-2, 0, 4.5, 9, STEEL_D, 1.5); // magazine
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 16, -1, 2.2, 2, 0.8);
+      // Bullpup heavy battle rifle, thick frame, muzzle suppressor, large top scope
+      body(-10, -5, 22, 10, STEEL_D, "#0f172a", 2); // Bullpup rear body
+      body(12, -2.4, 11, 4.8, STEEL_L, STEEL_D, 1.5); // Massive suppressor barrel
+      block(2, -4, 9, 8, "#334155", 1.5); // forearm
+      block(-8, 3.5, 4.5, 8.5, STEEL, 1); // rear magazine
+      // Top mounted scope
+      block(-4, -7.5, 8, 2.5, STEEL_D, 0.8);
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 1, -6.5, 2, 1.5, 0.4);
       ctx.fill();
       break;
     }
-    // ---------------- GATLING ----------------
+    // ---------------- GATLING (加特林) ----------------
     case "gatling": {
-      body(-7, -5, 13, 10, STEEL_X, STEEL, 2.5); // receiver
-      block(-12, -3, 6, 6, STEEL_D, 1.5); // grip/stock
+      // Heavy rotary machine gun with gold bullet link belt feeding from backpack
+      body(-8, -6, 14, 12, STEEL_X, STEEL, 3); // receiver casing
+      block(-14, -3, 6, 6, STEEL_D, 1.5); // grip handle
+      // Bullet link belt
+      ctx.strokeStyle = "#eab308";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(-6, 6); ctx.lineTo(-4, 14); ctx.stroke();
+      // Spinning multi-barrel cluster
       ctx.save();
-      ctx.translate(8, 0);
-      block(-4, -5, 13, 10, STEEL, 2); // barrel housing
-      // spinning multi-barrel cluster (visual spin while firing)
-      ctx.rotate(t * 9);
+      ctx.translate(6, 0);
+      ctx.rotate(t * 11);
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
-        const bx = Math.cos(a) * 3.2;
-        const by = Math.sin(a) * 3.2;
-        ctx.fillStyle = i % 2 ? STEEL_X : STEEL_L;
-        roundRect(ctx, 2 + bx - 1.3, by - 1.6, 11, 3.2, 1);
+        const bx = Math.cos(a) * 3.6;
+        const by = Math.sin(a) * 3.6;
+        ctx.fillStyle = i % 2 ? STEEL_L : STEEL_D;
+        roundRect(ctx, 0, by - 1.5, 14, 3, 0.8);
         ctx.fill();
-        ctx.strokeStyle = DARK;
-        ctx.lineWidth = 0.8;
         ctx.stroke();
       }
       ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 23, -2, 2.4, 4, 1);
-      ctx.fill();
       break;
     }
-    // ---------------- POISON MIST ----------------
+    // ---------------- POISON MIST (毒雾器) ----------------
     case "poison_mist": {
-      body(-7, -5, 16, 10, STEEL_X, STEEL_D, 2.5); // body
-      block(-11, -2.6, 5, 5.2, STEEL_D, 1.2); // grip
-      block(0, -8, 11, 4, "#4d7c0f", 1.5); // toxin tank
-      block(2, -7.4, 7, 1, "#bef264", 0.5); // tank highlight
-      body(9, -3, 8, 6, STEEL_L, STEEL_D, 1.5); // nozzle housing
-      block(16, -4.5, 3, 9, STEEL_D, 1); // muzzle
-      // drifting mist puff
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 5; i++) {
-        const ph = (t * 1.4 + i * 0.4) % 1;
-        const rr = 3 + ph * 8;
-        const px = 19 + ph * 11;
-        ctx.fillStyle = rgba("#a3e635", 0.32 * (1 - ph));
-        ctx.beginPath();
-        ctx.arc(px, Math.sin(i * 2 + t * 2) * 4, rr, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
+      // Biohazard toxic gun with dual bright-green fluid capsules
+      body(-6, -4.5, 16, 9, STEEL_D, "#151c0c", 2.5);
+      block(-10, -2.6, 4.5, 5.2, STEEL_D, 1);
+      // Bright green fluid capsules on top
+      ctx.fillStyle = "#22c55e"; // bright green toxic fluid
+      roundRect(ctx, -2, -7.5, 4, 3, 1);
+      roundRect(ctx, 3, -7.5, 4, 3, 1);
+      ctx.fill();
+      ctx.stroke();
+      // Dispenser nozzle
+      body(10, -3.2, 8, 6.4, STEEL_L, STEEL_D, 1.5);
       break;
     }
-    // ---------------- LEWIS MACHINE GUN ----------------
+    // ---------------- LEWIS (路易斯机枪) ----------------
     case "lewis": {
-      body(-9, -4.5, 20, 9, STEEL_X, STEEL, 2.5); // receiver
-      body(9, -2, 14, 4, STEEL_L, STEEL_D, 1.5); // long barrel
-      block(11, -4, 10, 2, STEEL_D, 1); // cooling shroud
-      block(-4, -6.5, 9, 5, STEEL_D, 1.5); // pan magazine (top)
-      block(-13, -2.4, 7, 4.8, STEEL_D, 1.5); // stock
-      ctx.save();
-      ctx.translate(0, 3);
-      ctx.rotate(0.42);
-      block(-2, 0, 5, 10, STEEL_D, 2); // magazine well
-      ctx.restore();
-      ctx.fillStyle = gun.glow;
-      roundRect(ctx, 24, -1, 2.6, 2.4, 1);
+      // Lewis LMG with top mounted circular pan magazine and cooling shroud barrel
+      body(-8, -4.5, 19, 9, STEEL_X, STEEL, 2.5); // receiver
+      body(11, -3, 12, 6, STEEL_L, STEEL_D, 2); // thick cooling shroud
+      block(-14, -2.4, 7, 4.8, WOOD, 1.5); // solid stock
+      // Top flat pan magazine
+      ctx.fillStyle = STEEL_D;
+      ctx.beginPath();
+      ctx.ellipse(-2, -6.5, 8.5, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    // ---------------- PLASMA RIFLE (电浆步枪) ----------------
+    case "plasma_rifle": {
+      // Sci-fi rifle with pure white shell, purple glowing barrel, and energy cell slot
+      body(-6, -4.5, 18, 9, "#faf5ff", "#c084fc", 2.5); // white casing shell
+      body(12, -2.6, 9, 5.2, "#a855f7", "#7e22ce", 1.5); // purple barrel shroud
+      block(-12, -2.4, 7, 4.8, "#6b21a8", 1.5); // purple stock
+      // Glowing energy cell battery
+      ctx.fillStyle = rgba(gun.glow, 0.95);
+      roundRect(ctx, 1, 3.5, 4.5, 7.5, 1);
       ctx.fill();
       break;
     }
-    // ---------------- PLASMA RIFLE ----------------
-    case "plasma_rifle": {
-      body(-6, -4.5, 18, 9, STEEL_X, STEEL, 2.5); // body
-      body(10, -2.4, 12, 4.8, STEEL_L, STEEL_D, 1.5); // barrel housing
-      block(3, -7, 10, 3, "#6d28d9", 1.5); // energy cell
-      block(5, -6.4, 6, 1, "#c4b5fd", 0.5); // cell highlight
-      block(-12, -2.4, 7, 4.8, STEEL_D, 1.5); // stock
+    // ---------------- DUAL BLADES (双刃) ----------------
+    case "dual_blades": {
+      // Two curved curved glowing plasma blades crossing in an X at the grip, pommel details
+      const glow = rgba(gun.glow, 0.85);
+      const flick = 1 + Math.sin(t * 26) * 0.06;
+      const len = (gun.meleeRange ?? 78) * 0.52;
+      // upper-left blade
       ctx.save();
-      ctx.translate(0, 3);
-      ctx.rotate(0.42);
-      block(-2, 0, 5, 9, STEEL_D, 2);
-      ctx.restore();
-      // glowing plasma muzzle
+      ctx.rotate(-0.55);
+      block(-3, -2.2, 6, 4.4, "#1e293b", 1); // hilt grip
+      block(-4, -3, 1.5, 6, STEEL_D, 0.5); // pommel cap
+      ctx.strokeStyle = STEEL_X;
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(2, 0);
+      ctx.quadraticCurveTo(len * 0.6, -len * 0.22, len, -len * 0.04);
+      ctx.stroke();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.fillStyle = rgba(gun.glow, 0.9);
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1.6 * flick;
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+      // lower-right blade (mirrored)
+      ctx.save();
+      ctx.rotate(0.55);
+      block(-3, -2.2, 6, 4.4, "#1e293b", 1);
+      block(-4, -3, 1.5, 6, STEEL_D, 0.5);
+      ctx.strokeStyle = STEEL_X;
+      ctx.lineWidth = 3.2;
       ctx.beginPath();
-      ctx.arc(23, 0, 3.4, 0, Math.PI * 2);
+      ctx.moveTo(2, 0);
+      ctx.quadraticCurveTo(len * 0.6, len * 0.22, len, len * 0.04);
+      ctx.stroke();
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = 1.6 * flick;
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+      break;
+    }
+    // ---------------- THRUST LONGSWORD (突刺长剑) ----------------
+    case "thrust_sword": {
+      // Claymore style double-edged steel longsword with purple leather grip, gold pommel, and glowing fuller line
+      const len = (gun.meleeRange ?? 88) * 0.85;
+      block(-10, -2.2, 7, 4.4, "#4c1d95", 1.2); // purple grip wrap hilt
+      block(-12, -2.6, 2, 5.2, "#ca8a04", 0.6); // gold pommel ring
+      block(-3, -5, 2.5, 10, STEEL_D, 1); // crossguard
+      // Double-edged steel blade
+      ctx.fillStyle = STEEL_X;
+      ctx.beginPath();
+      ctx.moveTo(0, -3.2);
+      ctx.lineTo(len - 4, -2.4);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(len - 4, 2.4);
+      ctx.lineTo(0, 3.2);
+      ctx.closePath();
       ctx.fill();
+      ctx.strokeStyle = STEEL_D;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      // Glowing fuller line down the center
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const flick = 1 + Math.sin(t * 18) * 0.08;
+      ctx.strokeStyle = rgba(gun.glow, 0.85);
+      ctx.lineWidth = 2.4 * flick;
+      ctx.beginPath();
+      ctx.moveTo(1, 0);
+      ctx.lineTo(len - 3, 0);
+      ctx.stroke();
       ctx.restore();
       break;
     }
@@ -2164,6 +2136,56 @@ export function drawWeaponIcon(
       });
       break;
 
+    case "dual_blades": {
+      // two short blades crossed in an X
+      body(() => {
+        ctx.beginPath();
+        // blade 1: lower-left -> upper-right
+        ctx.moveTo(-10, 9);
+        ctx.lineTo(-1.2, 1.2);
+        ctx.lineTo(10, -9);
+        ctx.lineTo(1.2, -1.2);
+        ctx.closePath();
+        // blade 2: upper-left -> lower-right
+        ctx.moveTo(-10, -9);
+        ctx.lineTo(-1.2, -1.2);
+        ctx.lineTo(10, 9);
+        ctx.lineTo(1.2, 1.2);
+        ctx.closePath();
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.arc(0, 0, 2, 0, Math.PI * 2); // grip
+      });
+      break;
+    }
+    case "thrust_sword": {
+      // longsword tilted up-right with crossguard + grip
+      body(() => {
+        ctx.beginPath();
+        // blade
+        ctx.moveTo(-1, 3);
+        ctx.lineTo(11, -11);
+        ctx.lineTo(-3, 1);
+        ctx.closePath();
+        // crossguard
+        ctx.rect(-5, -1.6, 7, 3.2);
+        // grip
+        ctx.rect(-7.5, 1, 3, 6);
+      });
+      cutout(() => {
+        ctx.beginPath();
+        // grip wrap lines
+        ctx.moveTo(-7.5, 2);
+        ctx.lineTo(-4.5, 2);
+        ctx.moveTo(-7.5, 4);
+        ctx.lineTo(-4.5, 4);
+        ctx.moveTo(-7.5, 6);
+        ctx.lineTo(-4.5, 6);
+        ctx.stroke();
+      });
+      break;
+    }
     default:
       body(() => {
         ctx.beginPath();

@@ -145,6 +145,24 @@ export interface GunDef {
   /** combo chain length for spear */
   comboLength?: number;
 
+  // ---- dual blades (双刃) combo + reflect ----
+  /** per-step damage for a combo weapon, e.g. dual blades [55,55,70,70,200] */
+  comboDamage?: number[];
+  /** reflect enemy bullets within this range while blades are raised (right-click held) */
+  reflectRange?: number;
+  /** fraction of a reflected bullet's damage the blademaster still takes (e.g. 0.05) */
+  reflectSelfDamage?: number;
+
+  // ---- thrust longsword (突刺长剑) charge dash ----
+  /** minimum charge time (seconds) before the dash can release */
+  chargeMin?: number;
+  /** damage dealt to enemies inside the dash corridor */
+  chargeDashDamage?: number;
+  /** dash distance in px (released after charge) */
+  chargeDashDist?: number;
+  /** half-width of the dash hit corridor in px */
+  chargeDashRange?: number;
+
   // ---- lightning whip (闪电鞭) ----
   /** if true, the melee swing alternates left/right and slows hit enemies */
   whip?: boolean;

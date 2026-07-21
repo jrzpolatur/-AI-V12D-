@@ -7,6 +7,8 @@ class SoundManager {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  private killSounds: HTMLAudioElement[] = [];
+  private deathSound: HTMLAudioElement | null = null;
   enabled = true;
   /** master volume 0..1 (scaled by BASE so the default 0.5 matches the old 0.3 gain) */
   volume = 0.5;
@@ -15,6 +17,17 @@ class SoundManager {
   /** Create / resume the audio context. Call from a user gesture. */
   ensure() {
     try {
+      if (!this.killSounds.length) {
+        console.log("[Audio] Preloading WAV sound files...");
+        this.killSounds = [
+          new Audio("killConfirm01.wav"),
+          new Audio("killconfirm02.wav"),
+        ];
+        this.deathSound = new Audio("DeathSound.wav");
+        this.killSounds.forEach(s => s.volume = this.volume);
+        if (this.deathSound) this.deathSound.volume = this.volume;
+        console.log("[Audio] WAV preloaded successfully. Paths:", this.killSounds.map(x => x.src), this.deathSound.src);
+      }
       if (!this.ctx) {
         const Ctor =
           window.AudioContext ||
@@ -45,6 +58,29 @@ class SoundManager {
     if (this.master) {
       this.master.gain.value = this.volume * SoundManager.BASE;
     }
+    this.killSounds.forEach(s => s.volume = this.volume);
+    if (this.deathSound) this.deathSound.volume = this.volume;
+  }
+
+  playKillConfirm() {
+    console.log("[Audio] playKillConfirm invoked. enabled:", this.enabled, "count:", this.killSounds.length);
+    if (!this.enabled || !this.killSounds.length) return;
+    const s = this.killSounds[Math.floor(Math.random() * this.killSounds.length)];
+    s.volume = this.volume;
+    s.currentTime = 0;
+    s.play()
+      .then(() => console.log("[Audio] playKillConfirm playing:", s.src))
+      .catch((err) => console.error("[Audio] playKillConfirm playback failed:", err));
+  }
+
+  playDeath() {
+    console.log("[Audio] playDeath invoked. enabled:", this.enabled, "hasSound:", !!this.deathSound);
+    if (!this.enabled || !this.deathSound) return;
+    this.deathSound.volume = this.volume;
+    this.deathSound.currentTime = 0;
+    this.deathSound.play()
+      .then(() => console.log("[Audio] playDeath playing:", this.deathSound?.src))
+      .catch((err) => console.error("[Audio] playDeath playback failed:", err));
   }
 
   private now() {
