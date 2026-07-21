@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import LoadoutScreen from "./components/LoadoutScreen";
-import GameScreen from "./components/GameScreen";
 import LobbyScreen from "./components/LobbyScreen";
 import MainMenuExtras from "./components/MainMenuExtras";
 import { Net } from "./net/Net";
@@ -10,6 +9,11 @@ import { useOnlineCount } from "./hooks/useOnlineCount";
 import homeBg from "./assets/home-bg.png";
 
 import { tabLock } from "./utils/tabLock";
+
+// Lazily load the game screen so the heavy engine/draw/sound modules are NOT
+// parsed+executed on the main menu's first load (they only run when the player
+// actually starts a match). Keeps the initial bundle lean and the menu snappy.
+const GameScreen = lazy(() => import("./components/GameScreen"));
 
 type Screen = "menu" | "loadout" | "lobby" | "game";
 
@@ -66,15 +70,17 @@ export default function App() {
 
   if (screen === "game") {
     return (
-      <GameScreen
-        loadout={loadout}
-        mode={mode}
-        net={mode === "local" ? null : net}
-        onExit={() => {
-          tabLock.release();
-          setScreen("menu");
-        }}
-      />
+      <Suspense fallback={null}>
+        <GameScreen
+          loadout={loadout}
+          mode={mode}
+          net={mode === "local" ? null : net}
+          onExit={() => {
+            tabLock.release();
+            setScreen("menu");
+          }}
+        />
+      </Suspense>
     );
   }
 

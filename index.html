@@ -7,9 +7,33 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>FIRING STICKERS · 2D 射击</title>
+    <style>
+      @keyframes fs-spin { to { transform: rotate(360deg); } }
+      #fs-splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 18px; background: #0b0c22; color: #cbd5e1;
+        font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      #fs-splash .title { font-weight: 800; letter-spacing: .14em; font-size: 22px; color: #fff; }
+      #fs-splash .spin {
+        width: 34px; height: 34px; border-radius: 50%;
+        border: 3px solid rgba(255,255,255,.2); border-top-color: #22d3ee;
+        animation: fs-spin 1s linear infinite;
+      }
+      #fs-splash .sub { font-size: 13px; opacity: .65; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Loading splash shown until React mounts. React replaces #root's
+           children on first render, so this disappears automatically. -->
+      <div id="fs-splash">
+        <div class="title">FIRING STICKERS</div>
+        <div class="spin"></div>
+        <div class="sub">加载中…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
