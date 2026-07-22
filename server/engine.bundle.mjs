@@ -2911,7 +2911,8 @@ var EMPTY_FRAME = {
   reload: false,
   secondaryFiring: false
 };
-var RESPAWN_TIME = 4;
+var RESPAWN_TIME = 6;
+var DAMAGE_LOG_WINDOW = 10;
 var GameEngine = class {
   canvas;
   ctx;
@@ -3144,6 +3145,7 @@ var GameEngine = class {
       victimName,
       weaponIconShape: iconShape,
       weaponGlow: glow,
+      weaponId: wId,
       timer: 4
     });
     if (this.killFeed.length > 5) {
@@ -3197,6 +3199,36 @@ var GameEngine = class {
    *  remote foe (inside `simulateBot` / `simulateRemote`). Used to suppress HUD
    *  emits so the player's own HUD never flickers to an opponent's state. */
   simulatingOther = false;
+  // ---- damage logging & statistics ----
+  damageLogs = [];
+  nextDamageLogId = 1;
+  playerDamageDealt = 0;
+  playerDamageTaken = 0;
+  playerDeaths = 0;
+  eliminatedBy = "";
+  /** Record or merge damage logs from the same weapon/attacker */
+  recordDamageLog(amount, weapon, targetName, sourceName, isDealtByMe) {
+    if (amount <= 0) return;
+    const rounded = Math.round(amount);
+    if (rounded <= 0) return;
+    const existing = this.damageLogs.find(
+      (l) => l.isDealtByMe === isDealtByMe && l.weapon === weapon && l.targetName === targetName && l.sourceName === sourceName
+    );
+    if (existing) {
+      existing.amount += rounded;
+      existing.timestamp = this.time;
+    } else {
+      this.damageLogs.push({
+        id: this.nextDamageLogId++,
+        timestamp: this.time,
+        amount: rounded,
+        weapon,
+        targetName,
+        sourceName,
+        isDealtByMe
+      });
+    }
+  }
   /** bot AI decision frequency (Hz), decoupled from the render frame rate.
    *  Sourced from settings; higher = smarter but more CPU. */
   botAiHz = DEFAULT_BOT_AI_HZ;
@@ -4404,6 +4436,9 @@ var GameEngine = class {
   }
   // ---------------------------------------------------------------- update
   update(dt) {
+    if (this.damageLogs.length > 0 && !(this.player.deadTimer && this.player.deadTimer > 0)) {
+      this.damageLogs = this.damageLogs.filter((l) => this.time - l.timestamp <= DAMAGE_LOG_WINDOW);
+    }
     let feedDirty = false;
     if (this.activeScoreFeed) {
       this.activeScoreFeed.timer -= dt;
@@ -6616,7 +6651,20 @@ var GameEngine = class {
     e.hp -= dmg;
     const dealt = before - Math.max(e.hp, 0);
     const finalAttackerId = attackerId !== void 0 ? attackerId : this.activeId ?? 0;
-    if (dealt > 0) this.awardDamageScore(finalAttackerId, dealt);
+    if (dealt > 0) {
+      this.awardDamageScore(finalAttackerId, dealt);
+      const isLocalAttacker = this.mode === "local" && finalAttackerId === 0 || this.mode !== "local" && finalAttackerId === this.selfPid;
+      if (isLocalAttacker) {
+        this.playerDamageDealt += dealt;
+        this.recordDamageLog(
+          dealt,
+          src?.weapon || this.gun.id,
+          e.name || (e.type === "monster" ? "\u602A\u7269" : "\u654C\u4EBA"),
+          "\u4F60",
+          true
+        );
+      }
+    }
     if (!silent) e.hitFlash = 1;
     if (!silent && this.hitSndCd <= 0) {
       sound.hit();
@@ -6823,6 +6871,8 @@ var GameEngine = class {
       return;
     }
     p.hp -= dmg;
+    this.playerDamageTaken += dmg;
+    this.recordDamageLog(dmg, "enemy_attack", "\u4F60", "\u654C\u4EBA", false);
     p.flash = 1;
     p.iframes = 0.45;
     p.lastHitTime = this.time;
@@ -6831,6 +6881,8 @@ var GameEngine = class {
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
     if (p.hp <= 0) {
       p.hp = 0;
+      this.playerDeaths++;
+      this.eliminatedBy = "\u654C\u4EBA";
       sound.playDeath();
       if (this.mode === "local") {
         this.endGame("\u4F60\u5012\u4E0B\u4E86");
@@ -6941,13 +6993,42 @@ var GameEngine = class {
     }
     const hpDiff = prevHp - p.hp;
     this.awardDamageScore(attackerId, hpDiff);
+    const victimC = this.combatants.find((c) => c.player === p || c.id === p.cid);
+    const attackerC = this.combatants.find((c) => c.id === attackerId);
+    if (victimC) victimC.damageTaken = (victimC.damageTaken ?? 0) + hpDiff;
+    if (attackerC) attackerC.damageDealt = (attackerC.damageDealt ?? 0) + hpDiff;
+    const isLocalAttacker = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
+    if (hpDiff > 0) {
+      if (isLocalAttacker && !isLocalVictim) {
+        this.playerDamageDealt += hpDiff;
+        this.recordDamageLog(
+          hpDiff,
+          this.gun.id,
+          victimC ? victimC.name : "\u5BF9\u624B",
+          "\u4F60",
+          true
+        );
+      } else if (isLocalVictim && !isLocalAttacker) {
+        this.playerDamageTaken += hpDiff;
+        this.recordDamageLog(
+          hpDiff,
+          "combatant_attack",
+          "\u4F60",
+          attackerC ? attackerC.name : "\u5BF9\u624B",
+          false
+        );
+      }
+    }
     if (p.hp <= 0) {
       p.hp = 0;
       p.deadTimer = RESPAWN_TIME;
       p.bowDrawing = false;
+      if (victimC) victimC.deaths = (victimC.deaths ?? 0) + 1;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
       const isLocal = this.mode === "local" && p.cid === 0 || this.mode !== "local" && p.cid === this.selfPid;
       if (isLocal) {
+        this.playerDeaths++;
+        this.eliminatedBy = attackerC ? attackerC.name : "\u5BF9\u624B";
         sound.playDeath();
       }
       if (this.gameMode === "cashout") {
@@ -9042,7 +9123,7 @@ var GameEngine = class {
         events: this.activeScoreFeed.events.map((e) => ({ id: e.id, text: e.text, victimName: e.victimName, subScore: e.subScore })),
         totalKills: this.activeScoreFeed.totalKills
       } : null,
-      killFeed: this.killFeed.map((f) => ({ id: f.id, type: f.type, text: f.text, teamColor: f.teamColor, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
+      killFeed: this.killFeed.map((f) => ({ id: f.id, type: f.type, text: f.text, teamColor: f.teamColor, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow, weaponId: f.weaponId })),
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
       shieldMaxHp: this.gun.shieldMaxHp ?? null,
@@ -9059,7 +9140,41 @@ var GameEngine = class {
         you: this.mode === "local" ? c.id === 0 : c.id === this.selfPid,
         dead: !!(c.player.deadTimer && c.player.deadTimer > 0)
       })) : void 0,
-      dmTarget: this.isDM ? this.dmKillLimit : void 0
+      dmTarget: this.isDM ? this.dmKillLimit : void 0,
+      deadTimer: p.deadTimer ?? 0,
+      eliminatedBy: this.eliminatedBy,
+      damageLogs: this.damageLogs,
+      postGameStats: this.gameOver ? this.combatants && this.combatants.length > 0 ? (() => {
+        let maxScore = -1;
+        this.combatants.forEach((c) => {
+          if (c.score > maxScore) maxScore = c.score;
+        });
+        return this.combatants.map((c) => ({
+          id: c.id,
+          name: c.name,
+          isLocal: this.mode === "local" ? c.id === 0 : c.id === this.selfPid,
+          score: c.score,
+          kills: c.kills,
+          deaths: c.deaths ?? 0,
+          damageDealt: Math.round(c.damageDealt ?? 0),
+          damageTaken: Math.round(c.damageTaken ?? 0),
+          isMvp: c.score === maxScore && maxScore > 0,
+          color: c.color,
+          characterName: c.character?.name
+        })).sort((a, b) => b.score - a.score);
+      })() : [{
+        id: 0,
+        name: this.character?.name || "\u73A9\u5BB6",
+        isLocal: true,
+        score: this.score,
+        kills: this.kills,
+        deaths: this.playerDeaths,
+        damageDealt: Math.round(this.playerDamageDealt),
+        damageTaken: Math.round(this.playerDamageTaken),
+        isMvp: true,
+        color: "#38bdf8",
+        characterName: this.character?.name
+      }] : void 0
     };
     this.onHud(hud);
   }
@@ -11515,5 +11630,7 @@ ${results}`;
   }
 };
 export {
-  GameEngine
+  DAMAGE_LOG_WINDOW,
+  GameEngine,
+  RESPAWN_TIME
 };

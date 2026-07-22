@@ -2543,3 +2543,19 @@ export function drawGadgetIcon(
   }
   ctx.restore();
 }
+
+/** Draws a weapon using its actual detailed in-game model, centered and scaled for UI. */
+export function drawWeaponModel(
+  ctx: CanvasRenderingContext2D,
+  gun: GunDef,
+  cx: number,
+  cy: number,
+  size: number
+) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  const sc = size / 26;
+  ctx.scale(sc, sc);
+  drawWeapon(ctx, gun, gun.glow, 0, 0);
+  ctx.restore();
+}

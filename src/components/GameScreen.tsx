@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GameEngine, type HudState, type Loadout } from "../game/engine";
 import type { NetMode } from "../net/protocol";
 import type { Net } from "../net/Net";
-import { getCharacter, getOutfit } from "../game/content";
+import { getCharacter, getOutfit, getGun } from "../game/content";
 import { sound } from "../game/sound";
-import { drawWeaponIcon, drawGadgetIcon } from "../game/draw";
+import { drawWeaponIcon, drawWeaponModel, drawGadgetIcon } from "../game/draw";
 import { cn } from "../utils/cn";
 import { isTouchDevice } from "../utils/device";
 import MobileControls from "./MobileControls";
 import SettingsOverlay from "./SettingsOverlay";
+import { GameSummaryScreen } from "./GameSummaryScreen";
+
 import {
   useSettings,
   subscribe,
@@ -84,27 +86,37 @@ const HUD_HINTS: { keys: string; label: string }[] = [
   { keys: "P / Esc", label: "暂停 / 设置" },
 ];
 
-/** Small canvas that renders a weapon's vector silhouette icon. */
+/** Small canvas that renders a weapon's vector silhouette or detailed model icon. */
 function WeaponIcon({
   iconShape,
   glow,
+  gunId,
   size = 22,
 }: {
   iconShape: string;
   glow: string;
+  gunId?: string;
   size?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    const c = ref.current!;
+    const c = ref.current;
+    if (!c) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     c.width = size * dpr;
     c.height = size * dpr;
-    const ctx = c.getContext("2d")!;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
-    drawWeaponIcon(ctx, iconShape, size / 2, size / 2, size * 0.72, glow);
-  }, [iconShape, glow, size]);
+
+    const gun = gunId ? getGun(gunId) : undefined;
+    if (gun) {
+      drawWeaponModel(ctx, gun, size / 2, size / 2, size * 0.85);
+    } else {
+      drawWeaponIcon(ctx, iconShape, size / 2, size / 2, size * 0.72, glow);
+    }
+  }, [iconShape, glow, gunId, size]);
   return (
     <canvas
       ref={ref}
@@ -730,6 +742,7 @@ export default function GameScreen({
                 <WeaponIcon
                   iconShape={g.iconShape}
                   glow={gunDef?.glow ?? "#e2e8f0"}
+                  gunId={g.id}
                   size={28}
                 />
                 <span className="mt-0.5 text-[8px] font-semibold text-slate-300">
@@ -828,44 +841,118 @@ export default function GameScreen({
         />
       )}
 
-      {/* ============ GAME OVER ============ */}
+      {/* ============ GAME OVER SUMMARY ============ */}
       {hud.gameOver && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-80 rounded-2xl border border-white/10 bg-[#15163a]/90 p-6 text-center">
-            <h2 className="mb-1 bg-gradient-to-r from-rose-300 to-amber-300 bg-clip-text text-3xl font-black text-transparent">
-              {hud.gameOverReason}
-            </h2>
-            <p className="mb-5 text-sm text-slate-400">
-              {hud.gameOverReason.includes("基地")
-                ? "防线失守…"
-                : hud.gameOverReason.includes("获胜") ||
-                  hud.gameOverReason.includes("赢")
-                ? "胜利！"
-                : "你倒下了…"}
-            </p>
-            <div className="mb-5 grid grid-cols-4 gap-2">
-              <Stat label="分数" value={hud.score.toLocaleString()} />
-              <Stat label="波数" value={`${hud.wave}`} />
-              <Stat label="击杀" value={`${hud.kills}`} />
-              <Stat label="金币" value={`${hud.gold}`} />
+        <GameSummaryScreen
+          reason={hud.gameOverReason}
+          stats={hud.postGameStats}
+          onRestart={() => engineRef.current?.restart()}
+          onExit={onExit}
+        />
+      )}
+
+      {/* ============ RESPAWN & DAMAGE LOG OVERLAY ============ */}
+      {(hud.deadTimer ?? 0) > 0 && !hud.gameOver && (
+        <>
+          {/* Right-side Damage Statistics Panel */}
+          <div className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 z-40 flex flex-col items-end gap-1.5 max-w-sm select-none">
+            {/* Header: 被淘汰 / [KILLER] */}
+            <div className="w-80 rounded-t-lg bg-gradient-to-r from-rose-600 via-rose-700 to-rose-800 px-4 py-2 text-sm font-black text-white italic tracking-wider flex items-center justify-between shadow-xl border-b border-white/20">
+              <div className="flex items-center gap-1.5">
+                <span className="text-base">💀</span>
+                <span>被淘汰 / {hud.eliminatedBy || "CONTESTANT"}</span>
+              </div>
+              <span className="text-[10px] font-mono opacity-70 uppercase tracking-widest">DAMAGE</span>
             </div>
-            <div className="space-y-2">
-              <button
-                onClick={() => engineRef.current?.restart()}
-                className="w-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 py-2.5 font-bold text-slate-900 transition-transform hover:scale-105"
-              >
-                ↻ 再来一局
-              </button>
-              <button
-                onClick={onExit}
-                className="w-full rounded-full border border-white/15 py-2.5 font-semibold text-slate-300 hover:bg-white/10"
-              >
-                返回装配
-              </button>
+
+            {/* List of Damage Logs: Newest at top (index 0), oldest at bottom */}
+            <div className="flex flex-col gap-1 w-80">
+              {(() => {
+                // Freeze the snapshot when dead so HUD re-renders don't re-trigger animation
+                const activeLogs = (hud.damageLogs ?? []);
+                const logs = [...activeLogs].reverse(); // newest first (fatal blow at top)
+                const N = logs.length;
+                const totalSeqDuration = 2.0; // 2 seconds total for all items to reveal
+                const stepTime = N > 1 ? totalSeqDuration / N : 0;
+                const animDuration = Math.min(0.45, Math.max(0.15, totalSeqDuration / (N || 1)));
+
+                return logs.map((log, idx) => {
+                  const delay = (idx * stepTime).toFixed(3) + "s";
+                  const dur = animDuration.toFixed(3) + "s";
+                  const gun = getGun(log.weapon);
+
+                  return (
+                    <div
+                      key={log.id || idx}
+                      style={{
+                        animationDelay: delay,
+                        animationDuration: dur,
+                      }}
+                      className={cn(
+                        "flex items-center justify-between rounded-md px-3.5 py-2 text-xs font-bold shadow-lg border backdrop-blur-md animate-slide-in-right",
+                        log.isDealtByMe
+                          ? "border-cyan-500/30 bg-[#09353e]/90 text-cyan-200"
+                          : "border-rose-500/30 bg-[#3d0b1a]/90 text-rose-200"
+                      )}
+                    >
+                      {/* Left: [Fatal Icon if idx===0] + [Damage Amount] + [Weapon Icon] */}
+                      <div className="flex items-center gap-2 font-mono">
+                        {idx === 0 && !log.isDealtByMe && (
+                          <span className="text-rose-400 font-bold text-xs" title="致死伤害">💀</span>
+                        )}
+                        <span className={cn(
+                          "font-black text-base italic tracking-tight",
+                          log.isDealtByMe ? "text-cyan-300" : "text-rose-300"
+                        )}>
+                          {log.amount}
+                        </span>
+
+                        {/* Weapon Icon / Badge */}
+                        <div className="flex items-center gap-1">
+                          {gun ? (
+                            <WeaponIcon iconShape={gun.iconShape} glow={gun.glow} gunId={gun.id} size={22} />
+                          ) : (
+                            <span className="text-amber-400 font-bold px-1 text-xs">⚡ 攻击</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: [由 / 对] + [Opponent Name] */}
+                      <div className="flex items-center gap-1.5 text-xs font-semibold">
+                        <span className="opacity-60">{log.isDealtByMe ? "对" : "由"}</span>
+                        <span className="font-bold underline decoration-white/20 tracking-wide">
+                          {log.isDealtByMe ? log.targetName : log.sourceName}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+
+              {(hud.damageLogs ?? []).length === 0 && (
+                <div className="rounded-md bg-slate-900/80 border border-white/10 p-3 text-center text-xs text-slate-400 backdrop-blur-sm">
+                  无近期伤害数据
+                </div>
+              )}
             </div>
           </div>
-        </div>
+
+          {/* Bottom Respawn Timer Bar */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex items-center justify-center bg-gradient-to-t from-black/90 via-black/40 to-transparent pb-8 pt-12">
+            <div className="flex items-center gap-3 rounded-full bg-slate-900/90 px-8 py-2.5 border border-rose-500/50 shadow-2xl backdrop-blur-md">
+              <div className="h-4 w-4 rounded-full border-2 border-rose-400 border-t-transparent animate-spin" />
+              <span className="text-base font-bold text-slate-200">
+                后可以重生
+                <span className="text-2xl font-black text-amber-400 font-mono ml-2 tracking-wider">
+                  {Math.ceil(hud.deadTimer ?? 0)}
+                </span>
+              </span>
+              <span className="text-xs text-slate-400 font-mono">S</span>
+            </div>
+          </div>
+        </>
       )}
+
 
       {/* ============ BATTLEFIELD STYLE SCORE FEED ============ */}
       {hud.activeScoreFeed && (
@@ -918,7 +1005,7 @@ export default function GameScreen({
                     className="flex items-center justify-center rounded bg-slate-950/80 px-1.5 py-0.5 border border-white/10"
                     style={{ boxShadow: `0 0 5px ${kf.weaponGlow}44` }}
                   >
-                    <WeaponIcon iconShape={kf.weaponIconShape!} glow={kf.weaponGlow!} size={20} />
+                    <WeaponIcon iconShape={kf.weaponIconShape!} glow={kf.weaponGlow!} gunId={kf.weaponId} size={20} />
                   </span>
                   <span className="text-rose-300">{kf.victimName}</span>
                 </>

@@ -69,6 +69,13 @@
 * **手雷与部署物 (Turret/Mine) 逻辑** (`lines ~3467 - 3700`)：部署物的血量、寻找最近目标逻辑与 owner 绑定。
 * **燃烧场与毒气场 (`updateEffects`)** (`lines ~4200 - 4250`)：持续性地面伤害，已支持透传 `fx.ownerId` 以正确归属击杀得分。
 * **伤害与击杀计分板 (`damagePlayerEntity` / `addScoreFeed`)** (`lines ~4530 - 4660` 与 `lines ~680 - 710`)：控制 `scoreFeed` 与 `killFeed` 的数据推送。
+* **复活时间与伤害日志记录 (`recordDamageLog` / `damageLogs`)** (`lines ~657 - 661`, `lines ~1028 - 1063`, `lines ~4990 - 5007`, `lines ~5230 - 5240`, `lines ~5390 - 5420`)：
+  - `RESPAWN_TIME = 6` (固定 6 秒复活)，`DAMAGE_LOG_WINDOW = 10` (伤害日志保存 10 秒，阵亡期间暂停清理，信息不消失)。
+  - `recordDamageLog`: **同武器伤害合并显示核心逻辑**。对同武器、同来源/目标的伤害自动在已有条目上实时累加伤害量（amount）并更新时间戳，而不是每次命中新增一行。
+  - `damageEnemy` / `damagePlayer` / `damagePlayerEntity`: 自动捕获玩家伤害输出（`damageDealt`）、承伤（`damageTaken`）与死亡（`deaths`）。
+* **实机精美武器模型 UI 绘制 (`drawWeaponModel`)** (`src/game/draw.ts`, `lines ~2545 - 2560`)：
+  - `drawWeaponModel`: 将选装备页面（LoadoutScreen）与 HUD/伤害日志中的武器图标统一替换为游戏内真实的精细武器建模。
+* **结算 MVP 与玩家统计导出 (`postGameStats` / `emit`)** (`lines ~88 - 165` 与 `lines ~7825 - 7860`)：在 `HudState` 中新增 `postGameStats` 数组，结算时自动计算最高得分者为 MVP 并排序导出。
 * **服务端权威 Tick 与世界推进 (`simulateWorld` / `stepServer`)** (`lines ~5364 - 5420`)：30Hz 推进逻辑与基地/死斗胜负判定。
 * **网络快照与状态同步 (`getSnapshot` / `applySnapshot`)** (`lines ~5210 - 5280` 与 `lines ~5560 - 5640`)：生成与应用 Snapshot。注意 `applySnapshot` 必须正常无报错运行，才能使 `this.peerReady = true`，解除“等待对手同步”蒙层。
 * **Canvas 渲染与绘图 (`draw` / `drawBackground`)** (`lines ~6560 - 6700`)：处理场景背景、基地光圈渲染（生化/死斗跳过基地绘制）。
@@ -79,12 +86,23 @@
 * **`hello` 数据包处理与引擎启动 (`startEngine`)** (`lines ~240 - 255`)：当双方 Loadout 都到达后唤醒 Node 端的 `GameEngine` 线程。
 * **30Hz 循环步进器 (`startTick`)** (`lines ~140 - 180`)：高精度累加器触发 `stepServer` 并广播快照。
 
-### UI 界面与交互 (`src/components/GameScreen.tsx`)
-* **Canvas 游戏循环挂载** (`lines ~170 - 240`)：创建 `GameEngine` 实例并绑定 `requestAnimationFrame`。
-* **“等待双方同步”蒙层 (`hud.connecting`)** (`lines ~608 - 622`)：当 `this.peerReady` 为 false 时弹出的加载动画。
-* **击杀与得分 Feed UI (Battlefield 风格)** (`lines ~670 - 740`)：显示 `淘汰 玩家名 $250` 以及 `淘汰数 X +250`。
+### UI 界面与交互 (`src/components/*` & `src/index.css`)
+* **Canvas 游戏循环挂载** (`src/components/GameScreen.tsx`, `lines ~170 - 240`)：创建 `GameEngine` 实例并绑定 `requestAnimationFrame`。
+* **“等待双方同步”蒙层 (`hud.connecting`)** (`src/components/GameScreen.tsx`, `lines ~608 - 622`)：当 `this.peerReady` 为 false 时弹出的加载动画。
+* **复活倒计时条与右侧伤害统计版 (The Finals 风格)** (`src/components/GameScreen.tsx`, `lines ~844 - 910`)：
+  - 阵亡状态下正下方渲染 `后可以重生 X S` 倒计时条 (6s)。
+  - 顶部标题横条为红色斜体高亮：`被淘汰 / [击杀者名称]` (`eliminatedBy`)。
+  - **时间顺序**：按时间从上到下由近到远排列（最上条为致死伤害/最新事件，最下条为较早事件）。
+  - **元素布局**：`[致死💀图标/伤害数值 (247)] -> [精美实机武器模型图标] -> [由/对] -> [对手ID/名称]`。
+  - **2秒固定序列渐进展开动画**：在 CSS 中设定 `opacity: 0` 与 `animation-fill-mode: both`，消除一开始直接打出的问题；列表整体展开时间固定为 `2.0s`，无论数据多少条，都在 2 秒内优雅渐进滑入展示。
+* **游戏内 HUD 武器栏与击杀播报 (The Finals 风格)** (`src/components/GameScreen.tsx`, `lines ~740 - 750` & `lines ~1000 - 1012`)：
+  - 右下方主/副武器切换栏（按 E 切换）与右上角实时击杀播报栏中的武器图标已全量同步替换为游戏实机精细武器建模（`drawWeaponModel`），包含枪管、握把、渐变涂装及发光特效。
+* **全屏结算总结界面 (The Finals 风格)** (`src/components/GameSummaryScreen.tsx`, 全文件 `lines 1 - 150` & `src/components/GameScreen.tsx`, `lines ~834 - 842`)：
+  - 游戏结束时替代原微型弹窗，全屏卡片式展示各参赛者得分、击杀、死亡、造成伤害与承受伤害。
+  - 第一名/最高得分者高亮 MVP 黄金标示（`★ MVP 杰出选手`），并搭配 `animate-card-pop` 弹入动画。
 
 ---
+
 
 ## 6. 武器与道具建模 / 特效模式（务必分清两套绘制）
 
@@ -188,7 +206,7 @@
 ## 10. 构建/部署陷阱：首屏黑屏、加载慢、以及"卡在加载界面"三大坑（vite-plugin-singlefile）
 
 > [!CAUTION]
-> **血泪教训（v0.4.33 引入缺陷、v0.4.34 修复）**：首屏加载慢/黑屏容易修，但最容易踩的隐藏大坑是——**改完构建后整个应用卡在加载界面进不去**。下面三条都来自真实线上事故。
+> ：首屏加载慢/黑屏容易修，但最容易踩的隐藏大坑是——**改完构建后整个应用卡在加载界面进不去**。下面三条都来自真实线上事故。
 
 ### 10.1 坑一：大资源内联 → 首屏慢 / 黑屏
 * **症状**：首次加载有概率（约 30%）黑屏，且首屏加载时间长。

@@ -85,6 +85,30 @@ export interface GadgetHud {
   selected: boolean;
 }
 
+export interface DamageEvent {
+  id: number;
+  timestamp: number;
+  amount: number;
+  weapon: string;
+  targetName: string;
+  sourceName: string;
+  isDealtByMe: boolean;
+}
+
+export interface PlayerSummaryStat {
+  id: number;
+  name: string;
+  isLocal: boolean;
+  score: number;
+  kills: number;
+  deaths: number;
+  damageDealt: number;
+  damageTaken: number;
+  isMvp: boolean;
+  color?: string;
+  characterName?: string;
+}
+
 export interface HudState {
   hp: number;
   maxHp: number;
@@ -138,7 +162,7 @@ export interface HudState {
   kills: number;
   gold: number;
   activeScoreFeed: { totalScore: number; timer: number; events: { id: number; text: string; victimName?: string; subScore: number }[]; totalKills: number } | null;
-  killFeed: { id: number; type: "kill" | "event"; text?: string; teamColor?: string; killerName?: string; victimName?: string; weaponIconShape?: string; weaponGlow?: string }[];
+  killFeed: { id: number; type: "kill" | "event"; text?: string; teamColor?: string; killerName?: string; victimName?: string; weaponIconShape?: string; weaponGlow?: string; weaponId?: string }[];
   /** bow charge 0..1 (0 when not drawing) */
   bowChargePct: number;
   /** shield HP (null if not a shield weapon) */
@@ -156,6 +180,15 @@ export interface HudState {
   isNet: boolean;
   /** seconds remaining in an online match (null in single-player) */
   matchTimeLeft: number | null;
+  /** player dead timer (seconds left until respawn) */
+  deadTimer?: number;
+  /** name of opponent or monster that eliminated local player */
+  eliminatedBy?: string;
+  /** recent damage events for death HUD */
+  damageLogs?: DamageEvent[];
+
+  /** end game player summary statistics */
+  postGameStats?: PlayerSummaryStat[];
 }
 
 interface Player {
@@ -266,6 +299,9 @@ interface Combatant {
   gadgetCd: Map<string, number>;
   lastGadget: number;
   kills: number;
+  deaths?: number;
+  damageDealt?: number;
+  damageTaken?: number;
   score: number;
   /** fractional score accumulator so continuous/DoT damage isn't rounded away */
   scoreAcc?: number;
@@ -623,8 +659,11 @@ const EMPTY_FRAME: InputFrame = {
   reload: false,
   secondaryFiring: false,
 };
-/** PvP: seconds a downed player waits before respawning */
-const RESPAWN_TIME = 4;
+/** PvP/PvE: seconds a downed player waits before respawning */
+export const RESPAWN_TIME = 6;
+/** Seconds of damage history window tracked for death HUD */
+export const DAMAGE_LOG_WINDOW = 10;
+
 
 export interface Vault {
   id: number;
@@ -832,7 +871,7 @@ export class GameEngine {
   private waveTimer = 0;
   private spawnTimer = 0;
   // removed old scoreFeed array
-  public killFeed: { id: number; type: "kill" | "event"; text?: string; teamColor?: string; killerName?: string; victimName?: string; weaponIconShape?: string; weaponGlow?: string; timer: number }[] = [];
+  public killFeed: { id: number; type: "kill" | "event"; text?: string; teamColor?: string; killerName?: string; victimName?: string; weaponIconShape?: string; weaponGlow?: string; weaponId?: string; timer: number }[] = [];
   private nextScoreFeedId = 0;
   private nextKillFeedId = 0;
 
@@ -926,6 +965,7 @@ export class GameEngine {
       victimName,
       weaponIconShape: iconShape,
       weaponGlow: glow,
+      weaponId: wId,
       timer: 4.0,
     });
     if (this.killFeed.length > 5) {
@@ -983,6 +1023,53 @@ export class GameEngine {
    *  remote foe (inside `simulateBot` / `simulateRemote`). Used to suppress HUD
    *  emits so the player's own HUD never flickers to an opponent's state. */
   private simulatingOther = false;
+  // ---- damage logging & statistics ----
+  private damageLogs: DamageEvent[] = [];
+  private nextDamageLogId = 1;
+  private playerDamageDealt = 0;
+  private playerDamageTaken = 0;
+  private playerDeaths = 0;
+  private eliminatedBy = "";
+
+
+  /** Record or merge damage logs from the same weapon/attacker */
+  private recordDamageLog(
+    amount: number,
+    weapon: string,
+    targetName: string,
+    sourceName: string,
+    isDealtByMe: boolean
+  ) {
+    if (amount <= 0) return;
+    const rounded = Math.round(amount);
+    if (rounded <= 0) return;
+
+    // Search for existing entry of same weapon, target, source and direction
+    const existing = this.damageLogs.find(
+      (l) =>
+        l.isDealtByMe === isDealtByMe &&
+        l.weapon === weapon &&
+        l.targetName === targetName &&
+        l.sourceName === sourceName
+    );
+
+    if (existing) {
+      existing.amount += rounded;
+      existing.timestamp = this.time;
+    } else {
+      this.damageLogs.push({
+        id: this.nextDamageLogId++,
+        timestamp: this.time,
+        amount: rounded,
+        weapon,
+        targetName,
+        sourceName,
+        isDealtByMe,
+      });
+    }
+  }
+
+
   /** bot AI decision frequency (Hz), decoupled from the render frame rate.
    *  Sourced from settings; higher = smarter but more CPU. */
   private botAiHz = DEFAULT_BOT_AI_HZ;
@@ -2358,7 +2445,11 @@ export class GameEngine {
 
   // ---------------------------------------------------------------- update
   private update(dt: number) {
+    if (this.damageLogs.length > 0 && !(this.player.deadTimer && this.player.deadTimer > 0)) {
+      this.damageLogs = this.damageLogs.filter(l => this.time - l.timestamp <= DAMAGE_LOG_WINDOW);
+    }
     let feedDirty = false;
+
     if (this.activeScoreFeed) {
       this.activeScoreFeed.timer -= dt;
       if (this.activeScoreFeed.timer <= 0) {
@@ -4904,7 +4995,22 @@ export class GameEngine {
     // score reflects the ACTUAL damage dealt (overkill is capped to remaining hp)
     const dealt = before - Math.max(e.hp, 0);
     const finalAttackerId = attackerId !== undefined ? attackerId : (this.activeId ?? 0);
-    if (dealt > 0) this.awardDamageScore(finalAttackerId, dealt);
+    if (dealt > 0) {
+      this.awardDamageScore(finalAttackerId, dealt);
+      const isLocalAttacker = (this.mode === "local" && finalAttackerId === 0) ||
+                              (this.mode !== "local" && finalAttackerId === this.selfPid);
+      if (isLocalAttacker) {
+        this.playerDamageDealt += dealt;
+        this.recordDamageLog(
+          dealt,
+          src?.weapon || this.gun.id,
+          e.name || (e.type === "monster" ? "怪物" : "敌人"),
+          "你",
+          true
+        );
+      }
+    }
+
     if (!silent) e.hitFlash = 1;
     if (!silent && this.hitSndCd <= 0) {
       sound.hit();
@@ -5131,6 +5237,8 @@ export class GameEngine {
       return;
     }
     p.hp -= dmg;
+    this.playerDamageTaken += dmg;
+    this.recordDamageLog(dmg, "enemy_attack", "你", "敌人", false);
     p.flash = 1;
     p.iframes = 0.45;
     p.lastHitTime = this.time;
@@ -5139,6 +5247,8 @@ export class GameEngine {
     this.spawnParticles(p.x, p.y, "#f87171", 6, 120, 0.4);
     if (p.hp <= 0) {
       p.hp = 0;
+      this.playerDeaths++;
+      this.eliminatedBy = "敌人";
       sound.playDeath();
       if (this.mode === "local") {
         this.endGame("你倒下了");
@@ -5155,6 +5265,7 @@ export class GameEngine {
         this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
       }
     }
+
   }
 
   private damageBase(dmg: number) {
@@ -5283,17 +5394,51 @@ export class GameEngine {
     const hpDiff = prevHp - p.hp;
     this.awardDamageScore(attackerId, hpDiff);
 
+    const victimC = this.combatants.find(c => c.player === p || c.id === p.cid);
+    const attackerC = this.combatants.find(c => c.id === attackerId);
+
+    if (victimC) victimC.damageTaken = (victimC.damageTaken ?? 0) + hpDiff;
+    if (attackerC) attackerC.damageDealt = (attackerC.damageDealt ?? 0) + hpDiff;
+
+    const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
+
+    if (hpDiff > 0) {
+      if (isLocalAttacker && !isLocalVictim) {
+        this.playerDamageDealt += hpDiff;
+        this.recordDamageLog(
+          hpDiff,
+          this.gun.id,
+          victimC ? victimC.name : "对手",
+          "你",
+          true
+        );
+      } else if (isLocalVictim && !isLocalAttacker) {
+        this.playerDamageTaken += hpDiff;
+        this.recordDamageLog(
+          hpDiff,
+          "combatant_attack",
+          "你",
+          attackerC ? attackerC.name : "对手",
+          false
+        );
+      }
+    }
+
     if (p.hp <= 0) {
       p.hp = 0;
       p.deadTimer = RESPAWN_TIME;
       p.bowDrawing = false;
+      if (victimC) victimC.deaths = (victimC.deaths ?? 0) + 1;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
       
       const isLocal = (this.mode === "local" && p.cid === 0) ||
                       (this.mode !== "local" && p.cid === this.selfPid);
       if (isLocal) {
+        this.playerDeaths++;
+        this.eliminatedBy = attackerC ? attackerC.name : "对手";
         sound.playDeath();
       }
+
 
       if (this.gameMode === "cashout") {
         const c = this.combatants.find(comb => comb.id === p.cid);
@@ -7685,7 +7830,7 @@ export class GameEngine {
         events: this.activeScoreFeed.events.map(e => ({ id: e.id, text: e.text, victimName: e.victimName, subScore: e.subScore })),
         totalKills: this.activeScoreFeed.totalKills
       } : null,
-      killFeed: this.killFeed.map(f => ({ id: f.id, type: f.type, text: f.text, teamColor: f.teamColor, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow })),
+      killFeed: this.killFeed.map(f => ({ id: f.id, type: f.type, text: f.text, teamColor: f.teamColor, killerName: f.killerName, victimName: f.victimName, weaponIconShape: f.weaponIconShape, weaponGlow: f.weaponGlow, weaponId: f.weaponId })),
       bowChargePct: p.bowDrawing ? Math.min(1, p.bowCharge / (this.gun.maxChargeTime ?? 1)) : 0,
       shieldHp: this.gun.shieldMaxHp ? Math.max(0, Math.round(p.shieldHp)) : null,
       shieldMaxHp: this.gun.shieldMaxHp ?? null,
@@ -7711,6 +7856,42 @@ export class GameEngine {
             }))
         : undefined,
       dmTarget: this.isDM ? this.dmKillLimit : undefined,
+      deadTimer: p.deadTimer ?? 0,
+      eliminatedBy: this.eliminatedBy,
+      damageLogs: this.damageLogs,
+      postGameStats: this.gameOver ? (
+        this.combatants && this.combatants.length > 0 ? (
+          (() => {
+            let maxScore = -1;
+            this.combatants.forEach(c => { if (c.score > maxScore) maxScore = c.score; });
+            return this.combatants.map(c => ({
+              id: c.id,
+              name: c.name,
+              isLocal: this.mode === "local" ? c.id === 0 : c.id === this.selfPid,
+              score: c.score,
+              kills: c.kills,
+              deaths: c.deaths ?? 0,
+              damageDealt: Math.round(c.damageDealt ?? 0),
+              damageTaken: Math.round(c.damageTaken ?? 0),
+              isMvp: c.score === maxScore && maxScore > 0,
+              color: c.color,
+              characterName: c.character?.name
+            })).sort((a, b) => b.score - a.score);
+          })()
+        ) : [{
+          id: 0,
+          name: this.character?.name || "玩家",
+          isLocal: true,
+          score: this.score,
+          kills: this.kills,
+          deaths: this.playerDeaths,
+          damageDealt: Math.round(this.playerDamageDealt),
+          damageTaken: Math.round(this.playerDamageTaken),
+          isMvp: true,
+          color: "#38bdf8",
+          characterName: this.character?.name
+        }]
+      ) : undefined,
     };
     this.onHud(hud);
   }

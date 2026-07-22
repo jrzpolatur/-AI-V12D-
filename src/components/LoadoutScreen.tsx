@@ -10,7 +10,7 @@ import {
 import { sound } from "../game/sound";
 import type { Loadout } from "../game/engine";
 import type { GunDef } from "../game/types";
-import { drawCharacter, drawWeaponIcon, drawGadgetIcon, rgba } from "../game/draw";
+import { drawCharacter, drawWeaponIcon, drawWeaponModel, drawGadgetIcon, rgba } from "../game/draw";
 import { cn } from "../utils/cn";
 
 function CharPreview({
@@ -91,7 +91,7 @@ function CharPreview({
       });
       raf = requestAnimationFrame(render);
     };
-    render();
+    raf = requestAnimationFrame(render);
     return () => {
       cancelAnimationFrame(raf);
       canvas.removeEventListener("mousemove", onMove);
@@ -100,22 +100,32 @@ function CharPreview({
   }, [loadout]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="h-full w-full cursor-crosshair"
-      style={{ width: "100%", height: "100%" }}
-    />
+    <div
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        aim.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        mouse.current.inside = true;
+      }}
+      onMouseLeave={() => {
+        mouse.current.inside = false;
+      }}
+      className="relative flex items-center justify-center rounded-2xl bg-[#0f1129]/80 border border-white/10 p-4 shadow-xl backdrop-blur-md"
+    >
+      <canvas ref={canvasRef} style={{ width: 220, height: 260 }} />
+    </div>
   );
 }
 
-/** Small canvas rendering a weapon's vector silhouette. */
+/** Small canvas rendering actual detailed in-game weapon model. */
 function WeaponIcon({
   iconShape,
   glow,
+  gunId,
   size = 36,
 }: {
   iconShape: string;
   glow: string;
+  gunId?: string;
   size?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -127,8 +137,13 @@ function WeaponIcon({
     const ctx = c.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
-    drawWeaponIcon(ctx, iconShape, size / 2, size / 2, size * 0.78, glow);
-  }, [iconShape, glow, size]);
+    const gun = gunId ? getGun(gunId) : GUNS.find(g => g.iconShape === iconShape || g.glow === glow);
+    if (gun) {
+      drawWeaponModel(ctx, gun, size / 2, size / 2, size * 0.9);
+    } else {
+      drawWeaponIcon(ctx, iconShape, size / 2, size / 2, size * 0.78, glow);
+    }
+  }, [iconShape, glow, gunId, size]);
   return (
     <div
       className="flex items-center justify-center rounded-xl p-2.5 bg-white/[0.04] border border-white/[0.06] transition-transform duration-200"
@@ -211,7 +226,7 @@ function WeaponDetail({ gun }: { gun: GunDef }) {
     <div className="rounded-xl border border-white/10 bg-black/30 p-3">
       <div className="mb-2 flex items-center gap-3">
         <div className="grid h-12 w-12 place-items-center rounded-lg bg-white/5">
-          <WeaponIcon iconShape={gun.iconShape} glow={gun.glow} size={32} />
+          <WeaponIcon iconShape={gun.iconShape} glow={gun.glow} gunId={gun.id} size={32} />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -609,7 +624,7 @@ export default function LoadoutScreen({
                         {idx + 1}
                       </span>
                     )}
-                    <WeaponIcon iconShape={g.iconShape} glow={g.glow} size={32} />
+                    <WeaponIcon iconShape={g.iconShape} glow={g.glow} gunId={g.id} size={32} />
                     <span className="text-xs font-semibold">{g.name}</span>
                     <span className="text-[10px] text-slate-400">
                       {g.weaponClass === "melee"
