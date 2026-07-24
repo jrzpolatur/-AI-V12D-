@@ -847,6 +847,8 @@ export interface DrawCharOpts {
   meleeSwing?: number;
   /** lunge offset along aim direction (for spear dash) */
   lunge?: number;
+  isCloaked?: boolean;
+  cloakAlpha?: number;
 }
 
 export function drawCharacter(
@@ -856,6 +858,11 @@ export function drawCharacter(
   const { x, y, angle, character, outfit, size, flash = 0 } = opts;
   const t = opts.t ?? 0;
   const breath = 1 + Math.sin(t * 3) * 0.03;
+
+  ctx.save();
+  if (opts.isCloaked) {
+    ctx.globalAlpha = opts.cloakAlpha ?? 0.15;
+  }
 
   // shadow
   ctx.save();
@@ -1025,6 +1032,25 @@ export function drawCharacter(
   }
 
   ctx.restore();
+  ctx.restore();
+
+  // 隐身特效：被 cloak 时叠加一圈流动的微光环，提示隐身已激活
+  if (opts.isCloaked) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.22 + 0.22 * pulse;
+    ctx.strokeStyle = "#67e8f9";
+    ctx.lineWidth = 2 + pulse;
+    ctx.beginPath();
+    ctx.arc(x, y, size * (1.25 + 0.18 * pulse), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.14 + 0.14 * pulse;
+    ctx.beginPath();
+    ctx.arc(x, y, size * (0.85 + 0.12 * pulse), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 // ===========================================================================

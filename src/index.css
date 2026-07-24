@@ -101,3 +101,46 @@ body::-webkit-scrollbar {
   animation: cardPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ============================================================
+   Mobile / touch helpers
+   ============================================================ */
+
+/* Elements only shown on touch devices (coarse pointer / no hover). */
+.show-touch {
+  display: none !important;
+}
+/* Elements only shown on non-touch (mouse / keyboard) devices.
+   No base style so it never clobbers the element's own display (e.g. flex). */
+@media (hover: none), (pointer: coarse) {
+  .hide-touch {
+    display: none !important;
+  }
+  .show-touch {
+    display: flex !important;
+  }
+}
+
+/* iOS / Android safe-area insets (notch, rounded corners, home indicator).
+   Applied to full-screen game HUD + menu containers so on-screen controls and
+   HUD panels never hide under the hardware cut-out. */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px) !important;
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px) !important;
+}
+
+/* Remove the 300ms tap delay and prevent double-tap zoom on interactive
+   elements (especially the menu / loadout buttons on touch devices). */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+

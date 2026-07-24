@@ -86,6 +86,19 @@ const HUD_HINTS: { keys: string; label: string }[] = [
   { keys: "P / Esc", label: "暂停 / 设置" },
 ];
 
+/** Touch controls shown on mobile (replaces keyboard keys). */
+const HUD_HINTS_TOUCH: { keys: string; label: string }[] = [
+  { keys: "左摇杆", label: "移动" },
+  { keys: "屏幕拖动", label: "瞄准" },
+  { keys: "开火键", label: "射击 / 部署选中道具" },
+  { keys: "技能键", label: "释放技能" },
+  { keys: "切枪键", label: "切换武器" },
+  { keys: "换弹键", label: "换弹" },
+  { keys: "道具 1 / 2 / 3", label: "选择道具" },
+  { keys: "暂停键", label: "暂停 / 设置" },
+  { keys: "长按复活键", label: "复活队友" },
+];
+
 /** Small canvas that renders a weapon's vector silhouette or detailed model icon. */
 function WeaponIcon({
   iconShape,
@@ -175,6 +188,7 @@ export default function GameScreen({
   }));
   const settings = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pointerLocked, setPointerLocked] = useState(false);
   const [isFull, setIsFull] = useState(false);
   const isTouch = useMemo(() => isTouchDevice(), []);
   // ---- HUD hints (controls help) ----
@@ -242,6 +256,7 @@ export default function GameScreen({
     engineRef.current = engine;
     // ESC / P should open the in-game settings overlay (which then pauses).
     engine.onPauseRequest = () => setSettingsOpen((o) => !o);
+    engine.onPointerLock = setPointerLocked;
     // NOTE: enable touch mode HERE (not from MobileControls' own effect). Child
     // effects run before the parent effect that creates the engine, so at that
     // point engineRef.current is still null and setTouchMode would silently no-op.
@@ -261,12 +276,19 @@ export default function GameScreen({
     const apply = (st: ReturnType<typeof getSettings>) => {
       sound.setVolume(st.volume);
       sound.setEnabled(!st.muted);
-      engineRef.current?.setTargetFps(st.fps);
-      engineRef.current?.setBotAiHz(st.botAiHz);
+      if (isTouch) {
+        // Mobile: cap frame rate / bot AI so low-end phones stay smooth.
+        // min() keeps any deliberate lower setting the user picked.
+        engineRef.current?.setTargetFps(Math.min(st.fps, 45));
+        engineRef.current?.setBotAiHz(Math.min(st.botAiHz, 20));
+      } else {
+        engineRef.current?.setTargetFps(st.fps);
+        engineRef.current?.setBotAiHz(st.botAiHz);
+      }
     };
     apply(getSettings());
     return subscribe(apply);
-  }, []);
+  }, [isTouch]);
 
   // ---- opening settings pauses the local simulation ----
   useEffect(() => {
@@ -303,7 +325,7 @@ export default function GameScreen({
 
   return (
     <div
-      className="relative h-screen w-screen select-none overflow-hidden bg-black"
+      className="relative h-screen w-screen select-none overflow-hidden bg-black pt-safe pb-safe pl-safe pr-safe"
       style={{ transform: `translate(${shake.x}px, ${shake.y}px)` }}
     >
       <canvas
@@ -545,12 +567,20 @@ export default function GameScreen({
       {showStartHints && !hud.gameOver && !hintsOpen && (
         <div className="pointer-events-none absolute inset-x-0 top-[11%] flex flex-col items-center gap-2">
           <div className="rounded-xl border border-white/15 bg-black/55 px-5 py-2.5 text-center text-sm text-slate-200 backdrop-blur">
-            移动{" "}
-            <span className="font-mono text-indigo-300">WASD</span> · 射击{" "}
-            <span className="font-mono text-indigo-300">左键</span> · 技能{" "}
-            <span className="font-mono text-indigo-300">Q</span> · 换弹{" "}
-            <span className="font-mono text-indigo-300">R</span> · 切换武器{" "}
-            <span className="font-mono text-indigo-300">E</span>
+            {isTouch ? (
+              <>
+                左摇杆移动 · 开火键射击 · 技能键放技能 · 切枪键换武器 · 拖动屏幕瞄准
+              </>
+            ) : (
+              <>
+                移动{" "}
+                <span className="font-mono text-indigo-300">WASD</span> · 射击{" "}
+                <span className="font-mono text-indigo-300">左键</span> · 技能{" "}
+                <span className="font-mono text-indigo-300">Q</span> · 换弹{" "}
+                <span className="font-mono text-indigo-300">R</span> · 切换武器{" "}
+                <span className="font-mono text-indigo-300">E</span>
+              </>
+            )}
           </div>
           <button
             onClick={() => {
@@ -560,6 +590,18 @@ export default function GameScreen({
             className="pointer-events-auto rounded-full border border-indigo-400/40 bg-indigo-500/20 px-3 py-1 text-xs font-medium text-indigo-200 hover:bg-indigo-500/30"
           >
             查看完整操作说明 (?)
+          </button>
+        </div>
+      )}
+
+      {/* ============ POINTER-LOCK HINT (desktop) ============ */}
+      {!isTouch && !pointerLocked && !settingsOpen && !hud.gameOver && !hud.connecting && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center">
+          <button
+            onClick={() => engineRef.current?.requestMouseLock()}
+            className="pointer-events-auto rounded-xl border border-cyan-300/40 bg-black/55 px-4 py-2 text-center text-sm text-cyan-100 backdrop-blur hover:bg-white/10"
+          >
+            点击画面锁定鼠标 · 按 <b>U</b> 或 <b>Esc</b> 显示光标
           </button>
         </div>
       )}
@@ -581,7 +623,7 @@ export default function GameScreen({
       )}
 
       {/* ============ GADGET BAR (right side) ============ */}
-      <div className="pointer-events-auto absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 sm:right-4">
+      <div className={cn("pointer-events-auto absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 sm:right-4", isTouch && "hidden")}>
         {hud.gadgets.map((gd, i) => (
           <button
             key={gd.id}
@@ -672,8 +714,8 @@ export default function GameScreen({
         </div>
       </div>
 
-      {/* Right bottom: weapon slots + skill */}
-      <div className="pointer-events-auto absolute bottom-3 right-3 flex items-end gap-3 sm:bottom-4 sm:right-4">
+      {/* Right bottom: weapon slots + skill (hidden on touch — replaced by MobileControls) */}
+      <div className={cn("pointer-events-auto absolute bottom-3 right-3 flex items-end gap-3 sm:bottom-4 sm:right-4", isTouch && "hidden")}>
         {/* Skill button */}
         <button
           onClick={() => engineRef.current?.triggerSkill()}
@@ -793,7 +835,7 @@ export default function GameScreen({
               </button>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {HUD_HINTS.map((h) => (
+              {(isTouch ? HUD_HINTS_TOUCH : HUD_HINTS).map((h) => (
                 <div
                   key={h.label}
                   className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2"
@@ -806,7 +848,9 @@ export default function GameScreen({
               ))}
             </div>
             <p className="mt-4 text-center text-xs text-slate-400">
-              按 <span className="font-mono text-slate-200">H</span> 或点击空白处关闭
+              {isTouch
+                ? "点击空白处关闭"
+                : '按 H 或点击空白处关闭'}
             </p>
           </div>
         </div>
@@ -1240,7 +1284,7 @@ function WeaponStatus({ hud }: { hud: HudState }) {
             }}
           />
         </div>
-        <kbd className="kbd">R</kbd>
+        <kbd className="kbd hide-touch">R</kbd>
       </div>
       {warm < 0.999 && (
         <div className="pointer-events-none mt-1 flex w-56 max-w-[70vw] items-center gap-2 rounded-full border border-amber-300/20 bg-black/45 px-3 py-1.5 backdrop-blur">

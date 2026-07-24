@@ -59,6 +59,14 @@ export interface SnapPlayer {
   ammo: number | null;
   /** magazine capacity (null for weapons without a magazine) */
   magazine: number | null;
+  isCloaked?: boolean;
+  cloakAlpha?: number;
+  skillEnergy?: number;
+  winchActive?: boolean;
+  winchX?: number;
+  winchY?: number;
+  isChargingSlam?: boolean;
+  chargeSlamTime?: number;
   /** >0 = electrified by a lightsaber hit (guest renders crackling arcs) */
   electrified: number;
   electrifiedGlow: string;
@@ -86,7 +94,7 @@ export interface SnapBullet {
   color: string;
   glow: string;
   kind: string;
-  owner: "self" | "foe" | "enemy";
+  owner: "self" | "foe" | "enemy" | "player";
 }
 
 /** A thrown grenade (mirrored so the guest can render it mid-flight). */
@@ -165,7 +173,7 @@ export interface Snapshot {
   gold: number;
   gameOver: boolean;
   gameOverReason: string;
-  dmKills?: [number, number];
+  dmKills?: number[];
   dmTarget?: number;
 }
 

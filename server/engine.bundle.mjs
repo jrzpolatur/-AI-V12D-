@@ -14,7 +14,7 @@ var guns_default = [
     spread: 0.03,
     pellets: 1,
     pierce: 0,
-    life: 1.1,
+    life: 1.15,
     knockback: 110,
     color: "#e2e8f0",
     glow: "#94a3b8",
@@ -63,7 +63,7 @@ var guns_default = [
     spread: 0.08,
     pellets: 1,
     pierce: 0,
-    life: 0.9,
+    life: 0.99,
     knockback: 90,
     color: "#a5f3fc",
     glow: "#22d3ee",
@@ -145,7 +145,7 @@ var guns_default = [
     color: "#fda4af",
     glow: "#fb7185",
     explosive: true,
-    explosionRadius: 96,
+    explosionRadius: 192,
     kind: "rocket",
     barrel: 26,
     magazine: 1,
@@ -163,7 +163,7 @@ var guns_default = [
     fireRate: 10,
     bulletSpeed: 1240,
     bulletSize: 5,
-    spread: 0.05,
+    spread: 0.07,
     pellets: 1,
     pierce: 0,
     life: 1.2,
@@ -187,7 +187,7 @@ var guns_default = [
     fireRate: 9,
     bulletSpeed: 1300,
     bulletSize: 6,
-    spread: 0.045,
+    spread: 0.055,
     pellets: 1,
     pierce: 1,
     life: 1.3,
@@ -466,7 +466,7 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "shak50",
     iconShape: "shak50",
-    damage: 42,
+    damage: 35,
     fireRate: 7,
     bulletSpeed: 1100,
     bulletSize: 6,
@@ -500,7 +500,7 @@ var guns_default = [
     spread: 0.012,
     pellets: 1,
     pierce: 0,
-    life: 1.3,
+    life: 1.36,
     knockback: 180,
     color: "#e2e8f0",
     glow: "#cbd5e1",
@@ -525,7 +525,7 @@ var guns_default = [
     spread: 0,
     pellets: 1,
     pierce: 8,
-    life: 2.2,
+    life: 2.25,
     knockback: 480,
     color: "#fde047",
     glow: "#facc15",
@@ -546,10 +546,10 @@ var guns_default = [
     fireRate: 19,
     bulletSpeed: 1550,
     bulletSize: 4.5,
-    spread: 0.11,
+    spread: 0.135,
     pellets: 1,
     pierce: 0,
-    life: 1,
+    life: 1.05,
     knockback: 55,
     color: "#fde68a",
     glow: "#fbbf24",
@@ -706,10 +706,10 @@ var guns_default = [
     shape: "lewis",
     iconShape: "lewis",
     damage: 30,
-    fireRate: 9,
+    fireRate: 8.5,
     bulletSpeed: 1500,
     bulletSize: 6,
-    spread: 0.06,
+    spread: 0.085,
     pellets: 1,
     pierce: 0,
     life: 1.2,
@@ -718,9 +718,36 @@ var guns_default = [
     glow: "#f59e0b",
     kind: "tracer",
     barrel: 26,
-    magazine: 60,
-    reloadTime: 3.2,
+    magazine: 47,
+    reloadTime: 3,
     rangeTier: "\u4E2D"
+  },
+  {
+    id: "scout",
+    name: "\u65A5\u5019",
+    desc: "\u8FDC\u8DDD\u79BB\u5C04\u624B\u6B65\u67AA\uFF1A\u534A\u81EA\u52A8\u7CBE\u51C6\u70B9\u5C04\uFF0C\u9AD8\u4F24\u5BB3\u53EF\u7A7F\u900F\uFF0C\u9002\u5408\u8FDC\u8DDD\u79BB\u538B\u5236",
+    weaponClass: "ranged",
+    shape: "sniper",
+    iconShape: "sniper",
+    damage: 68,
+    fireRate: 2.8,
+    bulletSpeed: 1700,
+    bulletSize: 5,
+    spread: 0.012,
+    pellets: 1,
+    pierce: 2,
+    life: 2.2,
+    knockback: 7,
+    color: "#34d399",
+    glow: "#a7f3d0",
+    explosive: false,
+    explosionRadius: 0,
+    kind: "bullet",
+    semiAuto: true,
+    barrel: 34,
+    magazine: 15,
+    reloadTime: 2.3,
+    rangeTier: "\u8FDC"
   }
 ];
 
@@ -939,6 +966,35 @@ var SKILLS = [
     duration: 4,
     color: "#fbbf24",
     icon: "\u{1F525}"
+  },
+  {
+    id: "charge_slam",
+    name: "\u51B2\u649E\u4E0E\u7838\u51FB",
+    desc: "\u9AD8\u901F\u5411\u524D\u51B2\u649E\u7834\u574F\u969C\u788D\uFF0C\u5BF9\u6CBF\u9014\u654C\u4EBA\u9020\u6210\u8F7B\u5FAE\u51FB\u9000\u4E0E\u4F24\u5BB3\uFF1B\u518D\u6B21\u6309\u952E\u6216\u7ED3\u675F\u65F6\u89E6\u53D1\u8303\u56F4\u7838\u5730\u7206\u88C2",
+    cooldown: 8,
+    duration: 1.6,
+    color: "#f97316",
+    icon: "\u{1F417}"
+  },
+  {
+    id: "cloak",
+    name: "\u9690\u8EAB\u88C5\u7F6E",
+    desc: "\u6309 Q \u5F00\u542F/\u5173\u95ED\u9690\u8EAB\uFF0C\u9759\u6B62\u65F6\u5B8C\u5168\u9690\u5F62\uFF0C\u79FB\u52A8\u65F6\u5FAE\u5F31\u626D\u66F2\uFF1B\u6301\u7EED\u6D88\u8017\u80FD\u91CF\uFF0C\u5F00\u706B/\u53D7\u51FB\u81EA\u52A8\u7834\u9690",
+    cooldown: 1.5,
+    duration: 0,
+    isEnergy: true,
+    maxEnergy: 100,
+    color: "#a855f7",
+    icon: "\u{1F464}"
+  },
+  {
+    id: "winch_claw",
+    name: "\u7EDE\u76D8\u94C1\u722A",
+    desc: "\u5411\u51C6\u661F\u5FEB\u901F\u53D1\u5C04\u6293\u94A9\u94C1\u722A\uFF0C\u6293\u4F4F\u654C\u4EBA\u5E76\u5C06\u5176\u5F3A\u884C\u62C9\u81F3\u9762\u524D\uFF0C\u5E76\u65BD\u52A0\u77ED\u6682\u50F5\u76F4",
+    cooldown: 7,
+    duration: 0.5,
+    color: "#eab308",
+    icon: "\u2693"
   }
 ];
 var GADGETS = [
@@ -1034,6 +1090,49 @@ var GADGETS = [
     color: "#4ade80",
     maxStack: 2,
     hp: 80
+  },
+  {
+    id: "healing_beam",
+    kind: "healing_beam",
+    name: "\u6CBB\u7597\u5C04\u7EBF",
+    desc: "\u6309\u4F4F\u5F00\u706B\u4E3A\u51C6\u661F\u9644\u8FD1\u7684\u961F\u53CB\u6301\u7EED\u56DE\u8840\uFF0C\u5E26\u8FC7\u70ED\u60E9\u7F5A",
+    cooldown: 0,
+    iconShape: "healing_beam",
+    color: "#60a5fa",
+    // blue
+    healPerSecond: 50,
+    heatPerSecond: 1 / 5,
+    // 5 seconds to overheat
+    coolRate: 1 / 4
+    // 4 seconds to cool down
+  },
+  {
+    id: "rpg",
+    kind: "rpg",
+    name: "RPG-7",
+    desc: "\u53D1\u5C04\u4E00\u679A\u9AD8\u7206\u706B\u7BAD\u5F39\uFF0C\u9020\u6210 140 \u5927\u8303\u56F4\u4F24\u5BB3",
+    cooldown: 35,
+    // long cooldown
+    iconShape: "rpg",
+    color: "#ef4444",
+    // red
+    projectileDamage: 140,
+    explosionRadius: 360,
+    // +100% on request: 180 -> 360
+    projectileSpeed: 800
+  },
+  {
+    id: "stun_gun",
+    kind: "stun_gun",
+    name: "\u7535\u51FB\u67AA",
+    desc: "\u53D1\u5C04\u547D\u4E2D\u654C\u4EBA\u53EF\u4F7F\u5176\u65E0\u6CD5\u79FB\u52A8\u3001\u5207\u67AA\u6216\u4F7F\u7528\u6280\u80FD\uFF0C\u6301\u7EED3\u79D2",
+    cooldown: 18,
+    iconShape: "stun_gun",
+    color: "#fde047",
+    // yellow
+    projectileDamage: 20,
+    projectileSpeed: 1e3,
+    ccDuration: 3
   }
 ];
 var MONSTERS = [
@@ -1227,6 +1326,54 @@ var SCENES = [
     accent: "#22d3ee",
     style: "city",
     gridColor: "rgba(34,211,238,0.10)"
+  },
+  {
+    id: "wild_west",
+    name: "\u897F\u90E8\u725B\u4ED4",
+    bgTop: "#d97706",
+    // amber-600
+    bgBottom: "#92400e",
+    // amber-800
+    wallColor: "#b45309",
+    // amber-700 (wood color)
+    wallDark: "#78350f",
+    // amber-900
+    accent: "#fcd34d",
+    // amber-300
+    style: "ruin",
+    gridColor: "rgba(252,211,77,0.15)"
+  },
+  {
+    id: "jungle",
+    name: "\u5E7D\u9759\u4E1B\u6797",
+    bgTop: "#166534",
+    // green-800
+    bgBottom: "#064e3b",
+    // emerald-900
+    wallColor: "#15803d",
+    // green-700
+    wallDark: "#14532d",
+    // green-900
+    accent: "#86efac",
+    // green-300
+    style: "organic",
+    gridColor: "rgba(134,239,172,0.10)"
+  },
+  {
+    id: "arctic_zone",
+    name: "\u6781\u5BD2\u5730\u5E26",
+    bgTop: "#93c5fd",
+    // blue-300
+    bgBottom: "#e0f2fe",
+    // sky-100
+    wallColor: "#bfdbfe",
+    // blue-200
+    wallDark: "#93c5fd",
+    // blue-300
+    accent: "#38bdf8",
+    // sky-400
+    style: "ice",
+    gridColor: "rgba(56,189,248,0.20)"
   }
 ];
 
@@ -1971,6 +2118,10 @@ function drawCharacter(ctx, opts) {
   const t = opts.t ?? 0;
   const breath = 1 + Math.sin(t * 3) * 0.03;
   ctx.save();
+  if (opts.isCloaked) {
+    ctx.globalAlpha = opts.cloakAlpha ?? 0.15;
+  }
+  ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.32)";
   ctx.beginPath();
   ctx.ellipse(x, y + size * 0.78, size * 0.95, size * 0.5, 0, 0, Math.PI * 2);
@@ -2108,6 +2259,23 @@ function drawCharacter(ctx, opts) {
     ctx.fill();
   }
   ctx.restore();
+  ctx.restore();
+  if (opts.isCloaked) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.22 + 0.22 * pulse;
+    ctx.strokeStyle = "#67e8f9";
+    ctx.lineWidth = 2 + pulse;
+    ctx.beginPath();
+    ctx.arc(x, y, size * (1.25 + 0.18 * pulse), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.14 + 0.14 * pulse;
+    ctx.beginPath();
+    ctx.arc(x, y, size * (0.85 + 0.12 * pulse), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 function drawMonster(ctx, opts) {
   const { behavior, size, color, glow, angle, t } = opts;
@@ -2795,6 +2963,11 @@ var SoundManager = class _SoundManager {
   hurt() {
     this.tone(200, 0.18, "sawtooth", 0.22, 80);
   }
+  /** Short error / denied buzz (e.g. gadget overheated). */
+  error() {
+    this.tone(140, 0.12, "square", 0.2, 90);
+    this.noiseBurst(0.08, 0.1, 600, 0.6);
+  }
   skill() {
     this.tone(300, 0.18, "triangle", 0.22, 720);
     this.tone(600, 0.18, "sine", 0.12, 1100);
@@ -2892,7 +3065,7 @@ var KEYS_MOVE = /* @__PURE__ */ new Set([
 var MAX_DASH_CHARGES = 3;
 var DASH_RECHARGE = 5;
 var GADGET_DEPLOY_DIST = 240;
-var GADGET_THROW_DIST = 630;
+var GADGET_THROW_DIST = 756;
 var MAX_PARTICLES = 700;
 var MAX_EFFECTS = 240;
 var GRID_CELL = 220;
@@ -2967,6 +3140,9 @@ var GameEngine = class {
   enemies = [];
   particles = [];
   effects = [];
+  /** floating score / heal number popups (declared since the gadget heal
+   *  system pushes into it — previously missing, causing a runtime crash). */
+  scorePopups = [];
   pickups = [];
   grenades = [];
   // spatial hash grid for broad-phase collision/damage queries (perf)
@@ -3140,6 +3316,7 @@ var GameEngine = class {
       }
     }
     this.killFeed.push({
+      type: "kill",
       id: this.nextKillFeedId++,
       killerName,
       victimName,
@@ -3187,6 +3364,8 @@ var GameEngine = class {
   /** called when the player presses the pause/settings hotkey (ESC or P). The
    *  React layer wires this up to open the in-game settings overlay. */
   onPauseRequest;
+  /** called when the OS pointer lock state changes (desktop aim-lock feature) */
+  onPointerLock;
   // ---- deathmatch (offline PvP vs AI bots) ----
   /** true when the active sub-mode is deathmatch */
   isDM = false;
@@ -3252,6 +3431,10 @@ var GameEngine = class {
   flameActive = false;
   keys = /* @__PURE__ */ new Set();
   mouse = { x: 400, y: 300 };
+  /** screen-space cursor position relative to the canvas top-left (accumulated while pointer is locked) */
+  cursorScreen = { x: 0, y: 0 };
+  /** true when the OS pointer lock is currently active (desktop only) */
+  pointerLocked = false;
   firing = false;
   secondaryFiring = false;
   /** virtual movement vector from the on-screen joystick (-1..1 each axis) */
@@ -3268,6 +3451,7 @@ var GameEngine = class {
   boundBlur;
   boundResize;
   boundContext;
+  boundLockChange;
   constructor(canvas, loadout, onHud, opts = {}) {
     this.canvas = canvas;
     this.ctx = canvas ? canvas.getContext("2d") : null;
@@ -3301,6 +3485,7 @@ var GameEngine = class {
     };
     this.boundResize = () => this.onResize();
     this.boundContext = (e) => e.preventDefault();
+    this.boundLockChange = () => this.onPointerLockChange();
   }
   // ---------------------------------------------------------------- lifecycle
   start() {
@@ -3449,7 +3634,7 @@ var GameEngine = class {
     this.resize();
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
-    if (this.gameMode === "deathmatch") {
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
       const pCount = this.loadout.dmPlayerCount || 4;
       const scale = pCount === 4 ? 1 : pCount === 6 ? 1.2 : 1.5;
       this.worldW = RUNTIME.worldW * scale;
@@ -3654,10 +3839,11 @@ var GameEngine = class {
       this.spawnCashoutStation();
       this.banner = { text: "\u6392\u4F4D\u63D0\u73B0 \xB7 \u593A\u53D6\u73B0\u91D1\u76D2\u8FDB\u884C\u63D0\u73B0\uFF01", t: 2.8 };
       this.activeId = 0;
-    } else if (this.gameMode === "deathmatch") {
+    } else if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
       this.isDM = true;
+      const isTeam = this.gameMode === "team_deathmatch";
       const pCount = this.loadout.dmPlayerCount || 4;
-      this.dmKillLimit = this.mode === "local" ? pCount === 4 ? 15 : pCount === 6 ? 18 : 24 : 8;
+      this.dmKillLimit = this.mode === "local" ? isTeam ? pCount === 4 ? 20 : pCount === 6 ? 30 : 40 : pCount === 4 ? 15 : pCount === 6 ? 18 : 24 : isTeam ? 20 : 8;
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
@@ -3699,18 +3885,38 @@ var GameEngine = class {
         };
         this.combatants = [human];
         this.player.cid = 0;
-        const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
-        const botNames = ["\u963F\u5C14\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C", "\u5FB7\u5C14\u5854", "\u827E\u666E\u897F\u9F99", "\u6CFD\u5854", "\u4F0A\u5854", "\u897F\u5854"];
-        const botCount = pCount - 1;
-        const picks = this.rollBotLoadouts(botCount);
-        for (let i = 0; i < botCount; i++) {
-          const sp = this.dmSpawns[i + 1];
-          this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+        if (isTeam) {
+          const botColors = ["#8b5cf6", "#f472b6", "#a3e635", "#fbbf24"];
+          const botNames = ["\u963F\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C", "\u5FB7\u5854", "\u827E\u666E", "\u6CFD\u5854", "\u4F0A\u5854", "\u897F\u5854"];
+          const numTeams = pCount / 2;
+          const picks = this.rollBotLoadouts(pCount - 1);
+          let botIdx = 0;
+          for (let teamId = 0; teamId < numTeams; teamId++) {
+            const playersInTeam = teamId === 0 ? 1 : 2;
+            for (let pIdx = 0; pIdx < playersInTeam; pIdx++) {
+              const sp = this.dmSpawns[botIdx + 1];
+              const name = teamId === 0 ? "\u961F\u53CB" : botNames[botIdx];
+              const bot = this.makeBot(botIdx + 1, picks[botIdx], name, botColors[teamId], sp.x, sp.y);
+              bot.teamId = teamId;
+              this.combatants.push(bot);
+              botIdx++;
+            }
+          }
+          this.banner = { text: `\u53CC\u6392\u6B7B\u6597 \xB7 \u56E2\u961F\u5148\u6740 ${this.dmKillLimit} \u4EBA\u83B7\u80DC\uFF01`, t: 2.8 };
+        } else {
+          const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
+          const botNames = ["\u963F\u5C14\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C", "\u5FB7\u5C14\u5854", "\u827E\u666E\u897F\u9F99", "\u6CFD\u5854", "\u4F0A\u5854", "\u897F\u5854"];
+          const botCount = pCount - 1;
+          const picks = this.rollBotLoadouts(botCount);
+          for (let i = 0; i < botCount; i++) {
+            const sp = this.dmSpawns[i + 1];
+            this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+          }
+          this.banner = { text: `\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 ${this.dmKillLimit} \u4EBA\u83B7\u80DC\uFF01`, t: 2.4 };
         }
-        this.banner = { text: `\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 ${this.dmKillLimit} \u4EBA\u83B7\u80DC\uFF01`, t: 2.4 };
       } else {
         this.combatants = [];
-        this.banner = { text: "\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 8 \u4EBA\u83B7\u80DC\uFF01", t: 2.4 };
+        this.banner = { text: isTeam ? `\u53CC\u6392\u6B7B\u6597 \xB7 \u56E2\u961F\u5148\u6740 ${this.dmKillLimit} \u4EBA\u83B7\u80DC\uFF01` : "\u6B7B\u4EA1\u7ADE\u8D5B \xB7 \u5148\u6740 8 \u4EBA\u83B7\u80DC\uFF01", t: 2.4 };
       }
       this.activeId = 0;
     } else {
@@ -3730,7 +3936,7 @@ var GameEngine = class {
       this.player.lastGadget = 0;
       this.foe = this.makeFoe();
       this.net.sendGame({ t: "hello", name: this.character.name, loadout: this.loadout });
-      if (this.gameMode === "deathmatch") {
+      if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
         this.player.cid = this.selfPid;
         this.foe.cid = this.peerPid;
         const hostSpawn = this.dmSpawns[0];
@@ -4106,6 +4312,15 @@ var GameEngine = class {
       case 4:
         this.layoutCyber(building, cover, pillar, cx, cy);
         break;
+      case 5:
+        this.layoutRuin(building, cover, pillar, cx, cy);
+        break;
+      case 6:
+        this.layoutArctic(building, cover, pillar, cx, cy);
+        break;
+      case 7:
+        this.layoutCyber(building, cover, pillar, cx, cy);
+        break;
       default:
         this.layoutNeon(building, cover, pillar, cx, cy);
         break;
@@ -4244,6 +4459,7 @@ var GameEngine = class {
       passive: false
     });
     this.canvas.addEventListener("contextmenu", this.boundContext);
+    document.addEventListener("pointerlockchange", this.boundLockChange);
     window.addEventListener("blur", this.boundBlur);
     window.addEventListener("resize", this.boundResize);
   }
@@ -4256,6 +4472,7 @@ var GameEngine = class {
     window.removeEventListener("mouseup", this.boundMouseUp);
     this.canvas.removeEventListener("wheel", this.boundWheel);
     this.canvas.removeEventListener("contextmenu", this.boundContext);
+    document.removeEventListener("pointerlockchange", this.boundLockChange);
     window.removeEventListener("blur", this.boundBlur);
     window.removeEventListener("resize", this.boundResize);
   }
@@ -4283,6 +4500,12 @@ var GameEngine = class {
       return;
     if (e.code === "KeyP" || e.code === "Escape") {
       if (this.mode === "local" && !this.gameOver) this.onPauseRequest?.();
+      if (this.pointerLocked) this.exitMouseLock();
+      e.preventDefault();
+      return;
+    }
+    if (e.code === "KeyU" && !this.touchMode && !this.gameOver) {
+      this.toggleMouseLock();
       e.preventDefault();
       return;
     }
@@ -4302,6 +4525,7 @@ var GameEngine = class {
           e.preventDefault();
         }
       } else if (e.code === "KeyE") {
+        this.clearGadgetSelection();
         this.pendWeapon = true;
         e.preventDefault();
       }
@@ -4325,28 +4549,77 @@ var GameEngine = class {
       e.preventDefault();
     }
   }
+  // ---- pointer lock (desktop aim-lock) ----
+  requestMouseLock() {
+    if (!this.touchMode && this.canvas && this.canvas.requestPointerLock) {
+      try {
+        this.canvas.requestPointerLock();
+      } catch {
+      }
+    }
+  }
+  exitMouseLock() {
+    if (document.pointerLockElement) {
+      try {
+        document.exitPointerLock();
+      } catch {
+      }
+    }
+  }
+  toggleMouseLock() {
+    if (document.pointerLockElement === this.canvas) this.exitMouseLock();
+    else this.requestMouseLock();
+  }
+  isPointerLocked() {
+    return this.pointerLocked;
+  }
+  onPointerLockChange() {
+    this.pointerLocked = document.pointerLockElement === this.canvas;
+    if (this.pointerLocked && this.canvas) {
+      const rect = this.canvas.getBoundingClientRect();
+      this.cursorScreen.x = rect.width / 2;
+      this.cursorScreen.y = rect.height / 2;
+    }
+    this.onPointerLock?.(this.pointerLocked);
+  }
   onMouseMove(e) {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
-    this.mouse.x = e.clientX - rect.left + this.camX;
-    this.mouse.y = e.clientY - rect.top + this.camY;
+    if (this.pointerLocked) {
+      this.cursorScreen.x += e.movementX;
+      this.cursorScreen.y += e.movementY;
+    } else {
+      this.cursorScreen.x = e.clientX - rect.left;
+      this.cursorScreen.y = e.clientY - rect.top;
+    }
+    this.cursorScreen.x = Math.max(0, Math.min(rect.width, this.cursorScreen.x));
+    this.cursorScreen.y = Math.max(0, Math.min(rect.height, this.cursorScreen.y));
+    this.mouse.x = this.cursorScreen.x + this.camX;
+    this.mouse.y = this.cursorScreen.y + this.camY;
   }
   onMouseDown(e) {
     sound.ensure();
+    if (!this.touchMode && !this.pointerLocked && document.pointerLockElement !== this.canvas) {
+      this.requestMouseLock();
+    }
     if (e.button === 0) {
       if (this.selectedGadget >= 0 && !this.gameOver && !this.paused) {
         const idx = this.selectedGadget;
         const g = this.gadgets[idx];
         if (g) {
-          if (this.mode === "guest") {
-            this.pendGadget = idx;
-            this.gadgetCd.set(g.id, g.cooldown);
-          } else if ((this.gadgetCd.get(g.id) ?? 0) <= 0) {
-            this.deployGadget(idx, this.mouse.x, this.mouse.y);
+          if (g.kind === "healing_beam" || g.kind === "rpg" || g.kind === "stun_gun") {
+            this.firing = true;
+          } else {
+            if (this.mode === "guest") {
+              this.pendGadget = idx;
+              this.gadgetCd.set(g.id, g.cooldown);
+            } else if ((this.gadgetCd.get(g.id) ?? 0) <= 0) {
+              this.deployGadget(idx, this.mouse.x, this.mouse.y);
+            }
+            this.selectedGadget = -1;
+            e.preventDefault();
+            return;
           }
-          this.selectedGadget = -1;
-          e.preventDefault();
-          return;
         }
       }
       this.firing = true;
@@ -4478,6 +4751,18 @@ var GameEngine = class {
       dx /= vlen;
       dy /= vlen;
       const p = this.player;
+      if (p.isChargingSlam) {
+        const speed = Math.hypot(p.dashVx, p.dashVy) || 800;
+        const cur = Math.atan2(p.dashVy, p.dashVx);
+        const desired = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+        let diff = desired - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const turn = Math.max(-12 * dt, Math.min(12 * dt, diff));
+        const na = cur + turn;
+        p.dashVx = Math.cos(na) * speed;
+        p.dashVy = Math.sin(na) * speed;
+      }
       if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
@@ -4560,6 +4845,18 @@ var GameEngine = class {
       dx /= vlen;
       dy /= vlen;
       const p = this.player;
+      if (p.isChargingSlam) {
+        const speed = Math.hypot(p.dashVx, p.dashVy) || 800;
+        const cur = Math.atan2(p.dashVy, p.dashVx);
+        const desired = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+        let diff = desired - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const turn = Math.max(-12 * dt, Math.min(12 * dt, diff));
+        const na = cur + turn;
+        p.dashVx = Math.cos(na) * speed;
+        p.dashVy = Math.sin(na) * speed;
+      }
       if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
@@ -4714,12 +5011,90 @@ var GameEngine = class {
     if (p.slamCd > 0) p.slamCd -= dt;
     if (p.swingTimer > 0) p.swingTimer -= dt;
     if (p.slowT && p.slowT > 0) p.slowT -= dt;
+    if (p.stunTime && p.stunTime > 0) p.stunTime -= dt;
     if (p.comboTimer > 0) {
       p.comboTimer -= dt;
       if (p.comboTimer <= 0) p.comboStep = 0;
     }
     if (p.lunge > 0) p.lunge = Math.max(0, p.lunge - dt * 120);
     if (p.electrifiedTime && p.electrifiedTime > 0) p.electrifiedTime -= dt;
+    if (p.skillEnergy !== void 0 && p.skillEnergy > 0) {
+      p.skillEnergy -= dt;
+      if (p.skillEnergy <= 0) {
+        p.isCloaked = false;
+        p.winchActive = false;
+        if (p.isChargingSlam) {
+          p.isChargingSlam = false;
+          this.triggerChargeSlamAOE(p, this.activeId);
+        }
+      }
+    }
+    if (p.isChargingSlam) {
+      const ramDmg = 130 * dt;
+      const KB = -0.5;
+      const kx = p.dashVx * dt * KB;
+      const ky = p.dashVy * dt * KB;
+      const hitR = p.size + 8;
+      this.buildGrid();
+      const cand = this.queryGrid(p.x, p.y, hitR + this.gridMaxR + 4);
+      for (const it of cand) {
+        if (it.kind === "enemy") {
+          const e = it.ref;
+          if (Math.hypot(e.x - p.x, e.y - p.y) < hitR + e.size) {
+            this.damageEnemy(e, ramDmg, kx, ky, false, void 0, p.cid ?? this.activeId);
+          }
+        } else if (this.isDM && it.kind === "player" && it.ownerId !== (p.cid ?? this.activeId)) {
+          const q = it.ref;
+          if (!q.deadTimer || q.deadTimer <= 0) {
+            if (Math.hypot(q.x - p.x, q.y - p.y) < hitR + q.size) {
+              this.damagePlayerEntity(q, ramDmg, void 0, kx, ky, p.cid ?? this.activeId);
+            }
+          }
+        }
+      }
+    }
+    if (p.winchActive && p.winchX !== void 0 && p.winchY !== void 0) {
+      p.winchX += (p.winchVx ?? 0) * dt;
+      p.winchY += (p.winchVy ?? 0) * dt;
+      if ((p.skillEnergy ?? 0) <= this.getSkill("winch_claw").duration / 2) {
+        const dx2 = p.x - p.winchX;
+        const dy2 = p.y - p.winchY;
+        const dist = Math.hypot(dx2, dy2) || 1;
+        p.winchVx = dx2 / dist * 1200;
+        p.winchVy = dy2 / dist * 1200;
+      }
+      if ((p.skillEnergy ?? 0) > this.getSkill("winch_claw").duration / 2) {
+        const enemies = this.queryGrid(p.winchX, p.winchY, 30);
+        for (const it of enemies) {
+          if (it.kind === "enemy") {
+            const e = it.ref;
+            if (!e.isBoss) {
+              e.x = p.winchX;
+              e.y = p.winchY;
+            }
+          } else if (it.kind === "player" && it.ownerId !== (p.cid ?? 1)) {
+            const op = it.ref;
+            op.x = p.winchX;
+            op.y = p.winchY;
+          }
+        }
+      } else {
+        const enemies = this.queryGrid(p.winchX, p.winchY, 40);
+        for (const it of enemies) {
+          if (it.kind === "enemy") {
+            const e = it.ref;
+            if (!e.isBoss) {
+              e.x = p.winchX;
+              e.y = p.winchY;
+            }
+          } else if (it.kind === "player" && it.ownerId !== (p.cid ?? 1)) {
+            const op = it.ref;
+            op.x = p.winchX;
+            op.y = p.winchY;
+          }
+        }
+      }
+    }
     if (this.gun.id === "thrust_sword") {
       if (this.secondaryFiring && !p.thrustDashActive) {
         if (!p.thrustCharging) {
@@ -4816,16 +5191,25 @@ var GameEngine = class {
       return;
     }
     p.fireTimer -= dt;
+    let usingGadgetWeapon = false;
+    if (this.selectedGadget >= 0) {
+      const gDef = this.gadgets[this.selectedGadget];
+      if (gDef && (gDef.kind === "healing_beam" || gDef.kind === "rpg" || gDef.kind === "stun_gun")) {
+        usingGadgetWeapon = true;
+        this.updateGadgetWeapon(dt, gDef, this.firing && !this.paused);
+      }
+    }
     const ws = this.weaponStates.get(g.id);
     const fr = g.fireRate * this.character.fireRateMult * (1 + (this.outfit.fireRateBonus ?? 0)) * (p.overdriveTime > 0 ? 1.7 : 1);
     let spun = true;
     if (g.spinup) {
-      if (this.firing)
+      if (this.firing && !usingGadgetWeapon)
         ws.spin = Math.min(1, (ws.spin ?? 0) + dt / g.spinup);
       else ws.spin = Math.max(0, (ws.spin ?? 0) - dt / (g.spinDown ?? 0.8));
       spun = (ws.spin ?? 0) > 0.12;
     }
-    if (g.weaponClass === "beam") {
+    if (usingGadgetWeapon) {
+    } else if (g.weaponClass === "beam") {
       this.updateBeam(dt, this.firing && !this.paused, ws);
     } else if (g.weaponClass === "flamethrower") {
       this.updateFlamethrower(dt, this.firing && !this.paused, ws);
@@ -4860,6 +5244,7 @@ var GameEngine = class {
   fireGun(ws) {
     const p = this.player;
     const g = this.gun;
+    if (p.isCloaked) p.isCloaked = false;
     const spinMult = g.spinup ? (g.spinMinMult ?? 0.2) + (1 - (g.spinMinMult ?? 0.2)) * (ws.spin ?? 0) : 1;
     const dmg = g.damage * this.character.damageMult * spinMult;
     const base = p.angle;
@@ -5257,13 +5642,13 @@ var GameEngine = class {
       }
     }
     const opp = this.meleeOpponent();
-    if (opp && !(opp.deadTimer && opp.deadTimer > 0) && !p.thrustHitIds?.has(opp.id)) {
+    if (opp && !(opp.deadTimer && opp.deadTimer > 0) && !p.thrustHitIds?.has(opp.cid)) {
       const rx = opp.x - p.x;
       const ry = opp.y - p.y;
       const d = Math.hypot(rx, ry);
       const fwd = rx * ca + ry * sa;
       if (d <= range + opp.size && fwd > -range) {
-        p.thrustHitIds?.add(opp.id);
+        p.thrustHitIds?.add(opp.cid);
         this.damagePlayerEntity(opp, dmg, void 0, ca * 240, sa * 240, this.activeId);
       }
     }
@@ -5465,6 +5850,124 @@ var GameEngine = class {
     }
   }
   // --------------------------------------------------- poison mist sprayer
+  updateGadgetWeapon(dt, g, firing) {
+    const p = this.player;
+    let cd = this.gadgetCd.get(g.id) ?? 0;
+    if (g.kind === "healing_beam") {
+      if (p.gadgetHeat === void 0) p.gadgetHeat = 0;
+      if (cd > 0) {
+        cd -= dt;
+        if (cd <= 0) {
+          cd = 0;
+          p.gadgetHeat = 0;
+        }
+        this.gadgetCd.set(g.id, cd);
+      } else {
+        if (firing) {
+          p.gadgetHeat += (g.heatPerSecond ?? 0.2) * dt;
+          if (p.gadgetHeat >= 1) {
+            cd = 1 / (g.coolRate ?? 0.25);
+            this.gadgetCd.set(g.id, cd);
+            sound.error();
+          } else {
+            let bestTgt = null;
+            let bestDist = 400 * 400;
+            const myTeam = this.combatants.find((c) => c.id === this.activeId)?.teamId;
+            for (const c of this.combatants) {
+              if (c.id === this.activeId) continue;
+              if (c.teamId === myTeam) {
+                const q = c.player;
+                if (q.hp >= q.maxHp) continue;
+                if (q.deadTimer && q.deadTimer > 0) continue;
+                const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+                if (d < bestDist) {
+                  bestDist = d;
+                  bestTgt = q;
+                }
+              }
+            }
+            if (bestTgt) {
+              bestTgt.hp = Math.min(bestTgt.maxHp, bestTgt.hp + (g.healPerSecond ?? 50) * dt);
+              this.effects.push({ type: "heal_beam", x: p.x, y: p.y, targetId: bestTgt.cid, t: 0, duration: 0.1, radius: 2, color: g.color });
+              if (Math.random() < dt * 4) {
+                this.scorePopups.push({ x: bestTgt.x, y: bestTgt.y - 20, t: 1, score: `+${Math.round(g.healPerSecond ?? 50)}`, color: "#4ade80" });
+              }
+            } else {
+              this.effects.push({ type: "beam", x: p.x, y: p.y, angle: p.angle, range: 200, duration: 0.1, t: 0, color: g.color, radius: 2 });
+            }
+          }
+        } else {
+          p.gadgetHeat = Math.max(0, p.gadgetHeat - (g.coolRate ?? 0.25) * dt);
+        }
+        if (cd <= 0) {
+          this.gadgetCd.set(g.id, p.gadgetHeat * -1);
+        }
+      }
+    } else if (g.kind === "rpg") {
+      if (cd > 0) {
+        cd = Math.max(0, cd - dt);
+        this.gadgetCd.set(g.id, cd);
+      }
+      if (firing && cd <= 0 && p.fireTimer <= 0) {
+        this.bullets.push({
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(p.angle) * (g.projectileSpeed ?? 800),
+          vy: Math.sin(p.angle) * (g.projectileSpeed ?? 800),
+          size: 6,
+          color: g.color,
+          glow: "#f87171",
+          life: 2,
+          kind: "rocket",
+          ownerId: p.cid ?? this.activeId,
+          damage: g.projectileDamage ?? 140,
+          explosive: true,
+          explosionRadius: g.explosionRadius ?? 150,
+          pierce: 0,
+          bounces: 0,
+          knockback: 0,
+          hit: /* @__PURE__ */ new Set()
+        });
+        sound.shoot();
+        p.fireTimer = 1;
+        this.gadgetCd.set(g.id, g.cooldown);
+        this.clearGadgetSelection();
+      }
+    } else if (g.kind === "stun_gun") {
+      if (cd > 0) {
+        cd = Math.max(0, cd - dt);
+        this.gadgetCd.set(g.id, cd);
+      }
+      if (firing && cd <= 0 && p.fireTimer <= 0) {
+        this.bullets.push({
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(p.angle) * (g.projectileSpeed ?? 1e3),
+          vy: Math.sin(p.angle) * (g.projectileSpeed ?? 1e3),
+          size: 4,
+          color: g.color,
+          glow: "#fef08a",
+          life: 0.5,
+          kind: "bullet",
+          // basic projectile
+          ownerId: p.cid ?? this.activeId,
+          damage: g.projectileDamage ?? 20,
+          pierce: 0,
+          knockback: 0,
+          hit: /* @__PURE__ */ new Set(),
+          bounces: 0,
+          explosive: false,
+          explosionRadius: 0,
+          stunDuration: g.ccDuration ?? 3
+          // special property we'll check on hit
+        });
+        sound.shoot();
+        p.fireTimer = 0.5;
+        this.gadgetCd.set(g.id, g.cooldown);
+        this.clearGadgetSelection();
+      }
+    }
+  }
   updatePoisonMist(dt, firing, ws) {
     const g = this.gun;
     if (firing && !ws.overheated) {
@@ -6201,6 +6704,7 @@ var GameEngine = class {
             if (c.id === (d.ownerId ?? -1)) continue;
             const q = c.player;
             if (q.deadTimer && q.deadTimer > 0) continue;
+            if (q.isCloaked) continue;
             const dist = Math.hypot(q.x - d.x, q.y - d.y);
             if (dist < bestD) {
               bestD = dist;
@@ -6940,6 +7444,7 @@ var GameEngine = class {
     if (this.gameOver) return;
     this.gameOver = true;
     this.gameOverReason = reason;
+    this.exitMouseLock();
     this.spawnParticles(this.player.x, this.player.y, this.character.bodyColor, 40, 220, 0.8);
     this.emit(true);
   }
@@ -6956,6 +7461,15 @@ var GameEngine = class {
   /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
   damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0, attackerId) {
     if (p.deadTimer && p.deadTimer > 0) return;
+    if (this.gameMode === "team_deathmatch" && attackerId !== void 0) {
+      const victim = this.combatants.find((c) => c.id === (p.cid ?? -1));
+      const atk = this.combatants.find((c) => c.id === attackerId);
+      if (victim && atk && victim.teamId !== void 0 && atk.teamId !== void 0 && victim.teamId === atk.teamId) {
+        return;
+      }
+    }
+    if (p.isChargingSlam) dmg *= 0.65;
+    if (p.isCloaked) p.isCloaked = false;
     const prevHp = p.hp;
     const prevShield = p.shieldHp ?? 0;
     if (p.iframes > 0 || p.shieldTime > 0) {
@@ -6979,6 +7493,10 @@ var GameEngine = class {
     }
     p.hp -= dmg;
     p.flash = 1;
+    if (_b && _b.stunDuration && _b.stunDuration > 0) {
+      p.stunTime = Math.max(p.stunTime ?? 0, _b.stunDuration);
+      this.effects.push({ type: "lightning", x: p.x, y: p.y, r: p.size, duration: _b.stunDuration, color: "#fef08a" });
+    }
     if (!this.isDM) p.iframes = 0.45;
     p.lastHitTime = this.time;
     sound.hurt();
@@ -7086,8 +7604,17 @@ var GameEngine = class {
           } else if (victim.id === this.selfPid || this.mode === "local" && victim.id === 0) {
             this.banner = { text: `\u4F60\u88AB ${kName} \u51FB\u8D25\uFF01`, t: 1.6 };
           }
-          if (killer.kills >= this.dmKillLimit && !this.gameOver) {
-            this.endGame(killer.id === this.selfPid || this.mode === "local" && killer.id === 0 ? "\u4F60\u8D62\u4E86\uFF01" : `${kName} \u83B7\u80DC\uFF01`);
+          let teamKills = killer.kills;
+          if (this.gameMode === "team_deathmatch" && killer.teamId !== void 0) {
+            teamKills = this.combatants.filter((c) => c.teamId === killer.teamId).reduce((sum, c) => sum + c.kills, 0);
+          }
+          if (teamKills >= this.dmKillLimit && !this.gameOver) {
+            if (this.gameMode === "team_deathmatch") {
+              const isMyTeam = killer.teamId === 0;
+              this.endGame(isMyTeam ? "\u80DC\u5229\uFF01\u4F60\u7684\u961F\u4F0D\u8D62\u5F97\u4E86\u6BD4\u8D5B\uFF01" : "\u5931\u8D25\uFF01\u5176\u4ED6\u961F\u4F0D\u7387\u5148\u8FBE\u5230\u4E86\u76EE\u6807\uFF01");
+            } else {
+              this.endGame(killer.id === this.selfPid || this.mode === "local" && killer.id === 0 ? "\u4F60\u8D62\u4E86\uFF01" : `${kName} \u83B7\u80DC\uFF01`);
+            }
           }
         } else if (victim && (victim.id === this.selfPid || this.mode === "local" && victim.id === 0)) {
           this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${RESPAWN_TIME} \u79D2\u540E\u590D\u6D3B`, t: 1.6 };
@@ -7161,6 +7688,9 @@ var GameEngine = class {
     if (p.deadTimer <= 0) {
       p.deadTimer = 0;
       p.hp = p.maxHp;
+      if (this.gameMode === "cashout" && p.cid !== void 0) {
+        this.statues = this.statues.filter((s) => s.deadCid !== p.cid);
+      }
       p.x = spawnX;
       p.y = spawnY;
       p.vx = 0;
@@ -7234,10 +7764,20 @@ var GameEngine = class {
     }
     this.semiAutoLatch = false;
     this.updatePlayer(dt);
-    if (inp.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
-    if (inp.skill) this.activateSkill();
-    if (inp.reload) this.reloadCurrent();
-    if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    if (!this.player.stunTime || this.player.stunTime <= 0) {
+      if (inp.weaponSwitch) {
+        this.clearGadgetSelection();
+        this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+      }
+      if (inp.skill) {
+        const prevSkill = this.skill;
+        this.skill = getSkill(this.peerLoadout?.skillId ?? "dash");
+        this.activateSkill();
+        this.skill = prevSkill;
+      }
+      if (inp.reload) this.reloadCurrent();
+      if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    }
     foe.gunIndex = this.gunIndex;
     foe.skillCd = this.skillCd;
     foe.dashCharges = this.dashCharges;
@@ -7380,9 +7920,10 @@ var GameEngine = class {
     let bestD = Infinity;
     for (const o of this.combatants) {
       if (o.id === c.id) continue;
-      if (this.gameMode === "cashout" && o.teamId === c.teamId) continue;
+      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
+      if (q.isCloaked) continue;
       const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
       if (d < bestD) {
         bestD = d;
@@ -7470,6 +8011,9 @@ var GameEngine = class {
         } else {
           score = dps * 0.05 - (dist - r);
         }
+        if (dist < 120 && (gg.weaponClass === "melee" || gg.weaponClass === "shield" || (gg.pellets ?? 1) > 1)) {
+          score += 5e3;
+        }
         if (score > bestScore) {
           bestScore = score;
           best = i;
@@ -7530,7 +8074,8 @@ var GameEngine = class {
       los = this.botLOS(p.x, p.y, target.x, target.y);
       inRange = dist < this.gunEffRange(g) + 40;
       const facing = Math.abs(this.angleDiff(ang, p.angle));
-      this.firing = los && inRange && facing < 1.2;
+      const close = dist < 120 || p.isChargingSlam === true;
+      this.firing = (los || close) && inRange && (close || facing < 1.2);
     } else if (!isInsertingBox) {
       this.firing = false;
     }
@@ -7612,9 +8157,10 @@ var GameEngine = class {
     let bestD = Infinity;
     for (const o of this.combatants) {
       if (o.id === c.id) continue;
-      if (this.gameMode === "cashout" && o.teamId === c.teamId) continue;
+      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
+      if (q.isCloaked) continue;
       const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
       if (d < bestD) {
         bestD = d;
@@ -7662,7 +8208,8 @@ var GameEngine = class {
     c.losTtl = Math.max(0, (c.losTtl ?? 0) - dt);
     const inRange = dist < this.gunEffRange(g) + 40;
     const facing = Math.abs(this.angleDiff(ang, p.angle));
-    this.firing = los && inRange && facing < 1.2;
+    const close = dist < 120 || p.isChargingSlam === true;
+    this.firing = (los || close) && inRange && (close || facing < 1.2);
   }
   /** Line-of-sight test: true if the segment (x0,y0)->(x1,y1) is not blocked by a wall. */
   botLOS(x0, y0, x1, y1) {
@@ -7707,7 +8254,9 @@ var GameEngine = class {
       ammo: this.gun.magazine !== void 0 ? this.weaponStates.get(this.gun.id)?.ammo ?? null : null,
       magazine: this.gun.magazine ?? null,
       electrified: p.electrifiedTime ?? 0,
-      electrifiedGlow: p.electrifiedGlow ?? "#38bdf8"
+      electrifiedGlow: p.electrifiedGlow ?? "#38bdf8",
+      isCloaked: p.isCloaked ?? false,
+      skillEnergy: p.skillEnergy
     };
   }
   /** Build the full world snapshot (used by the host relay AND the authoritative server). */
@@ -7731,7 +8280,7 @@ var GameEngine = class {
       paused: this.paused,
       players: [
         this.toSnapPlayer(this.player, this.character, this.outfit, this.gadgets, this.gadgetCd),
-        this.toSnapPlayer(this.foe, this.foeChar, this.foeOutfit, this.foeGadgets, this.foeGadgetCd)
+        ...this.foe ? [this.toSnapPlayer(this.foe, this.foeChar, this.foeOutfit, this.foeGadgets, this.foeGadgetCd)] : []
       ],
       enemies: this.enemies.map((e) => ({
         id: e.id,
@@ -7813,10 +8362,7 @@ var GameEngine = class {
       gold: this.gold,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
-      dmKills: this.isDM ? [
-        this.combatants.find((c) => c.id === 1)?.kills ?? 0,
-        this.combatants.find((c) => c.id === 2)?.kills ?? 0
-      ] : void 0,
+      dmKills: this.isDM ? this.gameMode === "team_deathmatch" ? [0, 1, 2, 3].map((t) => this.combatants.filter((c) => c.teamId === t).reduce((sum, c) => sum + c.kills, 0)).filter((_, i, arr) => i === 0 || arr[i] > 0 || this.combatants.some((c) => c.teamId === i)) : [this.combatants.find((c) => c.id === 1)?.kills ?? 0, this.combatants.find((c) => c.id === 2)?.kills ?? 0] : void 0,
       dmTarget: this.isDM ? this.dmKillLimit : void 0
     };
   }
@@ -7894,10 +8440,15 @@ var GameEngine = class {
     }
     this.semiAutoLatch = false;
     this.updatePlayer(dt);
-    if (inp.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
-    if (inp.skill) this.activateSkill();
-    if (inp.reload) this.reloadCurrent();
-    if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    if (!this.player.stunTime || this.player.stunTime <= 0) {
+      if (inp.weaponSwitch) {
+        this.clearGadgetSelection();
+        this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+      }
+      if (inp.skill) this.activateSkill();
+      if (inp.reload) this.reloadCurrent();
+      if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    }
     player.gunIndex = this.gunIndex;
     player.skillCd = this.skillCd;
     player.dashCharges = this.dashCharges;
@@ -7997,7 +8548,9 @@ var GameEngine = class {
     this.peerInput.clear();
     this.peerLatch.clear();
     this.foe = this.makeFoe();
-    if (this.gameMode === "deathmatch") {
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
+      const isTeam = this.gameMode === "team_deathmatch";
+      const pCount = this.loadout.dmPlayerCount || 4;
       this.player.cid = this.selfPid;
       this.foe.cid = this.peerPid;
       this.dmSpawns = [
@@ -8016,7 +8569,7 @@ var GameEngine = class {
         id: 1,
         isBot: false,
         name: "\u73A9\u5BB61",
-        color: "#38bdf8",
+        color: isTeam ? "#8b5cf6" : "#38bdf8",
         player: this.player,
         character: this.character,
         outfit: this.outfit,
@@ -8035,13 +8588,14 @@ var GameEngine = class {
         score: 0,
         wander: 0,
         strafeDir: 1,
-        strafeTimer: 0
+        strafeTimer: 0,
+        teamId: isTeam ? 0 : void 0
       };
       const c2 = {
         id: 2,
         isBot: false,
         name: "\u73A9\u5BB62",
-        color: "#f472b6",
+        color: isTeam ? "#8b5cf6" : "#f472b6",
         player: this.foe,
         character: this.foeChar,
         outfit: this.foeOutfit,
@@ -8060,9 +8614,36 @@ var GameEngine = class {
         score: 0,
         wander: 0,
         strafeDir: 1,
-        strafeTimer: 0
+        strafeTimer: 0,
+        teamId: isTeam ? 0 : void 0
       };
       this.combatants = [c1, c2];
+      if (isTeam) {
+        const botColors = ["#8b5cf6", "#f472b6", "#a3e635", "#fbbf24"];
+        const botNames = ["\u963F\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C", "\u5FB7\u5854", "\u827E\u666E", "\u6CFD\u5854", "\u4F0A\u5854", "\u897F\u5854"];
+        const numTeams = pCount / 2;
+        const picks = this.rollBotLoadouts(pCount - 2);
+        let botIdx = 0;
+        for (let teamId = 1; teamId < numTeams; teamId++) {
+          for (let pIdx = 0; pIdx < 2; pIdx++) {
+            const sp = this.dmSpawns[botIdx + 2];
+            const name = botNames[botIdx];
+            const bot = this.makeBot(botIdx + 3, picks[botIdx], name, botColors[teamId], sp.x, sp.y);
+            bot.teamId = teamId;
+            this.combatants.push(bot);
+            botIdx++;
+          }
+        }
+      } else {
+        const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
+        const botNames = ["\u963F\u5C14\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C", "\u5FB7\u5C14\u5854", "\u827E\u666E\u897F\u9F99", "\u6CFD\u5854", "\u4F0A\u5854", "\u897F\u5854"];
+        const botCount = pCount - 2;
+        const picks = this.rollBotLoadouts(botCount);
+        for (let i = 0; i < botCount; i++) {
+          const sp = this.dmSpawns[i + 2];
+          this.combatants.push(this.makeBot(i + 3, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+        }
+      }
     }
     this.peerLoadout = loadoutB;
     this.applyPeerLoadout();
@@ -8228,42 +8809,31 @@ var GameEngine = class {
       }));
     }
     if (s.dmKills && this.isDM && this.combatants.length > 0) {
-      const hostC = this.combatants.find((c) => c.id === 1);
-      const guestC = this.combatants.find((c) => c.id === 2);
-      const oldHostKills = hostC?.kills ?? 0;
-      const oldGuestKills = guestC?.kills ?? 0;
-      const newHostKills = s.dmKills[0];
-      const newGuestKills = s.dmKills[1];
-      if (hostC) hostC.kills = newHostKills;
-      if (guestC) guestC.kills = newGuestKills;
-      if (this.mode === "guest") {
-        if (newHostKills > oldHostKills) {
-          const isMe = this.selfPid === 1;
-          const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
-          const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
-          const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
-          this.killFeed.push({
-            id: this.kfSeq++,
-            killerName: kName,
-            victimName: vName,
-            weaponIconShape: gun.iconShape,
-            weaponGlow: gun.glow,
-            timer: 4.2
-          });
-        }
-        if (newGuestKills > oldGuestKills) {
-          const isMe = this.selfPid === 2;
-          const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
-          const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
-          const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
-          this.killFeed.push({
-            id: this.kfSeq++,
-            killerName: kName,
-            victimName: vName,
-            weaponIconShape: gun.iconShape,
-            weaponGlow: gun.glow,
-            timer: 4.2
-          });
+      if (this.gameMode === "team_deathmatch") {
+      } else {
+        const hostC = this.combatants.find((c) => c.id === 1);
+        const guestC = this.combatants.find((c) => c.id === 2);
+        const oldHostKills = hostC?.kills ?? 0;
+        const oldGuestKills = guestC?.kills ?? 0;
+        const newHostKills = s.dmKills[0];
+        const newGuestKills = s.dmKills[1];
+        if (hostC) hostC.kills = newHostKills;
+        if (guestC) guestC.kills = newGuestKills;
+        if (this.mode === "guest") {
+          if (newHostKills > oldHostKills) {
+            const isMe = this.selfPid === 1;
+            const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
+            const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
+            const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
+            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+          }
+          if (newGuestKills > oldGuestKills) {
+            const isMe = this.selfPid === 2;
+            const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
+            const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
+            const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
+            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+          }
         }
       }
     }
@@ -8271,15 +8841,27 @@ var GameEngine = class {
       const iAmJoiner = this.mode === "guest";
       let reason;
       if (this.isDM && s.dmKills) {
-        const hostKills = s.dmKills[0];
-        const guestKills = s.dmKills[1];
-        const target = s.dmTarget ?? 8;
-        if (iAmJoiner) {
-          if (guestKills >= target) reason = "\u80DC\u5229\uFF01\u4F60\u51FB\u8D25\u4E86\u5BF9\u624B";
-          else reason = "\u5931\u8D25\uFF0C\u5BF9\u624B\u51FB\u8D25\u4E86\u4F60";
+        if (this.gameMode === "team_deathmatch") {
+          const myTeamId = 0;
+          const myTeamKills = s.dmKills[myTeamId] ?? 0;
+          let enemyTeamKills = 0;
+          for (let i = 1; i < s.dmKills.length; i++) {
+            if (s.dmKills[i] > enemyTeamKills) enemyTeamKills = s.dmKills[i];
+          }
+          const target = s.dmTarget ?? 20;
+          if (myTeamKills >= target) reason = "\u80DC\u5229\uFF01\u4F60\u7684\u961F\u4F0D\u8D62\u5F97\u4E86\u6BD4\u8D5B\uFF01";
+          else reason = "\u5931\u8D25\uFF01\u5176\u4ED6\u961F\u4F0D\u7387\u5148\u8FBE\u5230\u4E86\u76EE\u6807\uFF01";
         } else {
-          if (hostKills >= target) reason = "\u80DC\u5229\uFF01\u4F60\u51FB\u8D25\u4E86\u5BF9\u624B";
-          else reason = "\u5931\u8D25\uFF0C\u5BF9\u624B\u51FB\u8D25\u4E86\u4F60";
+          const hostKills = s.dmKills[0];
+          const guestKills = s.dmKills[1];
+          const target = s.dmTarget ?? 8;
+          if (iAmJoiner) {
+            if (guestKills >= target) reason = "\u80DC\u5229\uFF01\u4F60\u51FB\u8D25\u4E86\u5BF9\u624B";
+            else reason = "\u5931\u8D25\uFF0C\u5BF9\u624B\u51FB\u8D25\u4E86\u4F60";
+          } else {
+            if (hostKills >= target) reason = "\u80DC\u5229\uFF01\u4F60\u51FB\u8D25\u4E86\u5BF9\u624B";
+            else reason = "\u5931\u8D25\uFF0C\u5BF9\u624B\u51FB\u8D25\u4E86\u4F60";
+          }
         }
       } else if (iAmJoiner) {
         if (s.guestBaseHp <= 0) reason = "\u5931\u8D25\uFF0C\u57FA\u5730\u5931\u5B88";
@@ -8528,14 +9110,66 @@ var GameEngine = class {
     }
     return out;
   }
+  /** Charge-slam AOE burst fired when the charge_slam skill's dash window ends.
+   *  Was previously called but never defined, which crashed the game whenever a
+   *  player or bot used the skill. */
+  triggerChargeSlamAOE(p, ownerId) {
+    const radius = 180;
+    const damage = 40;
+    const oid = ownerId ?? (p.cid ?? this.activeId ?? 1);
+    this.buildGrid();
+    const cand = this.queryGrid(p.x, p.y, radius + this.gridMaxR + 2);
+    for (const it of cand) {
+      if (it.kind !== "enemy") continue;
+      const e = it.ref;
+      const dist = Math.hypot(e.x - p.x, e.y - p.y);
+      if (dist < radius + e.size) {
+        this.damageEnemy(e, damage, 0, 0, false, void 0, oid);
+      }
+    }
+    if (this.isDM) {
+      const attackerC = this.combatants.find((c) => c.id === oid);
+      for (const it of cand) {
+        if (it.kind !== "player") continue;
+        if (it.ownerId === oid) continue;
+        const victimC = this.combatants.find((c) => c.id === it.ownerId);
+        if (attackerC && victimC && attackerC.teamId !== void 0 && attackerC.teamId === victimC.teamId)
+          continue;
+        const q = it.ref;
+        if (q.deadTimer && q.deadTimer > 0) continue;
+        const dist = Math.hypot(q.x - p.x, q.y - p.y);
+        if (dist < radius + q.size) {
+          this.damagePlayerEntity(q, damage, void 0, 0, 0, oid);
+        }
+      }
+    } else if (oid === 2) {
+      const dist = Math.hypot(this.player.x - p.x, this.player.y - p.y);
+      if (dist < radius + this.player.size) {
+        this.damagePlayerEntity(this.player, damage, void 0, 0, 0, 2);
+      }
+    }
+    this.effects.push({
+      type: "shock",
+      x: p.x,
+      y: p.y,
+      t: 0,
+      duration: 0.4,
+      radius,
+      color: "#ef4444"
+    });
+    this.spawnParticles(p.x, p.y, "#ef4444", 40, 250, 0.6);
+    this.pushSkillCast(p.x, p.y, "#ef4444", 0);
+    sound.explosion();
+  }
   explode(x, y, radius, damage, color, srcWpn, ownerId) {
+    const r = radius * 1.15;
     this.effects.push({
       type: "explosion",
       x,
       y,
       t: 0,
       duration: 0.45,
-      radius,
+      radius: r,
       color
     });
     this.effects.push({
@@ -8544,7 +9178,7 @@ var GameEngine = class {
       y,
       t: 0,
       duration: 0.4,
-      radius,
+      radius: r,
       color
     });
     sound.explosion();
@@ -8552,17 +9186,17 @@ var GameEngine = class {
     this.spawnParticles(x, y, "#fde68a", 14, 200, 0.4);
     if (damage > 0) {
       this.buildGrid();
-      const cand = this.queryGrid(x, y, radius);
+      const cand = this.queryGrid(x, y, r);
       for (const it of cand) {
         if (it.kind !== "enemy") continue;
         const e = it.ref;
         const d = Math.hypot(e.x - x, e.y - y);
-        if (d < radius + e.size) {
-          const fall = 1 - d / (radius + e.size);
+        if (d < r + e.size) {
+          const fall = 1 - d / (r + e.size);
           const a = Math.atan2(e.y - y, e.x - x);
           this.damageEnemy(
             e,
-            damage * (0.5 + fall * 0.5),
+            damage * fall,
             Math.cos(a) * 260 * fall,
             Math.sin(a) * 260 * fall,
             false,
@@ -8578,18 +9212,32 @@ var GameEngine = class {
           const q = it.ref;
           if (q.deadTimer && q.deadTimer > 0) continue;
           const d = Math.hypot(q.x - x, q.y - y);
-          if (d < radius + q.size) {
-            const fall = 1 - d / (radius + q.size);
+          if (d < r + q.size) {
+            const fall = 1 - d / (r + q.size);
             const a = Math.atan2(q.y - y, q.x - x);
             this.damagePlayerEntity(
               q,
-              damage * (0.5 + fall * 0.5),
+              damage * fall,
               void 0,
               0,
               0,
               ownerId
             );
           }
+        }
+      }
+      if (!this.isDM) {
+        const d = Math.hypot(this.player.x - x, this.player.y - y);
+        if (d < r + this.player.size) {
+          const fall = 1 - d / (r + this.player.size);
+          this.damagePlayerEntity(
+            this.player,
+            damage * fall,
+            void 0,
+            0,
+            0,
+            ownerId
+          );
         }
       }
       for (const it of cand) {
@@ -8933,6 +9581,13 @@ var GameEngine = class {
       this.emit(true);
       return;
     }
+    if (p.isChargingSlam) {
+      p.isChargingSlam = false;
+      p.dashTime = 0;
+      p.skillEnergy = 0;
+      this.triggerChargeSlamAOE(p, this.activeId);
+      return;
+    }
     if (this.skillCd > 0) return;
     this.skillCd = s.cooldown;
     sound.skill();
@@ -8950,8 +9605,8 @@ var GameEngine = class {
         this.grenades.push({
           x: p.x,
           y: p.y,
-          vx: Math.cos(a) * 945,
-          vy: Math.sin(a) * 945,
+          vx: Math.cos(a) * 1134,
+          vy: Math.sin(a) * 1134,
           life: 0.55,
           fuse: 0.55,
           kind: "frag",
@@ -8962,6 +9617,33 @@ var GameEngine = class {
       case "overdrive": {
         p.overdriveTime = s.duration;
         this.spawnParticles(p.x, p.y, s.color, 20, 180, 0.5);
+        break;
+      }
+      case "cloak": {
+        p.isCloaked = true;
+        p.skillEnergy = s.duration;
+        this.spawnParticles(p.x, p.y, s.color, 15, 120, 0.4);
+        break;
+      }
+      case "winch_claw": {
+        p.winchActive = true;
+        p.skillEnergy = s.duration;
+        const speed = 900;
+        p.winchVx = Math.cos(p.angle) * speed;
+        p.winchVy = Math.sin(p.angle) * speed;
+        p.winchX = p.x;
+        p.winchY = p.y;
+        this.spawnParticles(p.x, p.y, s.color, 15, 120, 0.4);
+        break;
+      }
+      case "charge_slam": {
+        p.isChargingSlam = true;
+        p.skillEnergy = s.duration;
+        const speed = 800;
+        p.dashVx = Math.cos(p.angle) * speed;
+        p.dashVy = Math.sin(p.angle) * speed;
+        p.dashTime = s.duration;
+        this.spawnParticles(p.x, p.y, s.color, 15, 120, 0.4);
         break;
       }
     }
@@ -9483,7 +10165,7 @@ var GameEngine = class {
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.fillRect(-20, 25, 40, 6);
         ctx.fillStyle = "#f97316";
-        ctx.fillRect(-20, 25, 40 * v.progress, 6);
+        ctx.fillRect(-20, 25, 40 * (v.progress ?? 0), 6);
       }
       ctx.restore();
     }
@@ -9493,10 +10175,10 @@ var GameEngine = class {
       ctx.fillStyle = "#1e293b";
       ctx.fillRect(-25, -25, 50, 50);
       let teamColor = "#94a3b8";
-      if (st.ownerTeam === 0) teamColor = "#3b82f6";
-      else if (st.ownerTeam === 1) teamColor = "#ef4444";
-      else if (st.ownerTeam === 2) teamColor = "#10b981";
-      else if (st.ownerTeam === 3) teamColor = "#f59e0b";
+      if (st.ownerTeamId === 0) teamColor = "#3b82f6";
+      else if (st.ownerTeamId === 1) teamColor = "#ef4444";
+      else if (st.ownerTeamId === 2) teamColor = "#10b981";
+      else if (st.ownerTeamId === 3) teamColor = "#f59e0b";
       ctx.strokeStyle = teamColor;
       ctx.lineWidth = 4;
       ctx.strokeRect(-25, -25, 50, 50);
@@ -9506,7 +10188,7 @@ var GameEngine = class {
       ctx.fill();
       if (st.state === "cashout" || st.state === "stealing") {
         ctx.beginPath();
-        ctx.arc(0, 0, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * st.cashoutProgress);
+        ctx.arc(0, 0, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (st.cashoutProgress ?? 0));
         ctx.strokeStyle = teamColor;
         ctx.lineWidth = 3;
         ctx.stroke();
@@ -9515,7 +10197,7 @@ var GameEngine = class {
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.fillRect(-25, 30, 50, 6);
         ctx.fillStyle = "#a855f7";
-        ctx.fillRect(-25, 30, 50 * st.stealProgress, 6);
+        ctx.fillRect(-25, 30, 50 * (st.stealProgress ?? 0), 6);
       }
       ctx.restore();
     }
@@ -9681,6 +10363,42 @@ var GameEngine = class {
   /** Render a solid building. The slab colour follows the map palette
    *  (sceneTheme.wallColor → wallDark); the *structure* drawn on top depends on
    *  the map (this.sceneIndex) so every map has its own building style. */
+  bldWildWest(ctx, w) {
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.strokeStyle = "#A0522D";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(w.x, w.y, w.w, w.h);
+    ctx.beginPath();
+    for (let y = w.y + 10; y < w.y + w.h; y += 20) {
+      ctx.moveTo(w.x, y);
+      ctx.lineTo(w.x + w.w, y);
+    }
+    ctx.stroke();
+  }
+  bldJungle(ctx, w) {
+    ctx.fillStyle = "#2E8B57";
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.fillStyle = "#228B22";
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.arc(w.x + w.w * Math.random(), w.y + w.h * Math.random(), 10 + Math.random() * 15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  bldArcticZone(ctx, w) {
+    ctx.fillStyle = "#F0F8FF";
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.strokeStyle = "#B0E0E6";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(w.x, w.y, w.w, w.h);
+    ctx.beginPath();
+    ctx.moveTo(w.x + 5, w.y + 5);
+    ctx.lineTo(w.x + w.w - 5, w.y + w.h - 5);
+    ctx.moveTo(w.x + w.w - 5, w.y + 5);
+    ctx.lineTo(w.x + 5, w.y + w.h - 5);
+    ctx.stroke();
+  }
   drawBuilding(ctx, w) {
     ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.beginPath();
@@ -9698,6 +10416,15 @@ var GameEngine = class {
         break;
       case 4:
         this.bldCyber(ctx, w);
+        break;
+      case 5:
+        this.bldWildWest(ctx, w);
+        break;
+      case 6:
+        this.bldJungle(ctx, w);
+        break;
+      case 7:
+        this.bldArcticZone(ctx, w);
         break;
       default:
         this.bldNeon(ctx, w);
@@ -11136,7 +11863,8 @@ var GameEngine = class {
       size: 16,
       state: "preheat",
       timer: 15,
-      unlockingTeamId: null
+      unlockingTeamId: null,
+      progress: 0
     });
   }
   spawnCashoutStation() {
@@ -11157,7 +11885,9 @@ var GameEngine = class {
       stealerCid: null,
       stealTimer: 0,
       boxCount: 0,
-      challengerTeamId: null
+      challengerTeamId: null,
+      cashoutProgress: 0,
+      stealProgress: 0
     });
   }
   unlockVault(v) {
@@ -11189,6 +11919,7 @@ var GameEngine = class {
   endCashoutMatch() {
     this.gameOver = true;
     this.running = false;
+    this.exitMouseLock();
     const rank = [0, 1, 2, 3].sort((a, b) => this.teamCash[b] - this.teamCash[a]);
     const isWin = rank[0] === 0 || rank[1] === 0;
     const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];

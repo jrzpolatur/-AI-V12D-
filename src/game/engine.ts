@@ -45,7 +45,7 @@ export interface Loadout {
   gadgetIds?: string[];
   /** single-player sub-mode: biohazard survival, or offline deathmatch
    *  (you + 3 AI bots, first to 15 kills wins) */
-  gameMode?: "biohazard" | "deathmatch" | "cashout";
+  gameMode?: "biohazard" | "deathmatch" | "team_deathmatch" | "cashout";
   /** number of players in deathmatch (4, 6, 8) */
   dmPlayerCount?: 4 | 6 | 8;
 }
@@ -128,7 +128,7 @@ export interface HudState {
   /** gatling spin-up 0..1 (0 = cold, 1 = full fire rate) */
   warmup: number;
   /** single-player sub-mode */
-  mode: "biohazard" | "deathmatch" | "cashout";
+  mode: "biohazard" | "deathmatch" | "team_deathmatch" | "cashout";
   /** deathmatch leaderboard (4 combatants). Absent in other modes. */
   dm?: DmEntry[];
   /** kill target to win the deathmatch */
@@ -219,6 +219,8 @@ interface Player {
   comboTimer: number;
   /** lunge visual offset */
   lunge: number;
+  gadgetHeat?: number;
+  stunTime?: number;
   /** bow charge time (0..maxChargeTime) */
   bowCharge: number;
   /** whether bow is currently being drawn */
@@ -271,6 +273,32 @@ interface Player {
   thrustDashAngle?: number;
   /** damage applied per enemy hit during the dash */
   thrustDashDmg?: number;
+  // ---- new active-skill runtime state (declared so TS build is clean) ----
+  /** combatant id mirror (used for bullet/effect ownership) */
+  id?: number;
+  /** remaining seconds of the active skill's energy/charge */
+  skillEnergy?: number;
+  /** cloak skill: avatar hidden from enemies */
+  isCloaked?: boolean;
+  /** winch claw skill: a claw is attached to a target */
+  winchActive?: boolean;
+  /** winch claw attach point */
+  winchX?: number;
+  winchY?: number;
+  /** winch claw pull velocity */
+  winchVx?: number;
+  winchVy?: number;
+  /** charge-slam skill: dash window active, AOE pending on end */
+  isChargingSlam?: boolean;
+}
+
+/** Floating score / heal number shown above a unit (gadget heal system). */
+interface ScorePopup {
+  x: number;
+  y: number;
+  t: number;
+  score: string;
+  color: string;
 }
 
 /** A deathmatch combatant: a human or an AI bot, each carrying its own
@@ -358,7 +386,7 @@ interface Bullet {
   /** whether it has already bounced once (MGL32 explodes on 2nd) */
   bounced?: boolean;
   /** who fired this bullet (for PvP ownership) */
-  owner?: "self" | "foe" | "enemy";
+  owner?: "self" | "foe" | "enemy" | "player";
   /** combatant id that fired this bullet (deathmatch 4-way; overrides `owner`) */
   ownerId?: number;
   /** sideways drift velocity so parallel shots fan apart over flight (px/s) */
@@ -380,6 +408,8 @@ interface Bullet {
   z?: number;
   /** already reflected by a blade (so it won't be re-reflected) */
   reflected?: boolean;
+  /** stun duration (seconds) applied to the victim on hit (stun gun) */
+  stunDuration?: number;
 }
 
 interface Enemy {
@@ -486,7 +516,7 @@ interface Particle {
 }
 
 interface Effect {
-  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip" | "skillcast" | "dual_slash";
+  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip" | "skillcast" | "dual_slash" | "heal_beam" | "beam" | "lightning";
   x: number;
   y: number;
   t: number;
@@ -506,6 +536,8 @@ interface Effect {
   dirX?: number;
   dirY?: number;
   ownerId?: number;
+  /** target unit id for beam-style effects (heal beam / lightning) */
+  targetId?: number;
 }
 
 interface Pickup {
@@ -620,8 +652,8 @@ const DASH_RECHARGE = 5; // seconds per charge
 // gadget aiming: how far a placement (turret/mine/station) or a thrown
 // grenade may be placed/lobbed from the player.
 const GADGET_DEPLOY_DIST = 240;
-// grenade throw range: +125% (280 * 2.25) per request.
-const GADGET_THROW_DIST = 630;
+// grenade throw range: +125% (280 * 2.25) per request, then +20% on request.
+const GADGET_THROW_DIST = 756;
 /** Perf caps for client-side visual entities (local PvE, no network cost). */
 const MAX_PARTICLES = 700;
 const MAX_EFFECTS = 240;
@@ -673,6 +705,8 @@ export interface Vault {
   state: "preheat" | "idle" | "unlocking" | "unlocked";
   timer: number;       // preheat timer (15s) or unlock timer (20s)
   unlockingTeamId: number | null; // which team is currently unlocking it
+  /** unlock progress 0..1 (for rendering) */
+  progress?: number;
 }
 
 export interface CashBox {
@@ -716,6 +750,10 @@ export interface CashoutStation {
   stealTimer: number;         // current steal progress (max 7s)
   boxCount: number;           // number of boxes inserted (1 or 2)
   challengerTeamId: number | null; // Double Jeopardy challenger team
+  /** cashout progress 0..1 (for rendering) */
+  cashoutProgress?: number;
+  /** steal progress 0..1 (for rendering) */
+  stealProgress?: number;
 }
 
 export class GameEngine {
@@ -775,6 +813,9 @@ export class GameEngine {
   private enemies: Enemy[] = [];
   private particles: Particle[] = [];
   private effects: Effect[] = [];
+  /** floating score / heal number popups (declared since the gadget heal
+   *  system pushes into it — previously missing, causing a runtime crash). */
+  private scorePopups: ScorePopup[] = [];
   private pickups: Pickup[] = [];
   private grenades: Grenade[] = [];
   // spatial hash grid for broad-phase collision/damage queries (perf)
@@ -805,7 +846,7 @@ export class GameEngine {
   private authoritative = false;
   private net: Net | null = null;
   /** single-player sub-mode */
-  private gameMode: "biohazard" | "deathmatch" | "cashout" = "biohazard";
+  private gameMode: "biohazard" | "deathmatch" | "team_deathmatch" | "cashout" = "biohazard";
   // ---- Ranked Cashout state variables ----
   private vaults: Vault[] = [];
   private cashBoxes: CashBox[] = [];
@@ -960,6 +1001,7 @@ export class GameEngine {
       }
     }
     this.killFeed.push({
+    type: "kill",
       id: this.nextKillFeedId++,
       killerName,
       victimName,
@@ -1010,6 +1052,8 @@ export class GameEngine {
   /** called when the player presses the pause/settings hotkey (ESC or P). The
    *  React layer wires this up to open the in-game settings overlay. */
   onPauseRequest?: () => void;
+  /** called when the OS pointer lock state changes (desktop aim-lock feature) */
+  onPointerLock?: (locked: boolean) => void;
 
   // ---- deathmatch (offline PvP vs AI bots) ----
   /** true when the active sub-mode is deathmatch */
@@ -1096,6 +1140,10 @@ export class GameEngine {
 
   private keys = new Set<string>();
   private mouse = { x: 400, y: 300 };
+  /** screen-space cursor position relative to the canvas top-left (accumulated while pointer is locked) */
+  private cursorScreen = { x: 0, y: 0 };
+  /** true when the OS pointer lock is currently active (desktop only) */
+  private pointerLocked = false;
   private firing = false;
   private secondaryFiring = false;
   /** virtual movement vector from the on-screen joystick (-1..1 each axis) */
@@ -1113,6 +1161,7 @@ export class GameEngine {
   private boundBlur: () => void;
   private boundResize: () => void;
   private boundContext: (e: Event) => void;
+  private boundLockChange: () => void;
 
   constructor(
     canvas: HTMLCanvasElement | null,
@@ -1167,6 +1216,7 @@ export class GameEngine {
     };
     this.boundResize = () => this.onResize();
     this.boundContext = (e) => e.preventDefault();
+    this.boundLockChange = () => this.onPointerLockChange();
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -1340,7 +1390,7 @@ export class GameEngine {
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
 
-    if (this.gameMode === "deathmatch") {
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
       const pCount = this.loadout.dmPlayerCount || 4;
       const scale = pCount === 4 ? 1 : pCount === 6 ? 1.2 : 1.5;
       this.worldW = RUNTIME.worldW * scale;
@@ -1555,10 +1605,11 @@ export class GameEngine {
 
       this.banner = { text: "排位提现 · 夺取现金盒进行提现！", t: 2.8 };
       this.activeId = 0;
-    } else if (this.gameMode === "deathmatch") {
+    } else if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
       this.isDM = true;
+      const isTeam = this.gameMode === "team_deathmatch";
       const pCount = this.loadout.dmPlayerCount || 4;
-      this.dmKillLimit = this.mode === "local" ? (pCount === 4 ? 15 : pCount === 6 ? 18 : 24) : 8;
+      this.dmKillLimit = this.mode === "local" ? (isTeam ? (pCount === 4 ? 20 : pCount === 6 ? 30 : 40) : (pCount === 4 ? 15 : pCount === 6 ? 18 : 24)) : (isTeam ? 20 : 8);
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
@@ -1589,18 +1640,39 @@ export class GameEngine {
         };
         this.combatants = [human];
         this.player.cid = 0;
-        const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
-        const botNames = ["阿尔法", "贝塔", "伽马", "德尔塔", "艾普西龙", "泽塔", "伊塔", "西塔"];
-        const botCount = pCount - 1;
-        const picks = this.rollBotLoadouts(botCount);
-        for (let i = 0; i < botCount; i++) {
-          const sp = this.dmSpawns[i + 1];
-          this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+        
+        if (isTeam) {
+          const botColors = ["#8b5cf6", "#f472b6", "#a3e635", "#fbbf24"];
+          const botNames = ["阿法", "贝塔", "伽马", "德塔", "艾普", "泽塔", "伊塔", "西塔"];
+          const numTeams = pCount / 2;
+          const picks = this.rollBotLoadouts(pCount - 1);
+          let botIdx = 0;
+          for (let teamId = 0; teamId < numTeams; teamId++) {
+            const playersInTeam = teamId === 0 ? 1 : 2;
+            for (let pIdx = 0; pIdx < playersInTeam; pIdx++) {
+              const sp = this.dmSpawns[botIdx + 1];
+              const name = teamId === 0 ? "队友" : botNames[botIdx];
+              const bot = this.makeBot(botIdx + 1, picks[botIdx], name, botColors[teamId], sp.x, sp.y);
+              bot.teamId = teamId;
+              this.combatants.push(bot);
+              botIdx++;
+            }
+          }
+          this.banner = { text: `双排死斗 · 团队先杀 ${this.dmKillLimit} 人获胜！`, t: 2.8 };
+        } else {
+          const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
+          const botNames = ["阿尔法", "贝塔", "伽马", "德尔塔", "艾普西龙", "泽塔", "伊塔", "西塔"];
+          const botCount = pCount - 1;
+          const picks = this.rollBotLoadouts(botCount);
+          for (let i = 0; i < botCount; i++) {
+            const sp = this.dmSpawns[i + 1];
+            this.combatants.push(this.makeBot(i + 1, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+          }
+          this.banner = { text: `死亡竞赛 · 先杀 ${this.dmKillLimit} 人获胜！`, t: 2.4 };
         }
-        this.banner = { text: `死亡竞赛 · 先杀 ${this.dmKillLimit} 人获胜！`, t: 2.4 };
       } else {
         this.combatants = [];
-        this.banner = { text: "死亡竞赛 · 先杀 8 人获胜！", t: 2.4 };
+        this.banner = { text: isTeam ? `双排死斗 · 团队先杀 ${this.dmKillLimit} 人获胜！` : "死亡竞赛 · 先杀 8 人获胜！", t: 2.4 };
       }
       this.activeId = 0;
     } else {
@@ -1627,7 +1699,7 @@ export class GameEngine {
       this.foe = this.makeFoe();
       this.net.sendGame({ t: "hello", name: this.character.name, loadout: this.loadout });
 
-      if (this.gameMode === "deathmatch") {
+      if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
         this.player.cid = this.selfPid;
         this.foe.cid = this.peerPid;
 
@@ -2014,6 +2086,19 @@ export class GameEngine {
       case 4:
         this.layoutCyber(building, cover, pillar, cx, cy);
         break;
+      case 5:
+        // layoutWildWest was never implemented — fall back to an existing
+        // layout so selecting this scene doesn't crash the game.
+        this.layoutRuin(building, cover, pillar, cx, cy);
+        break;
+      case 6:
+        // layoutJungle was never implemented — fall back.
+        this.layoutArctic(building, cover, pillar, cx, cy);
+        break;
+      case 7:
+        // layoutArcticZone was never implemented — fall back.
+        this.layoutCyber(building, cover, pillar, cx, cy);
+        break;
       default:
         this.layoutNeon(building, cover, pillar, cx, cy);
         break;
@@ -2206,6 +2291,7 @@ export class GameEngine {
       passive: false,
     });
     this.canvas.addEventListener("contextmenu", this.boundContext);
+    document.addEventListener("pointerlockchange", this.boundLockChange);
     window.addEventListener("blur", this.boundBlur);
     window.addEventListener("resize", this.boundResize);
   }
@@ -2219,6 +2305,7 @@ export class GameEngine {
     window.removeEventListener("mouseup", this.boundMouseUp);
     this.canvas.removeEventListener("wheel", this.boundWheel);
     this.canvas.removeEventListener("contextmenu", this.boundContext);
+    document.removeEventListener("pointerlockchange", this.boundLockChange);
     window.removeEventListener("blur", this.boundBlur);
     window.removeEventListener("resize", this.boundResize);
   }
@@ -2261,6 +2348,14 @@ export class GameEngine {
       // We don't pause directly here — instead we ask the React layer to open the
       // in-game settings overlay, which then pauses the sim while it's open.
       if (this.mode === "local" && !this.gameOver) this.onPauseRequest?.();
+      // 打开设置面板时退出鼠标锁定，否则菜单无法点击（Esc 浏览器也会自动退锁）
+      if (this.pointerLocked) this.exitMouseLock();
+      e.preventDefault();
+      return;
+    }
+    // 桌面端：U 切换鼠标锁定（显示 / 隐藏光标）
+    if (e.code === "KeyU" && !this.touchMode && !this.gameOver) {
+      this.toggleMouseLock();
       e.preventDefault();
       return;
     }
@@ -2283,6 +2378,7 @@ export class GameEngine {
           e.preventDefault();
         }
       } else if (e.code === "KeyE") {
+        this.clearGadgetSelection();
         this.pendWeapon = true;
         e.preventDefault();
       }
@@ -2310,15 +2406,54 @@ export class GameEngine {
     }
   }
 
+  // ---- pointer lock (desktop aim-lock) ----
+  requestMouseLock() {
+    if (!this.touchMode && this.canvas && (this.canvas as any).requestPointerLock) {
+      try { (this.canvas as any).requestPointerLock(); } catch {}
+    }
+  }
+  exitMouseLock() {
+    if (document.pointerLockElement) { try { document.exitPointerLock(); } catch {} }
+  }
+  toggleMouseLock() {
+    if (document.pointerLockElement === this.canvas) this.exitMouseLock();
+    else this.requestMouseLock();
+  }
+  isPointerLocked() { return this.pointerLocked; }
+  private onPointerLockChange() {
+    this.pointerLocked = document.pointerLockElement === this.canvas;
+    if (this.pointerLocked && this.canvas) {
+      const rect = this.canvas.getBoundingClientRect();
+      // 进入锁定时从画布中心开始，避免从旧的绝对坐标跳变
+      this.cursorScreen.x = rect.width / 2;
+      this.cursorScreen.y = rect.height / 2;
+    }
+    this.onPointerLock?.(this.pointerLocked);
+  }
+
   private onMouseMove(e: MouseEvent) {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
-    this.mouse.x = e.clientX - rect.left + this.camX;
-    this.mouse.y = e.clientY - rect.top + this.camY;
+    if (this.pointerLocked) {
+      // 锁定模式下没有绝对坐标，用增量累加屏幕空间光标
+      this.cursorScreen.x += e.movementX;
+      this.cursorScreen.y += e.movementY;
+    } else {
+      this.cursorScreen.x = e.clientX - rect.left;
+      this.cursorScreen.y = e.clientY - rect.top;
+    }
+    this.cursorScreen.x = Math.max(0, Math.min(rect.width, this.cursorScreen.x));
+    this.cursorScreen.y = Math.max(0, Math.min(rect.height, this.cursorScreen.y));
+    this.mouse.x = this.cursorScreen.x + this.camX;
+    this.mouse.y = this.cursorScreen.y + this.camY;
   }
 
   private onMouseDown(e: MouseEvent) {
     sound.ensure();
+    // 桌面端：游玩时点击画面即把鼠标锁定在画面内（按 U / Esc 解除）
+    if (!this.touchMode && !this.pointerLocked && document.pointerLockElement !== this.canvas) {
+      this.requestMouseLock();
+    }
     if (e.button === 0) {
       // If a gadget is selected, left-click deploys it at the aimed location
       // (instead of firing). Clicking again after deploying returns to firing.
@@ -2326,17 +2461,21 @@ export class GameEngine {
         const idx = this.selectedGadget;
         const g = this.gadgets[idx];
         if (g) {
-          if (this.mode === "guest") {
-            // host will deploy at our aim position (sent via next input frame)
-            this.pendGadget = idx;
-            // local visual cooldown so the HUD shows the gadget on CD
-            this.gadgetCd.set(g.id, g.cooldown);
-          } else if ((this.gadgetCd.get(g.id) ?? 0) <= 0) {
-            this.deployGadget(idx, this.mouse.x, this.mouse.y);
+          if (g.kind === "healing_beam" || g.kind === "rpg" || g.kind === "stun_gun") {
+            // Weapon-like gadget, do NOT deploy or deselect immediately.
+            // Let the firing logic in updatePlayer handle it.
+            this.firing = true;
+          } else {
+            if (this.mode === "guest") {
+              this.pendGadget = idx;
+              this.gadgetCd.set(g.id, g.cooldown);
+            } else if ((this.gadgetCd.get(g.id) ?? 0) <= 0) {
+              this.deployGadget(idx, this.mouse.x, this.mouse.y);
+            }
+            this.selectedGadget = -1;
+            e.preventDefault();
+            return;
           }
-          this.selectedGadget = -1;
-          e.preventDefault();
-          return;
         }
       }
       this.firing = true;
@@ -2497,6 +2636,20 @@ export class GameEngine {
       dy /= vlen;
 
       const p = this.player;
+      // 冲撞转向：冲刺途中始终跟随鼠标方向实时改变冲刺方向（可自由转弯）
+      if (p.isChargingSlam) {
+        const speed = Math.hypot(p.dashVx, p.dashVy) || 800;
+        const cur = Math.atan2(p.dashVy, p.dashVx);
+        const desired = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+        let diff = desired - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const turn = Math.max(-12 * dt, Math.min(12 * dt, diff)); // 转向速率 12 rad/s
+        const na = cur + turn;
+        p.dashVx = Math.cos(na) * speed;
+        p.dashVy = Math.sin(na) * speed;
+        // 不覆盖 p.angle：冲刺时枪口继续跟随鼠标，便于边冲边瞄准
+      }
       if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
@@ -2593,6 +2746,20 @@ export class GameEngine {
       dy /= vlen;
 
       const p = this.player;
+      // 冲撞转向：冲刺途中始终跟随鼠标方向实时改变冲刺方向（可自由转弯）
+      if (p.isChargingSlam) {
+        const speed = Math.hypot(p.dashVx, p.dashVy) || 800;
+        const cur = Math.atan2(p.dashVy, p.dashVx);
+        const desired = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+        let diff = desired - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const turn = Math.max(-12 * dt, Math.min(12 * dt, diff)); // 转向速率 12 rad/s
+        const na = cur + turn;
+        p.dashVx = Math.cos(na) * speed;
+        p.dashVy = Math.sin(na) * speed;
+        // 不覆盖 p.angle：冲刺时枪口继续跟随鼠标，便于边冲边瞄准
+      }
       if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
@@ -2788,12 +2955,100 @@ export class GameEngine {
     if (p.slamCd > 0) p.slamCd -= dt;
     if (p.swingTimer > 0) p.swingTimer -= dt;
     if (p.slowT && p.slowT > 0) p.slowT -= dt;
+    if (p.stunTime && p.stunTime > 0) p.stunTime -= dt;
     if (p.comboTimer > 0) {
       p.comboTimer -= dt;
       if (p.comboTimer <= 0) p.comboStep = 0;
     }
     if (p.lunge > 0) p.lunge = Math.max(0, p.lunge - dt * 120);
     if (p.electrifiedTime && p.electrifiedTime > 0) p.electrifiedTime -= dt;
+    if (p.skillEnergy !== undefined && p.skillEnergy > 0) {
+      p.skillEnergy -= dt;
+      if (p.skillEnergy <= 0) {
+        p.isCloaked = false;
+        p.winchActive = false;
+        if (p.isChargingSlam) {
+          p.isChargingSlam = false;
+          this.triggerChargeSlamAOE(p, this.activeId);
+        }
+      }
+    }
+    
+    // charge-slam dash (冲撞): deal contact damage to anything the player
+    // overlaps while dashing forward.
+    if (p.isChargingSlam) {
+      const ramDmg = 130 * dt; // 冲撞持续伤害 130/s
+      // 冲撞击退降低150%：反向（吸附）并大幅削弱，使目标保持接触可被连续撞击
+      const KB = -0.5;
+      const kx = p.dashVx * dt * KB;
+      const ky = p.dashVy * dt * KB;
+      const hitR = p.size + 8;
+      this.buildGrid();
+      const cand = this.queryGrid(p.x, p.y, hitR + this.gridMaxR + 4);
+      for (const it of cand) {
+        if (it.kind === "enemy") {
+          const e = it.ref as Enemy;
+          if (Math.hypot(e.x - p.x, e.y - p.y) < hitR + e.size) {
+            this.damageEnemy(e, ramDmg, kx, ky, false, undefined, p.cid ?? this.activeId);
+          }
+        } else if (this.isDM && it.kind === "player" && it.ownerId !== (p.cid ?? this.activeId)) {
+          const q = it.ref as Player;
+          if (!q.deadTimer || q.deadTimer <= 0) {
+            if (Math.hypot(q.x - p.x, q.y - p.y) < hitR + q.size) {
+              this.damagePlayerEntity(q, ramDmg, undefined, kx, ky, p.cid ?? this.activeId);
+            }
+          }
+        }
+      }
+    }
+
+    // winch claw physical pull logic
+    if (p.winchActive && p.winchX !== undefined && p.winchY !== undefined) {
+      p.winchX += (p.winchVx ?? 0) * dt;
+      p.winchY += (p.winchVy ?? 0) * dt;
+      // return phase
+      if ((p.skillEnergy ?? 0) <= this.getSkill("winch_claw").duration / 2) {
+        const dx = p.x - p.winchX;
+        const dy = p.y - p.winchY;
+        const dist = Math.hypot(dx, dy) || 1;
+        p.winchVx = (dx / dist) * 1200;
+        p.winchVy = (dy / dist) * 1200;
+      }
+      
+      // pull targets hit
+      if ((p.skillEnergy ?? 0) > this.getSkill("winch_claw").duration / 2) {
+        const enemies = this.queryGrid(p.winchX, p.winchY, 30);
+        for (const it of enemies) {
+          if (it.kind === "enemy") {
+            const e = it.ref;
+            if (!e.isBoss) {
+               e.x = p.winchX;
+               e.y = p.winchY;
+            }
+          } else if (it.kind === "player" && it.ownerId !== (p.cid ?? 1)) {
+            const op = it.ref;
+            op.x = p.winchX;
+            op.y = p.winchY;
+          }
+        }
+      } else {
+        // pull back phase, we could also move caught targets back, but keeping it simple for now (they are dragged to player by the winch coordinates matching them).
+        const enemies = this.queryGrid(p.winchX, p.winchY, 40);
+        for (const it of enemies) {
+          if (it.kind === "enemy") {
+            const e = it.ref;
+            if (!e.isBoss) {
+               e.x = p.winchX;
+               e.y = p.winchY;
+            }
+          } else if (it.kind === "player" && it.ownerId !== (p.cid ?? 1)) {
+            const op = it.ref;
+            op.x = p.winchX;
+            op.y = p.winchY;
+          }
+        }
+      }
+    }
     // thrust longsword charge / release management
     if (this.gun.id === "thrust_sword") {
       if (this.secondaryFiring && !p.thrustDashActive) {
@@ -2912,6 +3167,17 @@ export class GameEngine {
 
     // weapon handling
     p.fireTimer -= dt;
+    
+    // Check if we have a weapon-gadget equipped
+    let usingGadgetWeapon = false;
+    if (this.selectedGadget >= 0) {
+      const gDef = this.gadgets[this.selectedGadget];
+      if (gDef && (gDef.kind === "healing_beam" || gDef.kind === "rpg" || gDef.kind === "stun_gun")) {
+        usingGadgetWeapon = true;
+        this.updateGadgetWeapon(dt, gDef, this.firing && !this.paused);
+      }
+    }
+    
     const ws = this.weaponStates.get(g.id)!;
     const fr =
       g.fireRate *
@@ -2922,13 +3188,15 @@ export class GameEngine {
     // gatling spin-up: spool the barrel while firing, decay when not
     let spun = true;
     if (g.spinup) {
-      if (this.firing)
+      if (this.firing && !usingGadgetWeapon)
         ws.spin = Math.min(1, (ws.spin ?? 0) + dt / g.spinup);
       else ws.spin = Math.max(0, (ws.spin ?? 0) - dt / (g.spinDown ?? 0.8));
       spun = (ws.spin ?? 0) > 0.12;
     }
 
-    if (g.weaponClass === "beam") {
+    if (usingGadgetWeapon) {
+      // normal weapon handling bypassed
+    } else if (g.weaponClass === "beam") {
       this.updateBeam(dt, this.firing && !this.paused, ws);
     } else if (g.weaponClass === "flamethrower") {
       this.updateFlamethrower(dt, this.firing && !this.paused, ws);
@@ -2981,6 +3249,7 @@ export class GameEngine {
   private fireGun(ws: WeaponState) {
     const p = this.player;
     const g = this.gun;
+    if (p.isCloaked) p.isCloaked = false; // 开火自动破隐
     // gatling: damage ramps with spin-up (weak until the barrel is spooled)
     const spinMult = g.spinup
       ? (g.spinMinMult ?? 0.2) + (1 - (g.spinMinMult ?? 0.2)) * (ws.spin ?? 0)
@@ -3411,13 +3680,13 @@ export class GameEngine {
     }
     // player-vs-player dash
     const opp = this.meleeOpponent();
-    if (opp && !(opp.deadTimer && opp.deadTimer > 0) && !p.thrustHitIds?.has(opp.id)) {
+    if (opp && !(opp.deadTimer && opp.deadTimer > 0) && !p.thrustHitIds?.has(opp.cid)) {
       const rx = opp.x - p.x;
       const ry = opp.y - p.y;
       const d = Math.hypot(rx, ry);
       const fwd = rx * ca + ry * sa;
       if (d <= range + opp.size && fwd > -range) {
-        p.thrustHitIds?.add(opp.id);
+        p.thrustHitIds?.add(opp.cid);
         this.damagePlayerEntity(opp, dmg, undefined, ca * 240, sa * 240, this.activeId);
       }
     }
@@ -3635,6 +3904,137 @@ export class GameEngine {
   }
 
   // --------------------------------------------------- poison mist sprayer
+  private updateGadgetWeapon(dt: number, g: GadgetDef, firing: boolean) {
+    const p = this.player;
+    let cd = this.gadgetCd.get(g.id) ?? 0;
+    
+    if (g.kind === "healing_beam") {
+      // Overheat mechanics mapped into gadgetCd:
+      // cd > 0 means overheated (cooling down).
+      // If not overheated, we store heat in p.gadgetHeat (temporary state on player)
+      if (p.gadgetHeat === undefined) p.gadgetHeat = 0;
+      
+      if (cd > 0) {
+        // Overheated!
+        cd -= dt;
+        if (cd <= 0) {
+          cd = 0;
+          p.gadgetHeat = 0;
+        }
+        this.gadgetCd.set(g.id, cd);
+      } else {
+        if (firing) {
+          p.gadgetHeat += (g.heatPerSecond ?? 0.2) * dt;
+          if (p.gadgetHeat >= 1) {
+            cd = 1 / (g.coolRate ?? 0.25); // Set cooldown to full cooling duration
+            this.gadgetCd.set(g.id, cd);
+            sound.error(); // Overheat sound
+          } else {
+            // Firing logic! Find nearest teammate
+            let bestTgt = null;
+            let bestDist = 400 * 400; // max range 400
+            const myTeam = this.combatants.find((c) => c.id === this.activeId)?.teamId;
+            for (const c of this.combatants) {
+              if (c.id === this.activeId) continue;
+              if (c.teamId === myTeam) {
+                const q = c.player;
+                if (q.hp >= q.maxHp) continue; // Only heal injured
+                if (q.deadTimer && q.deadTimer > 0) continue;
+                const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+                if (d < bestDist) {
+                  bestDist = d;
+                  bestTgt = q;
+                }
+              }
+            }
+            if (bestTgt) {
+              bestTgt.hp = Math.min(bestTgt.maxHp, bestTgt.hp + (g.healPerSecond ?? 50) * dt);
+              this.effects.push({ type: "heal_beam", x: p.x, y: p.y, targetId: bestTgt.cid, t: 0, duration: 0.1, radius: 2, color: g.color });
+              // Also add green numbers occasionally
+              if (Math.random() < dt * 4) {
+                this.scorePopups.push({ x: bestTgt.x, y: bestTgt.y - 20, t: 1.0, score: `+${Math.round(g.healPerSecond ?? 50)}`, color: "#4ade80" });
+              }
+            } else {
+              // Just draw beam into air
+              this.effects.push({ type: "beam", x: p.x, y: p.y, angle: p.angle, range: 200, duration: 0.1, t: 0, color: g.color, radius: 2 });
+            }
+          }
+        } else {
+          // Cooling down while not firing
+          p.gadgetHeat = Math.max(0, p.gadgetHeat - (g.coolRate ?? 0.25) * dt);
+        }
+        
+        // Pass heat to HUD via cdPct (we can hack it into gadgetCd map)
+        if (cd <= 0) {
+           this.gadgetCd.set(g.id, p.gadgetHeat * -1); // negative means heat!
+        }
+      }
+    } else if (g.kind === "rpg") {
+      if (cd > 0) {
+        cd = Math.max(0, cd - dt);
+        this.gadgetCd.set(g.id, cd);
+      }
+      if (firing && cd <= 0 && p.fireTimer <= 0) {
+        // Fire RPG!
+        this.bullets.push({
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(p.angle) * (g.projectileSpeed ?? 800),
+          vy: Math.sin(p.angle) * (g.projectileSpeed ?? 800),
+          size: 6,
+          color: g.color,
+          glow: "#f87171",
+          life: 2.0,
+          kind: "rocket",
+          ownerId: p.cid ?? this.activeId,
+          damage: g.projectileDamage ?? 140,
+          explosive: true,
+          explosionRadius: g.explosionRadius ?? 150,
+          pierce: 0,
+          bounces: 0,
+          knockback: 0,
+          hit: new Set<number>(),
+        });
+        sound.shoot();
+        p.fireTimer = 1.0;
+        this.gadgetCd.set(g.id, g.cooldown);
+        this.clearGadgetSelection(); // Put it away after firing
+      }
+    } else if (g.kind === "stun_gun") {
+      if (cd > 0) {
+        cd = Math.max(0, cd - dt);
+        this.gadgetCd.set(g.id, cd);
+      }
+      if (firing && cd <= 0 && p.fireTimer <= 0) {
+        // Fire Stun Gun!
+        this.bullets.push({
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(p.angle) * (g.projectileSpeed ?? 1000),
+          vy: Math.sin(p.angle) * (g.projectileSpeed ?? 1000),
+          size: 4,
+          color: g.color,
+          glow: "#fef08a",
+          life: 0.5,
+          kind: "bullet", // basic projectile
+          ownerId: p.cid ?? this.activeId,
+          damage: g.projectileDamage ?? 20,
+          pierce: 0,
+          knockback: 0,
+          hit: new Set<number>(),
+          bounces: 0,
+          explosive: false,
+          explosionRadius: 0,
+          stunDuration: g.ccDuration ?? 3.0 // special property we'll check on hit
+        });
+        sound.shoot();
+        p.fireTimer = 0.5;
+        this.gadgetCd.set(g.id, g.cooldown);
+        this.clearGadgetSelection(); // Put it away after firing
+      }
+    }
+  }
+
   private updatePoisonMist(dt: number, firing: boolean, ws: WeaponState) {
     const g = this.gun;
     if (firing && !ws.overheated) {
@@ -4483,6 +4883,7 @@ export class GameEngine {
             if (c.id === (d.ownerId ?? -1)) continue;
             const q = c.player;
             if (q.deadTimer && q.deadTimer > 0) continue;
+            if (q.isCloaked) continue; // 隐身玩家对炮塔不可见
             const dist = Math.hypot(q.x - d.x, q.y - d.y);
             if (dist < bestD) {
               bestD = dist;
@@ -5318,6 +5719,7 @@ export class GameEngine {
     if (this.gameOver) return;
     this.gameOver = true;
     this.gameOverReason = reason;
+    this.exitMouseLock();
     this.spawnParticles(this.player.x, this.player.y, this.character.bodyColor, 40, 220, 0.8);
     this.emit(true);
   }
@@ -5345,6 +5747,26 @@ export class GameEngine {
   ) {
     // already downed and waiting to respawn -> ignore further hits
     if (p.deadTimer && p.deadTimer > 0) return;
+
+    // team deathmatch: teammates must not be able to damage each other
+    // (no friendly fire). Resolve both teams via the combatant roster so we
+    // don't depend on Player carrying its own teamId.
+    if (this.gameMode === "team_deathmatch" && attackerId !== undefined) {
+      const victim = this.combatants.find((c) => c.id === (p.cid ?? -1));
+      const atk = this.combatants.find((c) => c.id === attackerId);
+      if (
+        victim && atk &&
+        victim.teamId !== undefined && atk.teamId !== undefined &&
+        victim.teamId === atk.teamId
+      ) {
+        return;
+      }
+    }
+
+    // 冲撞 (charge_slam) 进行中：所受伤害降低 35%
+    if (p.isChargingSlam) dmg *= 0.65;
+    if (p.isCloaked) p.isCloaked = false; // 受击自动破隐
+
     const prevHp = p.hp;
     const prevShield = p.shieldHp ?? 0;
 
@@ -5370,6 +5792,10 @@ export class GameEngine {
     }
     p.hp -= dmg;
     p.flash = 1;
+    if (_b && _b.stunDuration && _b.stunDuration > 0) {
+      p.stunTime = Math.max(p.stunTime ?? 0, _b.stunDuration);
+      this.effects.push({ type: "lightning", x: p.x, y: p.y, r: p.size, duration: _b.stunDuration, color: "#fef08a" });
+    }
     // In deathmatch (human-vs-bots) DON'T grant post-hit invulnerability, so
     // damage lands continuously — otherwise every combatant is immune for
     // 0.45s after each hit and feels far thicker than its 250 HP suggests.
@@ -5508,8 +5934,17 @@ export class GameEngine {
             this.banner = { text: `你被 ${kName} 击败！`, t: 1.6 };
           }
 
-          if (killer.kills >= this.dmKillLimit && !this.gameOver) {
-            this.endGame(killer.id === this.selfPid || (this.mode === "local" && killer.id === 0) ? "你赢了！" : `${kName} 获胜！`);
+          let teamKills = killer.kills;
+          if (this.gameMode === "team_deathmatch" && killer.teamId !== undefined) {
+             teamKills = this.combatants.filter(c => c.teamId === killer.teamId).reduce((sum, c) => sum + c.kills, 0);
+          }
+          if (teamKills >= this.dmKillLimit && !this.gameOver) {
+             if (this.gameMode === "team_deathmatch") {
+                 const isMyTeam = (killer.teamId === 0);
+                 this.endGame(isMyTeam ? "胜利！你的队伍赢得了比赛！" : "失败！其他队伍率先达到了目标！");
+             } else {
+                 this.endGame(killer.id === this.selfPid || (this.mode === "local" && killer.id === 0) ? "你赢了！" : `${kName} 获胜！`);
+             }
           }
         } else if (victim && (victim.id === this.selfPid || (this.mode === "local" && victim.id === 0))) {
           this.banner = { text: `你被击败！${RESPAWN_TIME} 秒后复活`, t: 1.6 };
@@ -5600,6 +6035,12 @@ export class GameEngine {
     if (p.deadTimer <= 0) {
       p.deadTimer = 0;
       p.hp = p.maxHp;
+      // cashout mode: a downed player leaves a revive statue. If they come
+      // back via the auto-respawn timer (no teammate revive), the statue must
+      // be removed too — otherwise it lingers forever at the death spot.
+      if (this.gameMode === "cashout" && p.cid !== undefined) {
+        this.statues = this.statues.filter((s) => s.deadCid !== p.cid);
+      }
       p.x = spawnX;
       p.y = spawnY;
       p.vx = 0;
@@ -5698,10 +6139,22 @@ export class GameEngine {
     }
     this.semiAutoLatch = false;
     this.updatePlayer(dt);
-    if (inp.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
-    if (inp.skill) this.activateSkill();
-    if (inp.reload) this.reloadCurrent();
-    if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    if (!this.player.stunTime || this.player.stunTime <= 0) {
+      if (inp.weaponSwitch) {
+        this.clearGadgetSelection();
+        this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+      }
+      if (inp.skill) {
+        // 用 guest 自己的技能定义驱动激活，否则会误用 host 的技能，
+        // 导致 guest 的隐身等技能不在 host 端 this.foe 上生效（快照看不到、人机照瞄）
+        const prevSkill = this.skill;
+        this.skill = getSkill(this.peerLoadout?.skillId ?? "dash");
+        this.activateSkill();
+        this.skill = prevSkill;
+      }
+      if (inp.reload) this.reloadCurrent();
+      if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    }
     // write foe state back
     foe.gunIndex = this.gunIndex;
     foe.skillCd = this.skillCd;
@@ -5883,9 +6336,10 @@ export class GameEngine {
     let bestD = Infinity;
     for (const o of this.combatants) {
       if (o.id === c.id) continue;
-      if (this.gameMode === "cashout" && o.teamId === c.teamId) continue;
+      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
+      if (q.isCloaked) continue; // 隐身玩家对 AI 不可见，跳过作为目标
       const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
       if (d < bestD) { bestD = d; target = q; }
     }
@@ -5980,6 +6434,10 @@ export class GameEngine {
         } else {
           score = dps * 0.05 - (dist - r);
         }
+        // 贴脸时优先选无需换弹的近战 / 霰弹武器，避免换弹空窗导致"贴脸不开枪"
+        if (dist < 120 && (gg.weaponClass === "melee" || gg.weaponClass === "shield" || (gg.pellets ?? 1) > 1)) {
+          score += 5000;
+        }
         if (score > bestScore) { bestScore = score; best = i; }
       }
       if (best !== c.gunIndex) {
@@ -6038,7 +6496,9 @@ export class GameEngine {
       los = this.botLOS(p.x, p.y, target.x, target.y);
       inRange = dist < this.gunEffRange(g) + 40;
       const facing = Math.abs(this.angleDiff(ang, p.angle));
-      this.firing = los && inRange && facing < 1.2;
+      // 同 botAimFire：贴脸 / 冲撞时放宽限制强制开火
+      const close = dist < 120 || p.isChargingSlam === true;
+      this.firing = (los || close) && inRange && (close || facing < 1.2);
     } else if (!isInsertingBox) {
       this.firing = false;
     }
@@ -6124,9 +6584,10 @@ export class GameEngine {
     let bestD = Infinity;
     for (const o of this.combatants) {
       if (o.id === c.id) continue;
-      if (this.gameMode === "cashout" && o.teamId === c.teamId) continue;
+      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
+      if (q.isCloaked) continue; // 隐身玩家对 AI 不可见，跳过作为目标
       const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
       if (d < bestD) { bestD = d; target = q; }
     }
@@ -6174,7 +6635,10 @@ export class GameEngine {
     c.losTtl = Math.max(0, (c.losTtl ?? 0) - dt);
     const inRange = dist < this.gunEffRange(g) + 40;
     const facing = Math.abs(this.angleDiff(ang, p.angle));
-    this.firing = los && inRange && facing < 1.2;
+    // 贴脸（敌人就在身上）或冲撞中（p.angle 不跟随鼠标、朝向偏移）时，
+    // 放宽朝向 / 视线限制，强制开火，避免"冲到脸上却站着不开枪"
+    const close = dist < 120 || p.isChargingSlam === true;
+    this.firing = (los || close) && inRange && (close || facing < 1.2);
   }
 
   /** Line-of-sight test: true if the segment (x0,y0)->(x1,y1) is not blocked by a wall. */
@@ -6228,6 +6692,8 @@ export class GameEngine {
       magazine: this.gun.magazine ?? null,
       electrified: p.electrifiedTime ?? 0,
       electrifiedGlow: p.electrifiedGlow ?? "#38bdf8",
+      isCloaked: p.isCloaked ?? false,
+      skillEnergy: p.skillEnergy,
     };
   }
 
@@ -6258,7 +6724,7 @@ export class GameEngine {
       paused: this.paused,
       players: [
         this.toSnapPlayer(this.player, this.character, this.outfit, this.gadgets, this.gadgetCd),
-        this.toSnapPlayer(this.foe!, this.foeChar!, this.foeOutfit!, this.foeGadgets, this.foeGadgetCd),
+        ...(this.foe ? [this.toSnapPlayer(this.foe, this.foeChar!, this.foeOutfit!, this.foeGadgets, this.foeGadgetCd)] : [])
       ],
       enemies: this.enemies.map((e) => ({
         id: e.id,
@@ -6340,10 +6806,11 @@ export class GameEngine {
       gold: this.gold,
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
-      dmKills: this.isDM ? [
-        this.combatants.find(c => c.id === 1)?.kills ?? 0,
-        this.combatants.find(c => c.id === 2)?.kills ?? 0
-      ] : undefined,
+      dmKills: this.isDM 
+        ? (this.gameMode === "team_deathmatch"
+          ? [0, 1, 2, 3].map(t => this.combatants.filter(c => c.teamId === t).reduce((sum, c) => sum + c.kills, 0)).filter((_, i, arr) => i === 0 || arr[i] > 0 || this.combatants.some(c => c.teamId === i))
+          : [this.combatants.find(c => c.id === 1)?.kills ?? 0, this.combatants.find(c => c.id === 2)?.kills ?? 0])
+        : undefined,
       dmTarget: this.isDM ? this.dmKillLimit : undefined,
     };
   }
@@ -6448,10 +6915,15 @@ export class GameEngine {
     }
     this.semiAutoLatch = false;
     this.updatePlayer(dt);
-    if (inp.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
-    if (inp.skill) this.activateSkill();
-    if (inp.reload) this.reloadCurrent();
-    if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    if (!this.player.stunTime || this.player.stunTime <= 0) {
+      if (inp.weaponSwitch) {
+        this.clearGadgetSelection();
+        this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+      }
+      if (inp.skill) this.activateSkill();
+      if (inp.reload) this.reloadCurrent();
+      if (inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    }
     // write peer state back
     player.gunIndex = this.gunIndex;
     player.skillCd = this.skillCd;
@@ -6565,7 +7037,9 @@ export class GameEngine {
     this.peerLatch.clear();
     this.foe = this.makeFoe();
 
-    if (this.gameMode === "deathmatch") {
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
+      const isTeam = this.gameMode === "team_deathmatch";
+      const pCount = this.loadout.dmPlayerCount || 4;
       this.player.cid = this.selfPid;
       this.foe.cid = this.peerPid;
 
@@ -6584,7 +7058,7 @@ export class GameEngine {
       this.foe.y = guestSpawn.y;
 
       const c1: Combatant = {
-        id: 1, isBot: false, name: "玩家1", color: "#38bdf8",
+        id: 1, isBot: false, name: "玩家1", color: isTeam ? "#8b5cf6" : "#38bdf8",
         player: this.player,
         character: this.character, outfit: this.outfit, skill: this.skill,
         guns: this.guns, gunIndex: this.gunIndex,
@@ -6592,11 +7066,12 @@ export class GameEngine {
         selectedGadget: this.selectedGadget,
         skillCd: this.skillCd, dashCharges: this.dashCharges,
         dashRecharge: this.dashRecharge, gadgetCd: this.gadgetCd,
-        lastGadget: this.lastGadget, kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0
+        lastGadget: this.lastGadget, kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0,
+        teamId: isTeam ? 0 : undefined
       };
 
       const c2: Combatant = {
-        id: 2, isBot: false, name: "玩家2", color: "#f472b6",
+        id: 2, isBot: false, name: "玩家2", color: isTeam ? "#8b5cf6" : "#f472b6",
         player: this.foe,
         character: this.foeChar!,
         outfit: this.foeOutfit!,
@@ -6611,10 +7086,39 @@ export class GameEngine {
         dashRecharge: 0,
         gadgetCd: new Map(),
         lastGadget: 0,
-        kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0
+        kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0,
+        teamId: isTeam ? 0 : undefined
       };
 
       this.combatants = [c1, c2];
+
+      if (isTeam) {
+        const botColors = ["#8b5cf6", "#f472b6", "#a3e635", "#fbbf24"];
+        const botNames = ["阿法", "贝塔", "伽马", "德塔", "艾普", "泽塔", "伊塔", "西塔"];
+        const numTeams = pCount / 2;
+        const picks = this.rollBotLoadouts(pCount - 2); // 2 humans already
+        let botIdx = 0;
+        // start from team 1 because team 0 is full (2 humans)
+        for (let teamId = 1; teamId < numTeams; teamId++) {
+          for (let pIdx = 0; pIdx < 2; pIdx++) {
+            const sp = this.dmSpawns[botIdx + 2];
+            const name = botNames[botIdx];
+            const bot = this.makeBot(botIdx + 3, picks[botIdx], name, botColors[teamId], sp.x, sp.y);
+            bot.teamId = teamId;
+            this.combatants.push(bot);
+            botIdx++;
+          }
+        }
+      } else {
+        const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
+        const botNames = ["阿尔法", "贝塔", "伽马", "德尔塔", "艾普西龙", "泽塔", "伊塔", "西塔"];
+        const botCount = pCount - 2;
+        const picks = this.rollBotLoadouts(botCount);
+        for (let i = 0; i < botCount; i++) {
+          const sp = this.dmSpawns[i + 2];
+          this.combatants.push(this.makeBot(i + 3, picks[i], botNames[i], botColors[i], sp.x, sp.y));
+        }
+      }
     }
 
     this.peerLoadout = loadoutB;
@@ -6803,46 +7307,36 @@ export class GameEngine {
       }));
     }
     if (s.dmKills && this.isDM && this.combatants.length > 0) {
-      const hostC = this.combatants.find(c => c.id === 1);
-      const guestC = this.combatants.find(c => c.id === 2);
-      const oldHostKills = hostC?.kills ?? 0;
-      const oldGuestKills = guestC?.kills ?? 0;
-      
-      const newHostKills = s.dmKills[0];
-      const newGuestKills = s.dmKills[1];
-      
-      if (hostC) hostC.kills = newHostKills;
-      if (guestC) guestC.kills = newGuestKills;
+      if (this.gameMode === "team_deathmatch") {
+        // For team deathmatch, dmKills is an array of team kills
+        // We only use this for HUD updates, not updating individual combatant kills
+      } else {
+        const hostC = this.combatants.find(c => c.id === 1);
+        const guestC = this.combatants.find(c => c.id === 2);
+        const oldHostKills = hostC?.kills ?? 0;
+        const oldGuestKills = guestC?.kills ?? 0;
+        
+        const newHostKills = s.dmKills[0];
+        const newGuestKills = s.dmKills[1];
+        
+        if (hostC) hostC.kills = newHostKills;
+        if (guestC) guestC.kills = newGuestKills;
 
-      // Local kill feed updates for DM on guest/client
-      if (this.mode === "guest") {
-        if (newHostKills > oldHostKills) {
-          const isMe = this.selfPid === 1;
-          const kName = isMe ? "你" : (this.peerName || "对手");
-          const vName = isMe ? (this.peerName || "对手") : "你";
-          const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
-          this.killFeed.push({
-            id: this.kfSeq++,
-            killerName: kName,
-            victimName: vName,
-            weaponIconShape: gun.iconShape,
-            weaponGlow: gun.glow,
-            timer: 4.2
-          });
-        }
-        if (newGuestKills > oldGuestKills) {
-          const isMe = this.selfPid === 2;
-          const kName = isMe ? "你" : (this.peerName || "对手");
-          const vName = isMe ? (this.peerName || "对手") : "你";
-          const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
-          this.killFeed.push({
-            id: this.kfSeq++,
-            killerName: kName,
-            victimName: vName,
-            weaponIconShape: gun.iconShape,
-            weaponGlow: gun.glow,
-            timer: 4.2
-          });
+        if (this.mode === "guest") {
+          if (newHostKills > oldHostKills) {
+            const isMe = this.selfPid === 1;
+            const kName = isMe ? "你" : (this.peerName || "对手");
+            const vName = isMe ? (this.peerName || "对手") : "你";
+            const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
+            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+          }
+          if (newGuestKills > oldGuestKills) {
+            const isMe = this.selfPid === 2;
+            const kName = isMe ? "你" : (this.peerName || "对手");
+            const vName = isMe ? (this.peerName || "对手") : "你";
+            const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
+            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+          }
         }
       }
     }
@@ -6852,15 +7346,27 @@ export class GameEngine {
       const iAmJoiner = this.mode === "guest";
       let reason: string;
       if (this.isDM && s.dmKills) {
-        const hostKills = s.dmKills[0];
-        const guestKills = s.dmKills[1];
-        const target = s.dmTarget ?? 8;
-        if (iAmJoiner) {
-          if (guestKills >= target) reason = "胜利！你击败了对手";
-          else reason = "失败，对手击败了你";
+        if (this.gameMode === "team_deathmatch") {
+          const myTeamId = 0; // Both humans are in team 0
+          const myTeamKills = s.dmKills[myTeamId] ?? 0;
+          let enemyTeamKills = 0;
+          for (let i = 1; i < s.dmKills.length; i++) {
+            if (s.dmKills[i] > enemyTeamKills) enemyTeamKills = s.dmKills[i];
+          }
+          const target = s.dmTarget ?? 20;
+          if (myTeamKills >= target) reason = "胜利！你的队伍赢得了比赛！";
+          else reason = "失败！其他队伍率先达到了目标！";
         } else {
-          if (hostKills >= target) reason = "胜利！你击败了对手";
-          else reason = "失败，对手击败了你";
+          const hostKills = s.dmKills[0];
+          const guestKills = s.dmKills[1];
+          const target = s.dmTarget ?? 8;
+          if (iAmJoiner) {
+            if (guestKills >= target) reason = "胜利！你击败了对手";
+            else reason = "失败，对手击败了你";
+          } else {
+            if (hostKills >= target) reason = "胜利！你击败了对手";
+            else reason = "失败，对手击败了你";
+          }
         }
       } else if (iAmJoiner) {
         if (s.guestBaseHp <= 0) reason = "失败，基地失守";
@@ -7152,6 +7658,70 @@ export class GameEngine {
     return out;
   }
 
+  /** Charge-slam AOE burst fired when the charge_slam skill's dash window ends.
+   *  Was previously called but never defined, which crashed the game whenever a
+   *  player or bot used the skill. */
+  private triggerChargeSlamAOE(p: Player, ownerId?: number) {
+    const radius = 180;
+    const damage = 40; // high AOE burst damage
+    const oid = ownerId ?? (p.cid ?? this.activeId ?? 1);
+
+    this.buildGrid();
+    const cand = this.queryGrid(p.x, p.y, radius + this.gridMaxR + 2);
+
+    // hit enemies
+    for (const it of cand) {
+      if (it.kind !== "enemy") continue;
+      const e = it.ref as Enemy;
+      const dist = Math.hypot(e.x - p.x, e.y - p.y);
+      if (dist < radius + e.size) {
+        this.damageEnemy(e, damage, 0, 0, false, undefined, oid);
+      }
+    }
+
+    // hit rival players (DM / PvP) — never the owner or teammates
+    if (this.isDM) {
+      const attackerC = this.combatants.find((c) => c.id === oid);
+      for (const it of cand) {
+        if (it.kind !== "player") continue;
+        if (it.ownerId === oid) continue;
+        const victimC = this.combatants.find((c) => c.id === it.ownerId);
+        if (
+          attackerC &&
+          victimC &&
+          attackerC.teamId !== undefined &&
+          attackerC.teamId === victimC.teamId
+        )
+          continue;
+        const q = it.ref as Player;
+        if (q.deadTimer && q.deadTimer > 0) continue;
+        const dist = Math.hypot(q.x - p.x, q.y - p.y);
+        if (dist < radius + q.size) {
+          this.damagePlayerEntity(q, damage, undefined, 0, 0, oid);
+        }
+      }
+    } else if (oid === 2) {
+      // bot slam in PvE-style modes can still hurt the human player
+      const dist = Math.hypot(this.player.x - p.x, this.player.y - p.y);
+      if (dist < radius + this.player.size) {
+        this.damagePlayerEntity(this.player, damage, undefined, 0, 0, 2);
+      }
+    }
+
+    this.effects.push({
+      type: "shock",
+      x: p.x,
+      y: p.y,
+      t: 0,
+      duration: 0.4,
+      radius,
+      color: "#ef4444",
+    });
+    this.spawnParticles(p.x, p.y, "#ef4444", 40, 250, 0.6);
+    this.pushSkillCast(p.x, p.y, "#ef4444", 0);
+    sound.explosion();
+  }
+
   private explode(
     x: number,
     y: number,
@@ -7161,13 +7731,14 @@ export class GameEngine {
     srcWpn?: string,
     ownerId?: number
   ) {
+    const r = radius * 1.15; // 15% increase in explosion radius
     this.effects.push({
       type: "explosion",
       x,
       y,
       t: 0,
       duration: 0.45,
-      radius,
+      radius: r,
       color,
     });
     this.effects.push({
@@ -7176,27 +7747,26 @@ export class GameEngine {
       y,
       t: 0,
       duration: 0.4,
-      radius,
+      radius: r,
       color,
     });
     // shake only when player is hit
-    // if (!this.simulatingOther) this.shake = Math.min(20, this.shake + 8);
     sound.explosion();
     this.spawnParticles(x, y, color, 26, 260, 0.55);
     this.spawnParticles(x, y, "#fde68a", 14, 200, 0.4);
     if (damage > 0) {
       this.buildGrid();
-      const cand = this.queryGrid(x, y, radius);
+      const cand = this.queryGrid(x, y, r);
       for (const it of cand) {
         if (it.kind !== "enemy") continue;
         const e = it.ref as Enemy;
         const d = Math.hypot(e.x - x, e.y - y);
-        if (d < radius + e.size) {
-          const fall = 1 - d / (radius + e.size);
+        if (d < r + e.size) {
+          const fall = 1 - d / (r + e.size); // 1.0 at center, 0.0 at edge
           const a = Math.atan2(e.y - y, e.x - x);
           this.damageEnemy(
             e,
-            damage * (0.5 + fall * 0.5),
+            damage * fall,
             Math.cos(a) * 260 * fall,
             Math.sin(a) * 260 * fall,
             false,
@@ -7213,12 +7783,12 @@ export class GameEngine {
           const q = it.ref as Player;
           if (q.deadTimer && q.deadTimer > 0) continue;
           const d = Math.hypot(q.x - x, q.y - y);
-          if (d < radius + q.size) {
-            const fall = 1 - d / (radius + q.size);
+          if (d < r + q.size) {
+            const fall = 1 - d / (r + q.size); // linear falloff to 0
             const a = Math.atan2(q.y - y, q.x - x);
             this.damagePlayerEntity(
               q,
-              damage * (0.5 + fall * 0.5),
+              damage * fall,
               undefined,
               0,
               0,
@@ -7227,6 +7797,23 @@ export class GameEngine {
           }
         }
       }
+      
+      // non-DM mode local player splash
+      if (!this.isDM) {
+        const d = Math.hypot(this.player.x - x, this.player.y - y);
+        if (d < r + this.player.size) {
+          const fall = 1 - d / (r + this.player.size);
+          this.damagePlayerEntity(
+            this.player,
+            damage * fall,
+            undefined,
+            0,
+            0,
+            ownerId
+          );
+        }
+      }
+      
       // splash also damages deployed turrets / stations / mines — but never the
       // owner's own turret/station (mines can always be caught in a blast).
       for (const it of cand) {
@@ -7619,6 +8206,15 @@ export class GameEngine {
       return;
     }
 
+    // charge_slam：冲刺途中再次按下技能键，立即结束冲刺并提前发动砸击
+    if (p.isChargingSlam) {
+      p.isChargingSlam = false;
+      p.dashTime = 0;
+      p.skillEnergy = 0;
+      this.triggerChargeSlamAOE(p, this.activeId);
+      return;
+    }
+
     if (this.skillCd > 0) return;
     this.skillCd = s.cooldown;
     sound.skill();
@@ -7634,12 +8230,12 @@ export class GameEngine {
       }
       case "grenade": {
         const a = p.angle;
-        // throw range +125%: 420 -> 945
+        // throw range +125%: 420 -> 945, then +20% on request: 945 -> 1134
         this.grenades.push({
           x: p.x,
           y: p.y,
-          vx: Math.cos(a) * 945,
-          vy: Math.sin(a) * 945,
+          vx: Math.cos(a) * 1134,
+          vy: Math.sin(a) * 1134,
           life: 0.55,
           fuse: 0.55,
           kind: "frag",
@@ -7650,6 +8246,33 @@ export class GameEngine {
       case "overdrive": {
         p.overdriveTime = s.duration;
         this.spawnParticles(p.x, p.y, s.color, 20, 180, 0.5);
+        break;
+      }
+      case "cloak": {
+        p.isCloaked = true;
+        p.skillEnergy = s.duration;
+        this.spawnParticles(p.x, p.y, s.color, 15, 120, 0.4);
+        break;
+      }
+      case "winch_claw": {
+        p.winchActive = true;
+        p.skillEnergy = s.duration;
+        const speed = 900;
+        p.winchVx = Math.cos(p.angle) * speed;
+        p.winchVy = Math.sin(p.angle) * speed;
+        p.winchX = p.x;
+        p.winchY = p.y;
+        this.spawnParticles(p.x, p.y, s.color, 15, 120, 0.4);
+        break;
+      }
+      case "charge_slam": {
+        p.isChargingSlam = true;
+        p.skillEnergy = s.duration;
+        const speed = 800;
+        p.dashVx = Math.cos(p.angle) * speed;
+        p.dashVy = Math.sin(p.angle) * speed;
+        p.dashTime = s.duration;
+        this.spawnParticles(p.x, p.y, s.color, 15, 120, 0.4);
         break;
       }
     }
@@ -8253,7 +8876,7 @@ export class GameEngine {
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.fillRect(-20, 25, 40, 6);
         ctx.fillStyle = "#f97316";
-        ctx.fillRect(-20, 25, 40 * v.progress, 6);
+        ctx.fillRect(-20, 25, 40 * (v.progress ?? 0), 6);
       }
       
       ctx.restore();
@@ -8270,10 +8893,10 @@ export class GameEngine {
       
       // Team color indicator
       let teamColor = "#94a3b8"; // Default neutral
-      if (st.ownerTeam === 0) teamColor = "#3b82f6"; // Blue
-      else if (st.ownerTeam === 1) teamColor = "#ef4444"; // Red
-      else if (st.ownerTeam === 2) teamColor = "#10b981"; // Green
-      else if (st.ownerTeam === 3) teamColor = "#f59e0b"; // Yellow
+      if (st.ownerTeamId === 0) teamColor = "#3b82f6"; // Blue
+      else if (st.ownerTeamId === 1) teamColor = "#ef4444"; // Red
+      else if (st.ownerTeamId === 2) teamColor = "#10b981"; // Green
+      else if (st.ownerTeamId === 3) teamColor = "#f59e0b"; // Yellow
       
       ctx.strokeStyle = teamColor;
       ctx.lineWidth = 4;
@@ -8289,7 +8912,7 @@ export class GameEngine {
       if (st.state === "cashout" || st.state === "stealing") {
         // Main cashout progress ring
         ctx.beginPath();
-        ctx.arc(0, 0, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * st.cashoutProgress);
+        ctx.arc(0, 0, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (st.cashoutProgress ?? 0));
         ctx.strokeStyle = teamColor;
         ctx.lineWidth = 3;
         ctx.stroke();
@@ -8300,7 +8923,7 @@ export class GameEngine {
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.fillRect(-25, 30, 50, 6);
         ctx.fillStyle = "#a855f7"; // Steal color
-        ctx.fillRect(-25, 30, 50 * st.stealProgress, 6);
+        ctx.fillRect(-25, 30, 50 * (st.stealProgress ?? 0), 6);
       }
       
       ctx.restore();
@@ -8482,6 +9105,49 @@ export class GameEngine {
   /** Render a solid building. The slab colour follows the map palette
    *  (sceneTheme.wallColor → wallDark); the *structure* drawn on top depends on
    *  the map (this.sceneIndex) so every map has its own building style. */
+
+  private bldWildWest(ctx: CanvasRenderingContext2D, w: Wall) {
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.strokeStyle = "#A0522D";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(w.x, w.y, w.w, w.h);
+    // Wooden planks
+    ctx.beginPath();
+    for (let y = w.y + 10; y < w.y + w.h; y += 20) {
+      ctx.moveTo(w.x, y);
+      ctx.lineTo(w.x + w.w, y);
+    }
+    ctx.stroke();
+  }
+
+  private bldJungle(ctx: CanvasRenderingContext2D, w: Wall) {
+    ctx.fillStyle = "#2E8B57";
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.fillStyle = "#228B22";
+    // Leaves pattern
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.arc(w.x + (w.w * Math.random()), w.y + (w.h * Math.random()), 10 + Math.random() * 15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  private bldArcticZone(ctx: CanvasRenderingContext2D, w: Wall) {
+    ctx.fillStyle = "#F0F8FF";
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.strokeStyle = "#B0E0E6";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(w.x, w.y, w.w, w.h);
+    // Ice crystals
+    ctx.beginPath();
+    ctx.moveTo(w.x + 5, w.y + 5);
+    ctx.lineTo(w.x + w.w - 5, w.y + w.h - 5);
+    ctx.moveTo(w.x + w.w - 5, w.y + 5);
+    ctx.lineTo(w.x + 5, w.y + w.h - 5);
+    ctx.stroke();
+  }
+
   private drawBuilding(ctx: CanvasRenderingContext2D, w: Wall) {
     // ground shadow so the slab reads as a raised structure
     ctx.fillStyle = "rgba(0,0,0,0.35)";
@@ -8500,6 +9166,15 @@ export class GameEngine {
         break;
       case 4:
         this.bldCyber(ctx, w);
+        break;
+      case 5:
+        this.bldWildWest(ctx, w);
+        break;
+      case 6:
+        this.bldJungle(ctx, w);
+        break;
+      case 7:
+        this.bldArcticZone(ctx, w);
         break;
       default:
         this.bldNeon(ctx, w);
@@ -10204,6 +10879,7 @@ export class GameEngine {
       state: "preheat",
       timer: 15,
       unlockingTeamId: null,
+      progress: 0,
     });
   }
 
@@ -10226,6 +10902,8 @@ export class GameEngine {
       stealTimer: 0,
       boxCount: 0,
       challengerTeamId: null,
+      cashoutProgress: 0,
+      stealProgress: 0,
     });
   }
 
@@ -10262,6 +10940,7 @@ export class GameEngine {
   private endCashoutMatch() {
     this.gameOver = true;
     this.running = false;
+    this.exitMouseLock();
     
     // Sort teams by cash
     const rank = [0, 1, 2, 3].sort((a, b) => this.teamCash[b] - this.teamCash[a]);

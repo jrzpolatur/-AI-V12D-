@@ -42,6 +42,7 @@ export class Net {
   private inbox: GameMsg[] = [];
   private autoReconnect = false;
   private pendingFind: string | null = null;
+  pendingMode?: string;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   /** dynamic listeners (used by GameScreen, which doesn't own the Net instance) */
   private peerGoneCbs: (() => void)[] = [];
@@ -93,7 +94,7 @@ export class Net {
       // SAME room instead of re-matching from scratch. Otherwise re-issue a
       // pending quick-match request.
       if (this.room && this.pid) this.rejoin(this.name, this.lastLoadout);
-      else if (this.pendingFind) this.find(this.pendingFind);
+      else if (this.pendingFind) this.find(this.pendingFind, this.pendingMode);
     };
     this.ws.onerror = () => this.setStatus("error", "无法连接服务器");
     this.ws.onclose = () => {
@@ -138,10 +139,10 @@ export class Net {
   }
 
   /** Quick match: server pairs us with the next waiting player. */
-  find(name: string) {
+  find(name: string, mode?: string) {
     this.name = name;
-    this.pendingFind = name;
-    this.send({ t: "find", name });
+    this.pendingFind = name; this.pendingMode = mode;
+    this.send({ t: "find", name, mode });
     this.setStatus("waiting", "匹配中，等待对手…");
   }
 

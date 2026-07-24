@@ -138,7 +138,7 @@ class SoundManager {
     src.stop(t + dur + 0.02);
   }
 
-  shoot(gunId: string) {
+  shoot(gunId?: string) {
     switch (gunId) {
       case "pistol":
         this.tone(420, 0.08, "square", 0.18, 180);
@@ -203,6 +203,12 @@ class SoundManager {
 
   hurt() {
     this.tone(200, 0.18, "sawtooth", 0.22, 80);
+  }
+
+  /** Short error / denied buzz (e.g. gadget overheated). */
+  error() {
+    this.tone(140, 0.12, "square", 0.2, 90);
+    this.noiseBurst(0.08, 0.1, 600, 0.6);
   }
 
   skill() {

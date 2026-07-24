@@ -99,7 +99,7 @@ const server = http.createServer((req, res) => {
 // ---------------------------------------------------------------- authoritative rooms
 const wss = new WebSocketServer({ server });
 const rooms = new Map(); // code -> room
-const queue = []; // quick-match waiting players
+const queues = {}; // mode -> queue[]
 let pidCounter = 1; // only used to tag sockets; per-room roles are fixed 1/2
 
 function genRoom() {

@@ -229,6 +229,8 @@ export interface SkillDef {
   duration: number;
   color: string;
   icon: string;
+  isEnergy?: boolean;
+  maxEnergy?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +245,10 @@ export type GadgetKind =
   | "glue_grenade"
   | "fire_grenade"
   | "poison_grenade"
-  | "healing_station";
+  | "healing_station"
+  | "healing_beam"
+  | "rpg"
+  | "stun_gun";
 
 export interface GadgetDef {
   id: string;
@@ -261,6 +266,22 @@ export interface GadgetDef {
   hp?: number;
   /** max placement/throw distance from the player (px). Defaults per kind. */
   range?: number;
+  
+  // ---- weapon-like gadgets (healing_beam, rpg, stun_gun) ----
+  /** Healing per second for healing beam */
+  healPerSecond?: number;
+  /** Heat generated per second for healing beam */
+  heatPerSecond?: number;
+  /** Heat cooled per second for healing beam */
+  coolRate?: number;
+  /** Damage of the projectile (RPG) */
+  projectileDamage?: number;
+  /** Radius of the explosion (RPG) */
+  explosionRadius?: number;
+  /** Speed of the projectile (RPG, Stun Gun) */
+  projectileSpeed?: number;
+  /** CC / Stun duration in seconds (Stun Gun) */
+  ccDuration?: number;
 }
 
 // ---------------------------------------------------------------------------

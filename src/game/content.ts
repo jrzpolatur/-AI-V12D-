@@ -234,6 +234,35 @@ export const SKILLS: SkillDef[] = [
     color: "#fbbf24",
     icon: "🔥",
   },
+  {
+    id: "charge_slam",
+    name: "冲撞与砸击",
+    desc: "高速向前冲撞破坏障碍，对沿途敌人造成轻微击退与伤害；再次按键或结束时触发范围砸地爆裂",
+    cooldown: 8,
+    duration: 1.6,
+    color: "#f97316",
+    icon: "🐗",
+  },
+  {
+    id: "cloak",
+    name: "隐身装置",
+    desc: "按 Q 开启/关闭隐身，静止时完全隐形，移动时微弱扭曲；持续消耗能量，开火/受击自动破隐",
+    cooldown: 1.5,
+    duration: 0,
+    isEnergy: true,
+    maxEnergy: 100,
+    color: "#a855f7",
+    icon: "👤",
+  },
+  {
+    id: "winch_claw",
+    name: "绞盘铁爪",
+    desc: "向准星快速发射抓钩铁爪，抓住敌人并将其强行拉至面前，并施加短暂僵直",
+    cooldown: 7,
+    duration: 0.5,
+    color: "#eab308",
+    icon: "⚓",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -333,6 +362,42 @@ export const GADGETS: GadgetDef[] = [
     color: "#4ade80",
     maxStack: 2,
     hp: 80,
+  },
+  {
+    id: "healing_beam",
+    kind: "healing_beam",
+    name: "治疗射线",
+    desc: "按住开火为准星附近的队友持续回血，带过热惩罚",
+    cooldown: 0,
+    iconShape: "healing_beam",
+    color: "#60a5fa", // blue
+    healPerSecond: 50,
+    heatPerSecond: 1 / 5, // 5 seconds to overheat
+    coolRate: 1 / 4, // 4 seconds to cool down
+  },
+  {
+    id: "rpg",
+    kind: "rpg",
+    name: "RPG-7",
+    desc: "发射一枚高爆火箭弹，造成 140 大范围伤害",
+    cooldown: 35, // long cooldown
+    iconShape: "rpg",
+    color: "#ef4444", // red
+    projectileDamage: 140,
+    explosionRadius: 360, // +100% on request: 180 -> 360
+    projectileSpeed: 800,
+  },
+  {
+    id: "stun_gun",
+    kind: "stun_gun",
+    name: "电击枪",
+    desc: "发射命中敌人可使其无法移动、切枪或使用技能，持续3秒",
+    cooldown: 18,
+    iconShape: "stun_gun",
+    color: "#fde047", // yellow
+    projectileDamage: 20,
+    projectileSpeed: 1000,
+    ccDuration: 3.0,
   },
 ];
 
@@ -508,7 +573,7 @@ export interface SceneTheme {
   wallDark: string;
   accent: string;
   /** "grid" = flat neon grid floor (default); "city" = top-down cyber-city blocks */
-  style?: "grid" | "city";
+  style?: "grid" | "city" | "ruin" | "organic" | "ice";
   /** override grid line color (used by cyber style) */
   gridColor?: string;
 }
@@ -560,5 +625,38 @@ export const SCENES: SceneTheme[] = [
     accent: "#22d3ee",
     style: "city",
     gridColor: "rgba(34,211,238,0.10)",
+  },
+  {
+    id: "wild_west",
+    name: "西部牛仔",
+    bgTop: "#d97706", // amber-600
+    bgBottom: "#92400e", // amber-800
+    wallColor: "#b45309", // amber-700 (wood color)
+    wallDark: "#78350f", // amber-900
+    accent: "#fcd34d", // amber-300
+    style: "ruin",
+    gridColor: "rgba(252,211,77,0.15)",
+  },
+  {
+    id: "jungle",
+    name: "幽静丛林",
+    bgTop: "#166534", // green-800
+    bgBottom: "#064e3b", // emerald-900
+    wallColor: "#15803d", // green-700
+    wallDark: "#14532d", // green-900
+    accent: "#86efac", // green-300
+    style: "organic",
+    gridColor: "rgba(134,239,172,0.10)",
+  },
+  {
+    id: "arctic_zone",
+    name: "极寒地带",
+    bgTop: "#93c5fd", // blue-300
+    bgBottom: "#e0f2fe", // sky-100
+    wallColor: "#bfdbfe", // blue-200
+    wallDark: "#93c5fd", // blue-300
+    accent: "#38bdf8", // sky-400
+    style: "ice",
+    gridColor: "rgba(56,189,248,0.20)",
   },
 ];

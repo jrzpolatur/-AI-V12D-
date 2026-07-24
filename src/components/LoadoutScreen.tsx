@@ -12,6 +12,8 @@ import type { Loadout } from "../game/engine";
 import type { GunDef } from "../game/types";
 import { drawCharacter, drawWeaponIcon, drawWeaponModel, drawGadgetIcon, rgba } from "../game/draw";
 import { cn } from "../utils/cn";
+import { Net, type NetStatus } from "../net/Net";
+import { tabLock } from "../utils/tabLock";
 
 function CharPreview({
   loadout,
@@ -378,7 +380,7 @@ export default function LoadoutScreen({
   onBack,
   isMultiplayer = false,
 }: {
-  onConfirm: (loadout: Loadout) => void;
+  onConfirm: (loadout: Loadout, mode: "local" | "host" | "guest", net: Net | null) => void;
   onBack?: () => void;
   isMultiplayer?: boolean;
 }) {
@@ -415,14 +417,30 @@ export default function LoadoutScreen({
     }
     return ["turret_mg", "turret_cannon", "mine_explosive"];
   });
-  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch" | "cashout">(() => {
+  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch" | "team_deathmatch" | "cashout">(() => {
     const m = localStorage.getItem("dm_loadout.gameMode");
-    return m === "biohazard" || m === "deathmatch" || m === "cashout" ? (m as never) : "biohazard";
+    return m === "biohazard" || m === "deathmatch" || m === "team_deathmatch" || m === "cashout" ? (m as never) : "biohazard";
   });
   const [dmPlayerCount, setDmPlayerCount] = useState<4 | 6 | 8>(() => {
     const p = parseInt(localStorage.getItem("dm_loadout.dmPlayerCount") || "4", 10);
     return (p === 4 || p === 6 || p === 8) ? (p as 4 | 6 | 8) : 4;
   });
+  const [isNetworkPlay, setIsNetworkPlay] = useState(false);
+  
+  // Net stuff
+  const netRef = useRef<Net | null>(null);
+  const [netStatus, setNetStatus] = useState<NetStatus>("idle");
+  const [netInfo, setNetInfo] = useState<string>("");
+  const advanced = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (netRef.current) {
+        netRef.current.disconnect();
+        tabLock.release();
+      }
+    };
+  }, []);
 
   // remember the last picked loadout so quitting & re-entering doesn't force a
   // full re-selection every time.
@@ -482,6 +500,63 @@ export default function LoadoutScreen({
     gameMode: isMultiplayer ? "deathmatch" : gameMode,
     dmPlayerCount,
   };
+
+  const handleStart = () => {
+    sound.ensure();
+    if (gameMode === "team_deathmatch" && isNetworkPlay) {
+      const handleConflict = () => {
+        setNetStatus("error");
+        setNetInfo("检测到您在另一个标签页中已开始匹配或游戏！请关闭其他标签页。");
+        netRef.current?.disconnect();
+      };
+      
+      const onReady = (mode: "host" | "guest", net: Net) => {
+        onConfirm(loadout, mode, net);
+      };
+      
+      if (!netRef.current) {
+        netRef.current = new Net({
+          onStatus: (s, i) => {
+            setNetStatus(s);
+            if (i) setNetInfo(i);
+          },
+          onPeer: () => {},
+          onStart: () => {
+            setNetStatus("ready");
+            if (!advanced.current && netRef.current) {
+              advanced.current = true;
+              onReady(netRef.current.playerMode, netRef.current);
+            }
+          },
+          onPeerGone: () => setNetInfo("对手掉线，正在等待重连…"),
+          onPeerBack: () => {
+            setNetInfo("");
+            setNetStatus("ready");
+          },
+          onPeerLeft: () => {
+            advanced.current = false;
+            setNetStatus("waiting");
+            setNetInfo("对手已离开，正在重新匹配…");
+          },
+        });
+      }
+      
+      const net = netRef.current;
+      const url = typeof window !== "undefined" && window.location.protocol === "https:" 
+        ? `wss://${window.location.host}` 
+        : "ws://localhost:8080";
+        
+      net.connect(url, true);
+      
+      setTimeout(() => {
+        tabLock.acquire(handleConflict);
+        net.find("玩家", `team_deathmatch_${dmPlayerCount}`);
+      }, 500);
+    } else {
+      onConfirm(loadout, "local", null);
+    }
+  };
+
   const character = CHARACTERS.find((c) => c.id === characterId)!;
   const outfit = OUTFITS.find((o) => o.id === outfitId)!;
   const selectedGun = getGun(gunId);
@@ -512,7 +587,7 @@ export default function LoadoutScreen({
   ];
 
   return (
-    <div className="no-scrollbar min-h-screen w-full overflow-y-auto bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100">
+    <div className="no-scrollbar min-h-screen w-full overflow-y-auto bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100 pt-safe pb-safe pl-safe pr-safe">
       <div className="mx-auto max-w-6xl px-5 py-8">
         <header className="mb-6 text-center">
           <h1 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">
@@ -737,6 +812,54 @@ export default function LoadoutScreen({
                   ))}
                 </div>
               )}
+              
+              <PickCard
+                active={gameMode === "team_deathmatch"}
+                accent="#8b5cf6"
+                onClick={() => setGameMode("team_deathmatch")}
+              >
+                <span className="text-xl">🤝</span>
+                <span className="text-xs font-semibold">双排死斗</span>
+                <span className="text-[10px] text-slate-400">2人小队对抗 · 先达目标杀敌数胜</span>
+              </PickCard>
+              
+              {gameMode === "team_deathmatch" && (
+                <div className="flex flex-col w-full gap-2 mt-2 bg-black/30 p-2 rounded-xl border border-white/5">
+                  <div className="flex w-full gap-2">
+                    <span className="text-[10px] text-slate-400 w-12 flex items-center shrink-0">死斗规模</span>
+                    {[
+                      { count: 4, label: "2队4人", kills: 20 },
+                      { count: 6, label: "3队6人", kills: 30 },
+                      { count: 8, label: "4队8人", kills: 40 }
+                    ].map((opt) => (
+                      <button
+                        key={opt.count}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDmPlayerCount(opt.count as 4 | 6 | 8);
+                        }}
+                        className={`flex-1 rounded-lg py-1.5 flex flex-col items-center justify-center text-[10px] border transition-colors ${
+                          dmPlayerCount === opt.count
+                            ? "bg-violet-500/20 border-violet-400 text-white"
+                            : "bg-black/40 border-white/10 text-slate-400 hover:border-white/30"
+                        }`}
+                      >
+                        <span className="font-bold">{opt.label}</span>
+                        <span className="text-[8px] opacity-70">{opt.kills}杀</span>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isNetworkPlay}
+                      onChange={(e) => setIsNetworkPlay(e.target.checked)}
+                      className="accent-violet-500"
+                    />
+                    <span className="text-xs text-slate-300">网络联机匹配 (匹配一名真人队友)</span>
+                  </label>
+                </div>
+              )}
 
               <PickCard
                   active={gameMode === "cashout"}
@@ -752,7 +875,7 @@ export default function LoadoutScreen({
 
         {/* Controls + start */}
         <div className="mt-6 flex flex-col items-center gap-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-400">
+          <div className="hide-touch flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-400">
             <span><kbd className="kbd">WASD</kbd> 移动</span>
             <span><kbd className="kbd">鼠标左键</kbd> 攻击</span>
             <span><kbd className="kbd">Q</kbd> 技能</span>
@@ -761,6 +884,10 @@ export default function LoadoutScreen({
             <span><kbd className="kbd">1/2/3 · 滚轮</kbd> 选择道具 · <kbd className="kbd">左键</kbd> 部署</span>
             <span><kbd className="kbd">大锤右键</kbd> 砸地拆墙</span>
             <span><kbd className="kbd">P</kbd> 暂停</span>
+          </div>
+          <div className="show-touch flex flex-col items-center gap-1 text-center text-xs text-slate-400">
+            <span>屏幕左侧摇杆移动 · 拖动屏幕瞄准 · 开火键攻击</span>
+            <span>技能键放技能 · 切枪键换武器 · 换弹键换弹 · 道具键部署道具 · 暂停键设置</span>
           </div>
           <div className="flex items-center gap-3">
             {onBack && (
@@ -778,13 +905,10 @@ export default function LoadoutScreen({
               恢复默认
             </button>
             <button
-              onClick={() => {
-                sound.ensure();
-                onConfirm(loadout);
-              }}
-              className="rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-12 py-3 text-lg font-bold text-slate-900 shadow-lg shadow-violet-500/30 transition-transform hover:scale-105 active:scale-95"
+              onClick={handleStart}
+              className="relative rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-12 py-3 text-lg font-bold text-slate-900 shadow-lg shadow-violet-500/30 transition-transform hover:scale-105 active:scale-95"
             >
-              开始战斗 ▶
+              {netStatus === "waiting" || netStatus === "connecting" ? "匹配中..." : "开始战斗 ▶"}
             </button>
           </div>
         </div>
