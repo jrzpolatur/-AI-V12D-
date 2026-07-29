@@ -175,6 +175,74 @@ export const OUTFITS: OutfitDef[] = [
     hpBonus: 0,
     fireRateBonus: 0.05,
   },
+  {
+    id: "medic",
+    name: "战地医疗兵",
+    suit: "#f8fafc",
+    suitDark: "#cbd5e1",
+    accent: "#ef4444",
+    hat: "helmet",
+    perk: "血量 +12",
+    speedBonus: 0,
+    hpBonus: 12,
+  },
+  {
+    id: "cyber_ninja",
+    name: "赛博忍者",
+    suit: "#0f172a",
+    suitDark: "#020617",
+    accent: "#4ade80",
+    hat: "hood",
+    perk: "移速 +8%",
+    speedBonus: 0.08,
+    hpBonus: 0,
+  },
+  {
+    id: "pirate",
+    name: "星际海盗",
+    suit: "#78350f",
+    suitDark: "#451a03",
+    accent: "#fbbf24",
+    hat: "cap",
+    perk: "射速 +4%，移速 +2%",
+    speedBonus: 0.02,
+    hpBonus: 0,
+    fireRateBonus: 0.04,
+  },
+  {
+    id: "royal_guard",
+    name: "皇家卫士",
+    suit: "#7f1d1d",
+    suitDark: "#450a0a",
+    accent: "#fcd34d",
+    hat: "visor",
+    perk: "血量 +15",
+    speedBonus: 0,
+    hpBonus: 15,
+  },
+  {
+    id: "hazard",
+    name: "防化清道夫",
+    suit: "#eab308",
+    suitDark: "#a16207",
+    accent: "#171717",
+    hat: "visor",
+    perk: "无额外加成",
+    speedBonus: 0,
+    hpBonus: 0,
+  },
+  {
+    id: "ghost",
+    name: "幽灵特工",
+    suit: "#f8fafc",
+    suitDark: "#94a3b8",
+    accent: "#60a5fa",
+    hat: "hood",
+    perk: "移速 +5%，射速 +3%",
+    speedBonus: 0.05,
+    hpBonus: 0,
+    fireRateBonus: 0.03,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -399,6 +467,37 @@ export const GADGETS: GadgetDef[] = [
     projectileSpeed: 1000,
     ccDuration: 3.0,
   },
+  {
+    id: "turret_sniper",
+    kind: "turret_sniper",
+    name: "狙击炮塔",
+    desc: "部署一台高亮红外线的炮塔，射速极慢，但每次发射高伤害穿透弹（永久存在）",
+    cooldown: 25,
+    iconShape: "turret_sniper",
+    color: "#f43f5e", // rose
+    maxStack: 2,
+    hp: 120,
+  },
+  {
+    id: "mine_stun",
+    kind: "mine_stun",
+    name: "震撼地雷",
+    desc: "触发后爆炸范围较小，但会使范围内所有敌人陷入长时间瘫痪",
+    cooldown: 22,
+    iconShape: "mine_stun",
+    color: "#fde047", // yellow
+    maxStack: 3,
+  },
+  {
+    id: "cluster_grenade",
+    kind: "cluster_grenade",
+    name: "集束手雷",
+    desc: "投掷一枚手雷，落地爆炸后向四周散布4枚微型炸弹",
+    cooldown: 28,
+    iconShape: "cluster_grenade",
+    color: "#f97316", // orange
+    maxStack: 2,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -556,6 +655,9 @@ export const getCharacter = (id: string) =>
 export const getOutfit = (id: string) =>
   OUTFITS.find((o) => o.id === id) ?? OUTFITS[0];
 export const getGun = (id: string) => GUNS.find((g) => g.id === id) ?? GUNS[0];
+/** Like getGun but returns undefined when the id doesn't match any weapon in guns.json.
+ *  Use this in UI code where you need to distinguish "real weapon" from "generic attack". */
+export const findGun = (id: string): GunDef | undefined => GUNS.find((g) => g.id === id);
 export const getSkill = (id: string) =>
   SKILLS.find((s) => s.id === id) ?? SKILLS[0];
 export const getGadget = (id: string) =>

@@ -60,7 +60,9 @@ export type ProjectileKind =
   | "tracer"
   | "flame"
   | "ion"
-  | "grenade";
+  | "grenade"
+  | "knife"
+  | "boomerang";
 
 export type WeaponClass =
   | "ranged"
@@ -248,7 +250,10 @@ export type GadgetKind =
   | "healing_station"
   | "healing_beam"
   | "rpg"
-  | "stun_gun";
+  | "stun_gun"
+  | "turret_sniper"
+  | "mine_stun"
+  | "cluster_grenade";
 
 export interface GadgetDef {
   id: string;

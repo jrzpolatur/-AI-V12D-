@@ -68,7 +68,7 @@ if (mode === "dev") {
 } else {
   console.log("=== Building fresh dist ===");
   // Keep the authoritative-server bundle in sync with the TS sources.
-  run(`${esbuildBin} src/game/engine.ts --bundle --format=esm --platform=node --outfile=server/engine.bundle.mjs`);
+  run(`${esbuildBin} src/game/engine.ts --bundle --format=esm --platform=node --external:"./ai.worker.ts?worker&inline" --outfile=server/engine.bundle.mjs`);
   // Build the browser game.
   run(`${viteBin} build`);
   // Make the single-file build openable via file:// (double-click).

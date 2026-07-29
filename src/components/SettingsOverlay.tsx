@@ -99,6 +99,31 @@ export default function SettingsOverlay({
           </div>
         </section>
 
+        {/* ---- Graphics Quality ---- */}
+        <section className="mb-5">
+          <h3 className="mb-2 text-sm font-semibold text-slate-200">画质 (影响性能)</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "低", value: "low" },
+              { label: "中", value: "medium" },
+              { label: "高", value: "high" },
+            ].map((o) => (
+              <button
+                key={o.value}
+                onClick={() => updateSettings({ quality: o.value as any })}
+                className={
+                  "rounded-lg border py-2 text-sm font-bold transition " +
+                  (s.quality === o.value
+                    ? "border-violet-300/60 bg-violet-500/20 text-violet-100"
+                    : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10")
+                }
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* ---- Bot strength (AI step, decoupled from frame rate) ---- */}
         <section className="mb-5">
           <BotStrengthControl />

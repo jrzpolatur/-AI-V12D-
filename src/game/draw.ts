@@ -38,6 +38,21 @@ const WOOD = "#a9743a";
 const WOOD_D = "#6e4a24";
 
 // ---------------------------------------------------------------------------
+// Cached radial-glow gradients. Created at the ORIGIN (0,0,r) so callers can
+// translate before filling and reuse one object across every instance instead
+// of rebuilding it every frame — a major win on integrated GPUs.
+// ---------------------------------------------------------------------------
+const glowCache = new Map<string, CanvasGradient>();
+function glow(ctx: CanvasRenderingContext2D, r: number, key: string, stops: [number, string][]): CanvasGradient {
+  const g = glowCache.get(key);
+  if (g) return g;
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  for (const [o, c] of stops) grad.addColorStop(o, c);
+  glowCache.set(key, grad);
+  return grad;
+}
+
+// ---------------------------------------------------------------------------
 // Weapon drawing — drawn pointing along +x (grip at origin).
 // Each weapon gets its own detailed silhouette.
 // `swing` (0..1) drives melee swing animation: rotates the whole weapon arc.
@@ -81,12 +96,18 @@ export function drawWeapon(
   };
 
   // For melee weapons, animate the grip swinging around the player's hand.
-  // The caller already translates to the hand position; we add a rotation
-  // that sweeps the blade through an arc based on `swing` (0..1).
+  // When swinging (swing 0..1), sweep the blade through the attack arc.
+  // In idle state (swing === 0), keep the blade held naturally forward.
   if (gun.weaponClass === "melee") {
-    const swingArc = (gun.meleeArc ?? 2) * 0.8;
-    ctx.rotate(-swingArc / 2 + swing * swingArc);
-  }  switch (gun.shape) {
+    if (swing > 0) {
+      const full = gun.meleeArc ?? 2.4;
+      ctx.rotate(-full / 2 + swing * full);
+      ctx.translate(Math.sin(swing * Math.PI) * 14, 0); // Extend forward into the swing
+    }
+  }
+  // 武器图标统一绘制单位：枪械取枪管长度，其余取默认值
+  const g = gun.barrel ?? 13;
+  switch (gun.shape) {
     // ---------------- PISTOL (手枪) ----------------
     case "pistol": {
       // Sleek cyberpunk pistol with under-barrel laser sight
@@ -512,6 +533,27 @@ export function drawWeapon(
       ctx.fillStyle = rgba(gun.glow, 0.95);
       ctx.beginPath();
       ctx.moveTo(16 - pull, -3); ctx.lineTo(21 - pull, 0); ctx.lineTo(16 - pull, 3);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    // ---------------- DRAGON'S BREATH (龙息喷) ----------------
+    case "dragon_breath": {
+      // Heavy dragon-scale embossed shotgun with glowing flame vents along the barrel and dragon-horn sight
+      body(-7, -4, 18, 8, "#7c2d12", "#451a03", 2); // mahogany wooden stock
+      body(11, -2.4, 12, 4.8, STEEL_X, STEEL, 1); // dual heat-shield barrel
+      block(11, -3, 3, 6, "#ea580c", 0.6); // dragon muzzle ring
+      // glowing incendiary vents
+      ctx.fillStyle = gun.glow;
+      for (let i = 0; i < 3; i++) {
+        roundRect(ctx, 13 + i * 3, -1.8, 1.8, 3.6, 0.4);
+        ctx.fill();
+      }
+      // dragon horn front sight
+      ctx.fillStyle = "#f97316";
+      ctx.beginPath();
+      ctx.moveTo(21, -3); ctx.lineTo(24, -6); ctx.lineTo(23, -2);
+      ctx.closePath();
       ctx.fill();
       break;
     }
@@ -690,6 +732,60 @@ export function drawWeapon(
       ctx.restore();
       break;
     }
+    case "m1887": {
+      // 泵动霰弹枪
+      block(-g*0.5, -g*0.2, g*1.5, g*0.4, "#3b3f4b", "#23262e", 2); // 枪身
+      block(g*0.7, -g*0.13, g*0.5, g*0.26, gun.color, STEEL_D, 1); // 枪管
+      block(-g*0.5, g*0.05, g*0.6, g*0.34, "#23262e", "#000000", 1); // 下管(泵)
+      break;
+    }
+    case "knife": {
+      // 飞刀
+      ctx.fillStyle = gun.color;
+      ctx.beginPath();
+      ctx.moveTo(g*0.9, 0);
+      ctx.lineTo(-g*0.5, -g*0.22);
+      ctx.lineTo(-g*0.7, 0);
+      ctx.lineTo(-g*0.5, g*0.22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#23262e";
+      ctx.fillRect(-g*0.85, -g*0.1, g*0.25, g*0.2); // 刀柄
+      break;
+    }
+    case "boomerang": {
+      // 火焰回旋镖
+      ctx.strokeStyle = gun.color;
+      ctx.lineWidth = g*0.26;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-g*0.7, g*0.5);
+      ctx.quadraticCurveTo(0, -g*0.8, g*0.7, g*0.5);
+      ctx.stroke();
+      break;
+    }
+    case "sword": {
+      const len = (gun.meleeRange ?? 55) * 0.9;
+      body(-8, -5, 12, 10, "#fb923c", "#c2410c", 2);
+      block(-6, -2, 6, 4, STEEL_D, 1);
+      body(4, -2.5, len, 5, STEEL, STEEL_D, 1);
+      ctx.fillStyle = "#1e293b";
+      const shift = (t * 60) % 6;
+      for (let i = 0; i < len; i += 6) {
+        if (i - shift > 0) {
+          ctx.fillRect(4 + i - shift, -3.5, 3, 1.5);
+          ctx.fillRect(4 + i - shift, 2, 3, 1.5);
+        }
+      }
+      break;
+    }
+    case "heavy": {
+      body(-10, -6, 24, 12, STEEL_X, STEEL, 2);
+      body(-6, -4, 14, 8, "#bef264", "#4d7c0f", 2);
+      body(14, -2, 14, 4, STEEL_L, STEEL_D, 1);
+      body(28, -3.5, 6, 7, STEEL_D, "#0f172a", 1);
+      break;
+    }
     default: {
       body(-4, -4.5, gun.barrel + 6, 9, STEEL, STEEL_D, 3);
     }
@@ -843,12 +939,16 @@ export interface DrawCharOpts {
   flash?: number;
   glow?: string;
   gun?: GunDef;
+  gadget?: GadgetDef;
   /** melee swing progress 0..1 (drives weapon rotation) */
   meleeSwing?: number;
   /** lunge offset along aim direction (for spear dash) */
   lunge?: number;
   isCloaked?: boolean;
   cloakAlpha?: number;
+  /** thrust longsword charging status */
+  thrustCharging?: boolean;
+  thrustCharge?: number;
 }
 
 export function drawCharacter(
@@ -877,10 +977,7 @@ export function drawCharacter(
   ctx.rotate(angle);
 
   if (opts.glow) {
-    const g = ctx.createRadialGradient(0, 0, size * 0.4, 0, 0, size * 2.2);
-    g.addColorStop(0, rgba(opts.glow, 0.35));
-    g.addColorStop(1, rgba(opts.glow, 0));
-    ctx.fillStyle = g;
+    ctx.fillStyle = glow(ctx, size * 2.2, `char|${opts.glow}|${Math.round(size)}`, [[0, rgba(opts.glow, 0.35)], [1, rgba(opts.glow, 0)]]);
     ctx.beginPath();
     ctx.arc(0, 0, size * 2.2, 0, Math.PI * 2);
     ctx.fill();
@@ -965,10 +1062,17 @@ export function drawCharacter(
   ctx.moveTo(r * 0.1, -r * 0.5);
   ctx.lineTo(-r * 0.1, -r * 0.85);
   ctx.stroke();
-  // right arm (weapon side, +y) reaching forward
+  const isCharging = opts.thrustCharging ?? false;
+  const chargeVal = opts.thrustCharge ?? 0;
+  const chargePct = isCharging ? Math.min(1, chargeVal / 0.5) : 0;
+  const chargeBack = chargePct * r * 0.75;
+  const weaponHandX = isCharging ? r * 0.55 - chargeBack : r * 0.55;
+  const weaponHandY = isCharging ? r * 0.62 - chargePct * r * 0.15 : r * 0.62;
+
+  // right arm (weapon side, +y) reaching forward (or pulled back when charging)
   ctx.beginPath();
   ctx.moveTo(r * 0.2, r * 0.5);
-  ctx.lineTo(r * 0.55, r * 0.62);
+  ctx.lineTo(weaponHandX, weaponHandY);
   ctx.stroke();
   ctx.lineCap = "butt";
 
@@ -978,7 +1082,7 @@ export function drawCharacter(
   ctx.arc(-r * 0.12, -r * 0.85, r * 0.16, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(r * 0.55, r * 0.62, r * 0.16, 0, Math.PI * 2);
+  ctx.arc(weaponHandX, weaponHandY, r * 0.16, 0, Math.PI * 2);
   ctx.fill();
 
   // head (forward, +x) with forward-looking eyes
@@ -1010,9 +1114,20 @@ export function drawCharacter(
   ctx.restore();
 
   // weapon held forward by the right hand
-  if (opts.gun) {
+  if (opts.gadget) {
     ctx.save();
-    ctx.translate(r * 0.55, r * 0.62);
+    ctx.translate(weaponHandX, weaponHandY);
+    ctx.scale(0.8, 0.8);
+    drawGadgetModel(ctx, opts.gadget.kind, opts.gadget.color, t);
+    ctx.restore();
+  } else if (opts.gun) {
+    ctx.save();
+    const vibr = (isCharging && chargePct >= 1) ? (Math.random() - 0.5) * 1.8 : 0;
+    ctx.translate(weaponHandX + vibr, weaponHandY + vibr);
+    if (isCharging && chargePct > 0) {
+      // 突刺长剑蓄力动画：将剑向人物后方微后收，倾斜指向后方
+      ctx.rotate(-Math.PI * 0.38 * chargePct);
+    }
     drawWeapon(ctx, opts.gun, outfit.accent, t, swing);
     ctx.restore();
   }
@@ -1188,11 +1303,7 @@ export function drawMonster(ctx: CanvasRenderingContext2D, opts: DrawMonsterOpts
       fillPath(() => ctx.ellipse(0, 0, s * 0.85, s * 0.8, 0, 0, Math.PI * 2));
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.5);
-      cg.addColorStop(0, "#ffffff");
-      cg.addColorStop(0.4, rgba(glow, 0.9));
-      cg.addColorStop(1, rgba(glow, 0));
-      ctx.fillStyle = cg;
+      ctx.fillStyle = glow(ctx, s * 0.5, `abo|${glow}|${Math.round(s)}`, [[0, "#ffffff"], [0.4, rgba(glow, 0.9)], [1, rgba(glow, 0)]]);
       ctx.beginPath();
       ctx.arc(0, 0, s * 0.5, 0, Math.PI * 2);
       ctx.fill();
@@ -2185,6 +2296,18 @@ export function drawWeaponIcon(
       });
       break;
     }
+    case "dragon_breath": {
+      body(() => {
+        ctx.beginPath();
+        ctx.rect(-10, -4, 20, 8);
+        ctx.rect(10, -2.5, 4, 5);
+      });
+      cutout(() => {
+        ctx.beginPath();
+        ctx.arc(2, 0, 2, 0, Math.PI * 2);
+      });
+      break;
+    }
     case "thrust_sword": {
       // longsword tilted up-right with crossguard + grip
       body(() => {
@@ -2212,6 +2335,40 @@ export function drawWeaponIcon(
       });
       break;
     }
+    case "m1887":
+      body(() => {
+        ctx.beginPath();
+        ctx.rect(-7, -2.4, 11, 4.8); // 枪身
+        ctx.rect(4, -1.6, 5, 3.2); // 枪管
+        ctx.rect(-7, 1.5, 5, 3); // 下管/泵
+        ctx.moveTo(-5, 3);
+        ctx.lineTo(-2, 3);
+        ctx.lineTo(-3.5, 8);
+        ctx.lineTo(-6.5, 8);
+        ctx.closePath();
+      });
+      break;
+    case "knife":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(8, 0);
+        ctx.lineTo(-4, -3);
+        ctx.lineTo(-7, 0);
+        ctx.lineTo(-4, 3);
+        ctx.closePath();
+        ctx.rect(-9, -1.2, 3, 2.4); // 刀柄
+      });
+      break;
+    case "boomerang":
+      body(() => {
+        ctx.beginPath();
+        ctx.moveTo(-7, 5);
+        ctx.quadraticCurveTo(0, -9, 7, 5);
+        ctx.lineTo(4, 5);
+        ctx.quadraticCurveTo(0, -5, -4, 5);
+        ctx.closePath();
+      });
+      break;
     default:
       body(() => {
         ctx.beginPath();
@@ -2568,6 +2725,112 @@ export function drawGadgetIcon(
       });
   }
   ctx.restore();
+}
+
+export function drawGadgetModel(
+  ctx: CanvasRenderingContext2D,
+  kind: string,
+  color: string,
+  t: number = 0
+) {
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  const body = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    c1: string,
+    c2: string,
+    r = 2
+  ) => {
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c2);
+    ctx.fillStyle = g;
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fill();
+    ctx.strokeStyle = DARK;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  };
+  const block = (x: number, y: number, w: number, h: number, c: string, r = 2) => {
+    ctx.fillStyle = c;
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fill();
+    ctx.strokeStyle = DARK;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  };
+
+  switch (kind) {
+    case "turret_mg":
+    case "turret_cannon":
+    case "turret_sniper": {
+      block(-6, -6, 12, 12, STEEL_D, 3);
+      if (kind === "turret_mg") {
+        body(2, -2, 12, 4, STEEL_X, STEEL, 1);
+        body(-4, -4, 8, 8, color, shade(color, -0.4), 2);
+      } else if (kind === "turret_cannon") {
+        body(2, -3, 16, 6, STEEL_X, STEEL, 1);
+        body(15, -4, 5, 8, STEEL_D, "#000", 1);
+        body(-5, -5, 10, 10, color, shade(color, -0.4), 2);
+      } else {
+        body(2, -1.5, 20, 3, STEEL_X, STEEL, 1);
+        body(-4, -3.5, 9, 7, color, shade(color, -0.4), 2);
+        ctx.fillStyle = "#ef4444";
+        roundRect(ctx, 4, 2, 6, 1.5, 0.5);
+        ctx.fill();
+      }
+      break;
+    }
+    case "mine_explosive":
+    case "mine_poison":
+    case "mine_fire":
+    case "mine_stun": {
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, 0, Math.PI * 2);
+      ctx.fillStyle = STEEL_D;
+      ctx.fill();
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2;
+        ctx.fillStyle = STEEL_X;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a)*6, Math.sin(a)*6, 1.5, 0, Math.PI*2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "healing_station": {
+      block(-7, -7, 14, 14, "#ffffff", 3);
+      ctx.fillStyle = color;
+      ctx.fillRect(-2, -5, 4, 10);
+      ctx.fillRect(-5, -2, 10, 4);
+      break;
+    }
+    case "glue_grenade":
+    case "fire_grenade":
+    case "poison_grenade":
+    case "cluster_grenade":
+    default: {
+      body(-4, -5, 8, 10, color, shade(color, -0.4), 3);
+      block(-2, -7, 4, 2, STEEL_D, 1);
+      ctx.strokeStyle = STEEL;
+      ctx.beginPath();
+      ctx.moveTo(2, -6);
+      ctx.lineTo(5, -4);
+      ctx.stroke();
+      break;
+    }
+  }
 }
 
 /** Draws a weapon using its actual detailed in-game model, centered and scaled for UI. */

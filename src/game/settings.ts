@@ -32,6 +32,8 @@ export interface GameSettings {
    *  render frame rate — this is the single "step" knob that controls bot
    *  strength: higher Hz = bots re-decide more often (smarter, but more CPU). */
   botAiHz: number;
+  /** graphics quality: low (dpr=1, no shadows/particles), medium, high */
+  quality: "low" | "medium" | "high";
   /** on-screen mobile control buttons */
   mobile: MobileButtonCfg[];
 }
@@ -61,6 +63,7 @@ function defaultSettings(): GameSettings {
     muted: false,
     fps: 60,
     botAiHz: 16,
+    quality: "high",
     mobile: defaultMobileLayout(),
   };
 }
@@ -82,6 +85,10 @@ function load(): GameSettings {
         typeof parsed.botAiHz === "number"
           ? Math.min(120, Math.max(2, parsed.botAiHz))
           : base.botAiHz,
+      quality:
+        typeof parsed.quality === "string" && ["low", "medium", "high"].includes(parsed.quality)
+          ? (parsed.quality as "low" | "medium" | "high")
+          : base.quality,
       // merge saved buttons onto defaults so newly added actions still appear
       mobile: base.mobile.map((def) => {
         const saved = (parsed.mobile ?? []).find((m) => m.id === def.id);

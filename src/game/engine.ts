@@ -1,9 +1,11 @@
 import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getSkill, SCENES, CHARACTERS, OUTFITS, SKILLS } from "./content";
 import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef, OutfitDef } from "./types";
-import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK, drawGadgetIcon } from "./draw";
+import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK, drawGadgetIcon, drawGadgetModel } from "./draw";
 import { sound } from "./sound";
 import { RUNTIME } from "./runtimeConfig";
-import type { NetMode, InputFrame, Snapshot, SnapPlayer, SnapEffect } from "../net/protocol";
+// @ts-ignore
+import AiWorker from './ai.worker.ts?worker&inline';
+import type { NetMode, InputFrame, Snapshot, SnapPlayer, SnapEffect, SnapFeedEvent } from "../net/protocol";
 import type { Net } from "../net/Net";
 
 /** Coin-burst palettes keyed by kill style (drives ring tint + coin colors). */
@@ -45,7 +47,7 @@ export interface Loadout {
   gadgetIds?: string[];
   /** single-player sub-mode: biohazard survival, or offline deathmatch
    *  (you + 3 AI bots, first to 15 kills wins) */
-  gameMode?: "biohazard" | "deathmatch" | "team_deathmatch" | "cashout";
+  gameMode?: "biohazard" | "deathmatch" | "team_deathmatch" | "cashout" | "cashout_5v5";
   /** number of players in deathmatch (4, 6, 8) */
   dmPlayerCount?: 4 | 6 | 8;
 }
@@ -247,6 +249,11 @@ interface Player {
   electrifiedGlow?: string;
   /** slow debuff (from a lightning whip hit); time remaining */
   slowT?: number;
+  /** burn debuff (from incendiary/flame damage); time remaining (max 1.5s) */
+  burnT?: number;
+  burnDps?: number;
+  burnOwnerId?: number;
+  burnWeapon?: string;
   /** deathmatch combatant id this Player belongs to (for kill credit) */
   cid?: number;
   // ---- dual blades (双刃): raise state + reflect params ----
@@ -290,6 +297,11 @@ interface Player {
   winchVy?: number;
   /** charge-slam skill: dash window active, AOE pending on end */
   isChargingSlam?: boolean;
+  // ---- throwing knife (飞刀): charge throw ----
+  /** right-click held -> charging a charged throw */
+  knifeCharging?: boolean;
+  /** accumulated knife charge time (seconds) */
+  knifeCharge?: number;
 }
 
 /** Floating score / heal number shown above a unit (gadget heal system). */
@@ -348,6 +360,8 @@ interface Combatant {
   // "see an enemy but don't shoot" regression).
   aiMvx?: number;
   aiMvy?: number;
+  pathfindingReqId?: number;
+  pathDir?: { x: number; y: number };
   /** LOS cache for the per-frame aim/fire pass: reuses the expensive ray-vs-wall
    *  test for a short window (~0.1s) while the nearest target is unchanged, so
    *  the replay branch (which runs every render frame) doesn't re-cast it. */
@@ -410,6 +424,16 @@ interface Bullet {
   reflected?: boolean;
   /** stun duration (seconds) applied to the victim on hit (stun gun) */
   stunDuration?: number;
+  /** boomerang projectile: flies out then homes back to its owner */
+  boomerang?: boolean;
+  /** total distance to travel before returning */
+  outDist?: number;
+  /** true once the boomerang is heading back to the owner */
+  returning?: boolean;
+  /** distance travelled so far in the out phase */
+  traveled?: number;
+  /** constant travel speed used while steering the boomerang */
+  boomSpeed?: number;
 }
 
 interface Enemy {
@@ -492,6 +516,30 @@ interface EnemyBullet {
   poison?: boolean;
 }
 
+export interface MeleeTrail {
+  x: number;
+  y: number;
+  angle: number;
+  weapon: string;
+  life: number;
+  maxLife: number;
+  arc?: number;
+  range?: number;
+  length?: number;
+}
+
+export type WeatherType = "clear" | "fog" | "overcast" | "rain";
+export type TimeOfDay = "morning" | "afternoon" | "night";
+
+export interface Raindrop {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -516,7 +564,7 @@ interface Particle {
 }
 
 interface Effect {
-  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip" | "skillcast" | "dual_slash" | "heal_beam" | "beam" | "lightning";
+  type: "explosion" | "shock" | "spawn" | "slash" | "slam" | "debris" | "coinburst" | "poisoncloud" | "firefield" | "flamecone" | "glue" | "saberswing" | "whip" | "skillcast" | "dual_slash" | "heal_beam" | "beam" | "lightning" | "dash";
   x: number;
   y: number;
   t: number;
@@ -536,6 +584,7 @@ interface Effect {
   dirX?: number;
   dirY?: number;
   ownerId?: number;
+  weapon?: string;
   /** target unit id for beam-style effects (heal beam / lightning) */
   targetId?: number;
 }
@@ -556,7 +605,7 @@ interface Grenade {
   vy: number;
   life: number;
   fuse: number;
-  kind: "frag" | "glue" | "fire" | "poison";
+  kind: "frag" | "glue" | "fire" | "poison" | "cluster";
   ownerId?: number;
 }
 
@@ -761,6 +810,7 @@ export class GameEngine {
   private ctx: CanvasRenderingContext2D | null;
   private loadout: Loadout;
   private onHud: (h: HudState) => void;
+  private quality: "low" | "medium" | "high" = "high";
 
   private W = 800;
   private H = 600;
@@ -770,6 +820,15 @@ export class GameEngine {
   private camX = 0;
   private camY = 0;
   private raf = 0;
+  /** Cached radial gradients for glows, keyed by radius+color. Canvas gradients
+   *  are bound to the user-space at paint time, so we create them centred at the
+   *  origin (0,0,r) and let callers translate before filling — this lets bullets,
+   *  enemy bullets, etc. reuse one gradient object instead of rebuilding it every
+   *  frame (the single biggest render cost on the integrated GPU). */
+  private glowCache = new Map<string, CanvasGradient>();
+  /** Offscreen cache for the static background (linear gradient + vignette). */
+  private bgCache?: HTMLCanvasElement;
+  private bgCacheKey = "";
   private sceneTheme = SCENES[0];
   /** index into SCENES[] chosen by the host (authoritative); synced to the guest */
   private sceneIndex = 0;
@@ -813,6 +872,10 @@ export class GameEngine {
   private enemies: Enemy[] = [];
   private particles: Particle[] = [];
   private effects: Effect[] = [];
+  public meleeTrails: MeleeTrail[] = [];
+  public raindrops: Raindrop[] = [];
+  public weather: WeatherType = "clear";
+  public timeOfDay: TimeOfDay = "morning";
   /** floating score / heal number popups (declared since the gadget heal
    *  system pushes into it — previously missing, causing a runtime crash). */
   private scorePopups: ScorePopup[] = [];
@@ -846,7 +909,7 @@ export class GameEngine {
   private authoritative = false;
   private net: Net | null = null;
   /** single-player sub-mode */
-  private gameMode: "biohazard" | "deathmatch" | "team_deathmatch" | "cashout" = "biohazard";
+  private gameMode: "biohazard" | "deathmatch" | "team_deathmatch" | "cashout" | "cashout_5v5" = "biohazard";
   // ---- Ranked Cashout state variables ----
   private vaults: Vault[] = [];
   private cashBoxes: CashBox[] = [];
@@ -920,6 +983,14 @@ export class GameEngine {
   private nextScoreFeedEventId = 0;
   /** fractional score accumulator for the local (non-combatant) player */
   private localScoreAcc = 0;
+  /** per-attacker fractional damage-score accumulators for remote,
+   *  non-combatant attackers (host / authoritative server only) */
+  private pidScoreAcc = new Map<number, number>();
+  // --- score/kill feed events mirrored to clients over snapshots ---
+  private feedSeq = 1;
+  private feedBuf: SnapFeedEvent[] = [];
+  /** watermark of snapshot feed events already consumed; -1 = uninitialised */
+  private lastFeedId = -1;
 
   addScoreFeed(text: string, score: number, victimName?: string, subScore?: number, totalKills?: number) {
     if (this.gameMode === "biohazard" && text === "伤害击中") return;
@@ -962,29 +1033,85 @@ export class GameEngine {
    */
   private awardDamageScore(attackerId: number | undefined, dealt: number) {
     if (this.gameMode === "biohazard") return;
-    if (dealt <= 0 || attackerId === undefined || attackerId < 0) return;
-    const killerC = this.combatants.find((c) => c.id === attackerId);
+    if (dealt <= 0) return;
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = (attackerId !== undefined && attackerId >= 0) ? attackerId : localId;
+    const isLocal = finalAttackerId === localId;
+
+    const killerC = this.combatants.find((c) => c.id === finalAttackerId);
     let acc: number;
     if (killerC) {
       killerC.scoreAcc = (killerC.scoreAcc ?? 0) + dealt;
       acc = killerC.scoreAcc;
-    } else {
+    } else if (isLocal) {
       this.localScoreAcc += dealt;
       acc = this.localScoreAcc;
+    } else {
+      // remote non-combatant attacker (e.g. co-op teammate on the host/server):
+      // accumulate per-pid so their fractional damage isn't credited to us
+      acc = (this.pidScoreAcc.get(finalAttackerId) ?? 0) + dealt;
+      this.pidScoreAcc.set(finalAttackerId, acc);
     }
     if (acc >= 1) {
       const whole = Math.floor(acc);
       if (killerC) {
         killerC.score += whole;
         killerC.scoreAcc = acc - whole;
-      } else {
+        if (isLocal) {
+          this.score += whole;
+        }
+      } else if (isLocal) {
         this.score += whole;
         this.localScoreAcc = acc - whole;
+      } else {
+        this.pidScoreAcc.set(finalAttackerId, acc - whole);
       }
-      const isLocal =
-        (this.mode === "local" && attackerId === 0) ||
-        (this.mode !== "local" && attackerId === this.selfPid);
       if (isLocal) this.addScoreFeed("伤害击中", whole);
+      // mirror to clients so THEY can show their own damage-score popups
+      this.pushFeedEvent({ kind: "damage", pid: finalAttackerId, amount: whole });
+    }
+  }
+
+  /** Record a score/kill event for clients (host & authoritative server only).
+   *  Clients consume unseen ids from Snapshot.feed in consumeFeedEvent(). */
+  private pushFeedEvent(ev: Omit<SnapFeedEvent, "id">) {
+    if (this.mode !== "host" && this.mode !== "server") return;
+    this.feedBuf.push({ id: this.feedSeq++, ...ev });
+    if (this.feedBuf.length > 24) this.feedBuf.shift();
+  }
+
+  /** Apply one host/server feed event on a client: mirrors per-combatant
+   *  score/kills and shows the HUD feeds from THIS client's perspective. */
+  private consumeFeedEvent(ev: SnapFeedEvent) {
+    const isMe = ev.pid === this.selfPid;
+    const c = this.combatants.find((cb) => cb.id === ev.pid);
+    if (c) {
+      c.score += ev.amount;
+      if (ev.kind === "kill" && ev.kills !== undefined && ev.kills > c.kills) c.kills = ev.kills;
+    }
+    const nameFor = (pid: number | undefined, fallback?: string) =>
+      pid === this.selfPid ? "你"
+      : pid === this.peerPid ? (this.peerName || fallback || "对手")
+      : (fallback || "敌人");
+    if (ev.kind === "damage") {
+      if (isMe) {
+        this.score += ev.amount;
+        this.addScoreFeed("伤害击中", ev.amount);
+      }
+      return;
+    }
+    // kill → top kill feed for everyone, centre feed/banner/sound if involved
+    const kName = nameFor(ev.pid, ev.killerName);
+    const vName = ev.victimPid === -1 ? (ev.victimName || "敌人") : nameFor(ev.victimPid, ev.victimName);
+    this.addKillFeed(kName, vName, ev.weaponId, c);
+    if (isMe) {
+      this.kills += 1;
+      this.score += ev.amount;
+      this.addScoreFeed("淘汰", ev.amount, vName, ev.amount, ev.kills ?? this.kills);
+      this.banner = { text: `击杀 ${vName}！`, t: 1.6 };
+      sound.playKillConfirm();
+    } else if (ev.victimPid !== undefined && ev.victimPid === this.selfPid) {
+      this.banner = { text: `你被 ${kName} 击败！`, t: 1.6 };
     }
   }
 
@@ -1085,8 +1212,6 @@ export class GameEngine {
     isDealtByMe: boolean
   ) {
     if (amount <= 0) return;
-    const rounded = Math.round(amount);
-    if (rounded <= 0) return;
 
     // Search for existing entry of same weapon, target, source and direction
     const existing = this.damageLogs.find(
@@ -1098,19 +1223,25 @@ export class GameEngine {
     );
 
     if (existing) {
-      existing.amount += rounded;
+      existing.amount += amount;
       existing.timestamp = this.time;
     } else {
       this.damageLogs.push({
         id: this.nextDamageLogId++,
         timestamp: this.time,
-        amount: rounded,
+        amount,
         weapon,
         targetName,
         sourceName,
         isDealtByMe,
       });
     }
+  }
+
+  /** Get the weapon ID of a combatant's currently equipped gun */
+  private getAttackerWeaponId(c?: Combatant): string | undefined {
+    if (!c) return undefined;
+    return c.guns?.[c.gunIndex]?.id;
   }
 
 
@@ -1146,6 +1277,8 @@ export class GameEngine {
   private pointerLocked = false;
   private firing = false;
   private secondaryFiring = false;
+  /** when true, fireGun spawns the charged (85 dmg) knife pair instead of the 65 pair */
+  private knifeChargingActive = false;
   /** virtual movement vector from the on-screen joystick (-1..1 each axis) */
   private virtualMove = { x: 0, y: 0 };
   /** touch device: enables the mobile on-screen controls + mobile-only aim assist */
@@ -1162,6 +1295,9 @@ export class GameEngine {
   private boundResize: () => void;
   private boundContext: (e: Event) => void;
   private boundLockChange: () => void;
+
+  private aiWorker: Worker | null = null;
+  private pathReqId = 0;
 
   constructor(
     canvas: HTMLCanvasElement | null,
@@ -1217,6 +1353,57 @@ export class GameEngine {
     this.boundResize = () => this.onResize();
     this.boundContext = (e) => e.preventDefault();
     this.boundLockChange = () => this.onPointerLockChange();
+
+    if (typeof window !== "undefined" && typeof Worker !== "undefined") {
+      try {
+        this.aiWorker = new AiWorker();
+        this.aiWorker.onmessage = (e) => this.onWorkerMessage(e);
+      } catch (e) {
+        console.warn("Failed to initialize aiWorker", e);
+      }
+    }
+  }
+
+  private syncWorker() {
+    if (this.aiWorker) {
+      this.aiWorker.postMessage({
+        type: "init",
+        walls: this.walls,
+        worldW: this.worldW,
+        worldH: this.worldH
+      });
+    }
+  }
+
+  private onWorkerMessage(e: MessageEvent) {
+    const msg = e.data;
+    if (msg.type === "pathRes") {
+      const c = this.combatants.find(cb => cb.id === msg.botId);
+      if (c && c.pathfindingReqId === msg.reqId) {
+        c.pathDir = { x: msg.dx, y: msg.dy };
+        c.pathfindingReqId = undefined; // Mark as fulfilled
+      }
+    }
+  }
+
+  private getAsyncPath(c: Combatant, targetX: number, targetY: number): { x: number; y: number } {
+    if (!this.aiWorker) {
+      return this.findBotPath(c.player.x, c.player.y, targetX, targetY, c.player.size);
+    }
+    if (c.pathfindingReqId === undefined) {
+      c.pathfindingReqId = ++this.pathReqId;
+      this.aiWorker.postMessage({
+        type: "path",
+        reqId: c.pathfindingReqId,
+        botId: c.id,
+        startX: c.player.x,
+        startY: c.player.y,
+        targetX,
+        targetY,
+        pSize: c.player.size
+      });
+    }
+    return c.pathDir ?? { x: 0, y: 0 };
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -1385,8 +1572,27 @@ export class GameEngine {
     this.emit(true);
   }
 
+  private pickWeather() {
+    const weathers: WeatherType[] = ["clear", "fog", "overcast", "rain"];
+    const times: TimeOfDay[] = ["morning", "afternoon", "night"];
+    this.weather = weathers[Math.floor(Math.random() * weathers.length)];
+    this.timeOfDay = times[Math.floor(Math.random() * times.length)];
+    
+    // adjust valid combinations based on prompt requirements
+    if (this.weather === "fog") {
+      this.timeOfDay = Math.random() > 0.5 ? "afternoon" : "night";
+    } else if (this.weather === "overcast") {
+      this.timeOfDay = "afternoon";
+    } else if (this.weather === "rain") {
+      this.timeOfDay = Math.random() > 0.5 ? "afternoon" : "night";
+    } else if (this.weather === "clear") {
+      this.timeOfDay = Math.random() > 0.5 ? "morning" : "night";
+    }
+  }
+
   private resetState() {
     this.resize();
+    this.pickWeather();
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
 
@@ -1414,10 +1620,13 @@ export class GameEngine {
     this.enemies = [];
     this.particles = [];
     this.effects = [];
+    this.meleeTrails = [];
+    this.raindrops = [];
     this.pickups = [];
     this.grenades = [];
     this.deployables = [];
     this.walls = this.buildWalls();
+    this.syncWorker();
     this.base = {
       x: this.worldW / 2,
       y: this.worldH - 120,
@@ -1457,6 +1666,13 @@ export class GameEngine {
     this.wallsDirty = true;
     this.score = 0;
     this.kills = 0;
+    this.localScoreAcc = 0;
+    this.pidScoreAcc.clear();
+    this.feedBuf = [];
+    this.feedSeq = 1;
+    this.lastFeedId = -1;
+    this.killFeed = [];
+    this.activeScoreFeed = null;
     this.gold = 0;
     this.wave = 0;
     this.waveTimer = 0;
@@ -1532,23 +1748,16 @@ export class GameEngine {
     this.applyRuntime();
 
     // ---- deathmatch & cashout: build combatants ----
-    if (this.gameMode === "cashout") {
+    if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
+      const is5v5 = this.gameMode === "cashout_5v5";
       this.isDM = true;
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
       this.enemyBase.maxHp = Infinity;
 
-      // 12 spawn points distributed in circles
-      this.dmSpawns = [];
-      for (let i = 0; i < 12; i++) {
-        const angle = (i / 12) * Math.PI * 2;
-        const dist = 350 + Math.random() * 180;
-        this.dmSpawns.push({
-          x: this.worldW * 0.5 + Math.cos(angle) * dist,
-          y: this.worldH * 0.5 + Math.sin(angle) * dist,
-        });
-      }
+      // Well-distributed spawn points across the entire map
+      this.dmSpawns = this.generateDistributedSpawns();
 
       // Human player (cid 0, team 0)
       this.player.x = this.dmSpawns[0].x;
@@ -1569,15 +1778,16 @@ export class GameEngine {
       this.combatants = [human];
       this.player.cid = 0;
 
-      // Setup 11 bots (2 allies, 9 enemies in 3 teams)
-      const teamColors = ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"];
-      const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
-      const picks = this.rollBotLoadouts(11);
+      // Setup bots (5v5: 4 allies + 5 enemies; 3v3v3v3: 2 allies + 9 enemies)
+      const totalBots = is5v5 ? 9 : 11;
+      const teamColors = is5v5 ? ["#38bdf8", "#ef4444"] : ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"];
+      const teamNames = is5v5 ? ["蓝色小队", "赤红小队"] : ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+      const picks = this.rollBotLoadouts(totalBots);
 
-      for (let i = 1; i < 12; i++) {
-        const teamId = Math.floor(i / 3);
-        const memberIndex = i % 3;
-        const name = teamId === 0 ? `队友${memberIndex}` : `${teamNames[teamId]}·成员${memberIndex + 1}`;
+      for (let i = 1; i <= totalBots; i++) {
+        const teamId = is5v5 ? (i <= 4 ? 0 : 1) : Math.floor(i / 3);
+        const memberIndex = is5v5 ? (i <= 4 ? i : i - 4) : (i % 3);
+        const name = teamId === 0 ? `队友${memberIndex}` : `${teamNames[teamId]}·成员${memberIndex}`;
         const color = teamColors[teamId];
         const sp = this.dmSpawns[i];
         const bot = this.makeBot(i, picks[i - 1], name, color, sp.x, sp.y);
@@ -1592,7 +1802,7 @@ export class GameEngine {
       this.vaults = [];
       this.cashBoxes = [];
       this.cashoutStations = [];
-      this.teamCash = [0, 0, 0, 0];
+      this.teamCash = is5v5 ? [0, 0] : [0, 0, 0, 0];
       this.cashBoxCount = 0;
       this.cashoutTimeLeft = 480; // 8 minutes
       this.isOvertime = false;
@@ -1603,7 +1813,7 @@ export class GameEngine {
       this.spawnCashoutStation();
       this.spawnCashoutStation();
 
-      this.banner = { text: "排位提现 · 夺取现金盒进行提现！", t: 2.8 };
+      this.banner = { text: is5v5 ? "5v5 提现争夺 · 抢夺现金盒击败敌方！" : "排位提现 · 夺取现金盒进行提现！", t: 2.8 };
       this.activeId = 0;
     } else if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
       this.isDM = true;
@@ -1615,15 +1825,7 @@ export class GameEngine {
       this.enemyBase.hp = Infinity;
       this.enemyBase.maxHp = Infinity;
       
-      this.dmSpawns = [];
-      for (let i = 0; i < 12; i++) {
-        const angle = (i / 12) * Math.PI * 2;
-        const dist = 350 + Math.random() * 180;
-        this.dmSpawns.push({
-          x: this.worldW * 0.5 + Math.cos(angle) * dist,
-          y: this.worldH * 0.5 + Math.sin(angle) * dist,
-        });
-      }
+      this.dmSpawns = this.generateDistributedSpawns();
 
       if (this.mode === "local") {
         const human: Combatant = {
@@ -1958,8 +2160,8 @@ export class GameEngine {
       this.foe.size = c.size;
     }
     
-    // sync deathmatch peer combatant
-    if (this.gameMode === "deathmatch" && this.combatants.length > 0) {
+    // sync deathmatch / team_deathmatch / cashout peer combatant
+    if ((this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch" || this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && this.combatants.length > 0) {
       const peerC = this.combatants.find((c) => c.id === this.peerPid);
       if (peerC) {
         peerC.name = this.peerName || "对手";
@@ -2087,24 +2289,20 @@ export class GameEngine {
         this.layoutCyber(building, cover, pillar, cx, cy);
         break;
       case 5:
-        // layoutWildWest was never implemented — fall back to an existing
-        // layout so selecting this scene doesn't crash the game.
-        this.layoutRuin(building, cover, pillar, cx, cy);
+        this.layoutWildWest(building, cover, pillar, cx, cy);
         break;
       case 6:
-        // layoutJungle was never implemented — fall back.
-        this.layoutArctic(building, cover, pillar, cx, cy);
+        this.layoutJungle(building, cover, pillar, cx, cy);
         break;
       case 7:
-        // layoutArcticZone was never implemented — fall back.
-        this.layoutCyber(building, cover, pillar, cx, cy);
+        this.layoutArcticZone(building, cover, pillar, cx, cy);
         break;
       default:
         this.layoutNeon(building, cover, pillar, cx, cy);
         break;
     }
 
-    if (this.gameMode === "deathmatch" || this.gameMode === "cashout") {
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch" || (this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
       const baseArea = 2400 * 1200;
       const currentArea = this.worldW * this.worldH;
       const extraRatio = (currentArea / baseArea) - 1;
@@ -2157,30 +2355,32 @@ export class GameEngine {
   // radius 48, so mid-field anchors are kept a safe gap above/below them.
   // ---------------------------------------------------------------------------
 
-  /** 霓虹都市 — four large corner towers, four mid-field anchors, central pillar ring. */
+  /** 霓虹都市 — four corner towers, mid-field anchors, central pillar ring with balanced cover walls. */
   private layoutNeon(
     b: (x: number, y: number, w: number, h: number, hp?: number) => void,
-    _c: (x: number, y: number, w: number, h: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
     p: (x: number, y: number) => void,
     cx: number,
     cy: number,
   ) {
-    b(430, 320, 230, 180);
-    b(1970, 320, 230, 180);
-    b(430, 880, 230, 180);
-    b(1970, 880, 230, 180);
-    b(cx, 270, 220, 90); // top-center (clear of enemy base)
-    b(cx, 930, 220, 90); // bottom-center (clear of base)
-    b(170, cy, 120, 200); // left-mid
-    b(2230, cy, 120, 200); // right-mid
-    p(cx - 200, cy - 150);
-    p(cx + 200, cy - 150);
-    p(cx - 200, cy + 150);
-    p(cx + 200, cy + 150);
+    b(430, 320, 210, 160);
+    b(1970, 320, 210, 160);
+    b(430, 880, 210, 160);
+    b(1970, 880, 210, 160);
+    b(cx, 270, 200, 80); // top-center
+    b(cx, 930, 200, 80); // bottom-center
+    b(170, cy, 110, 180); // left-mid
+    b(2230, cy, 110, 180); // right-mid
+    c(cx - 350, cy - 130, 140, 26);
+    c(cx + 350, cy + 130, 140, 26);
+    p(cx - 180, cy - 120);
+    p(cx + 180, cy - 120);
+    p(cx - 180, cy + 120);
+    p(cx + 180, cy + 120);
     p(cx, cy);
   }
 
-  /** 沙漠废墟 — adobe compounds in the corners, a central alley of cover, scattered ruins. */
+  /** 沙漠废墟 — adobe compounds in the corners, a central alley of cover, diagonal sandbag walls. */
   private layoutDesert(
     b: (x: number, y: number, w: number, h: number, hp?: number) => void,
     c: (x: number, y: number, w: number, h: number) => void,
@@ -2188,23 +2388,26 @@ export class GameEngine {
     cx: number,
     cy: number,
   ) {
-    b(400, 260, 180, 150);
-    b(2000, 260, 180, 150);
-    b(400, 940, 180, 150);
-    b(2000, 940, 180, 150);
-    b(150, cy, 120, 180); // left-mid ruin
-    b(2250, cy, 120, 180); // right-mid ruin
-    b(cx, 270, 200, 90); // top-center
-    b(cx, 930, 200, 90); // bottom-center
-    // central adobe alley — a cross of low cover walls with an open middle
-    c(cx, cy - 170, 180, 28);
-    c(cx, cy + 170, 180, 28);
-    c(cx - 170, cy, 28, 180);
-    c(cx + 170, cy, 28, 180);
+    b(400, 270, 180, 140);
+    b(2000, 270, 180, 140);
+    b(400, 930, 180, 140);
+    b(2000, 930, 180, 140);
+    b(160, cy, 110, 160); // left-mid ruin
+    b(2240, cy, 110, 160); // right-mid ruin
+    b(cx, 270, 190, 80); // top-center
+    b(cx, 930, 190, 80); // bottom-center
+    c(cx - 300, cy - 140, 140, 28);
+    c(cx + 300, cy + 140, 140, 28);
+    c(cx, cy - 170, 160, 28);
+    c(cx, cy + 170, 160, 28);
+    c(cx - 170, cy, 28, 160);
+    c(cx + 170, cy, 28, 160);
+    p(cx - 200, cy);
+    p(cx + 200, cy);
     p(cx, cy);
   }
 
-  /** 冰原基地 — frozen bunkers in the corners + sides, a long central ice cross. */
+  /** 冰原基地 — frozen bunkers in the corners + sides, ice wall barriers. */
   private layoutArctic(
     b: (x: number, y: number, w: number, h: number, hp?: number) => void,
     c: (x: number, y: number, w: number, h: number) => void,
@@ -2212,53 +2415,53 @@ export class GameEngine {
     cx: number,
     cy: number,
   ) {
-    b(450, 300, 190, 150);
-    b(1950, 300, 190, 150);
-    b(450, 900, 190, 150);
-    b(1950, 900, 190, 150);
-    b(760, cy, 130, 190); // left-mid bunker
-    b(1640, cy, 130, 190); // right-mid bunker
-    b(cx, 270, 200, 90); // top-center
-    b(cx, 930, 200, 90); // bottom-center
-    c(cx, cy - 150, 230, 26);
-    c(cx, cy + 150, 230, 26);
-    c(cx - 150, cy, 26, 230);
-    c(cx + 150, cy, 26, 230);
+    b(450, 300, 180, 140);
+    b(1950, 300, 180, 140);
+    b(450, 900, 180, 140);
+    b(1950, 900, 180, 140);
+    b(740, cy, 120, 170); // left-mid bunker
+    b(1660, cy, 120, 170); // right-mid bunker
+    b(cx, 270, 190, 80); // top-center
+    b(cx, 930, 190, 80); // bottom-center
+    c(cx, cy - 160, 210, 26);
+    c(cx, cy + 160, 210, 26);
+    c(cx - 160, cy, 26, 210);
+    c(cx + 160, cy, 26, 210);
+    p(cx - 200, cy - 120);
+    p(cx + 200, cy + 120);
     p(cx, cy);
   }
 
-  /** 末日废墟 — broken city blocks clustered in the corners, scattered rubble pillars. */
+  /** 末日废墟 — broken city blocks in the corners, scattered barrier walls & rubble pillars. */
   private layoutRuin(
     b: (x: number, y: number, w: number, h: number, hp?: number) => void,
-    _c: (x: number, y: number, w: number, h: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
     p: (x: number, y: number) => void,
     cx: number,
     cy: number,
   ) {
-    // TL cluster
-    b(380, 250, 170, 150);
-    b(640, 430, 150, 170);
-    // TR cluster (mirror)
-    b(2020, 250, 170, 150);
-    b(1760, 430, 150, 170);
-    // BL cluster (mirror)
-    b(380, 950, 170, 150);
-    b(640, 770, 150, 170);
-    // BR cluster (mirror)
-    b(2020, 950, 170, 150);
-    b(1760, 770, 150, 170);
-    b(cx, 260, 210, 80); // top-center
-    b(cx, 930, 210, 80); // bottom-center
-    b(150, cy, 120, 190); // left-mid
-    b(2250, cy, 120, 190); // right-mid
-    p(cx - 160, cy - 130);
-    p(cx + 160, cy - 130);
-    p(cx - 160, cy + 130);
-    p(cx + 160, cy + 130);
+    b(380, 260, 160, 140);
+    b(640, 420, 140, 150);
+    b(2020, 260, 160, 140);
+    b(1760, 420, 140, 150);
+    b(380, 940, 160, 140);
+    b(640, 780, 140, 150);
+    b(2020, 940, 160, 140);
+    b(1760, 780, 140, 150);
+    b(cx, 260, 190, 80); // top-center
+    b(cx, 930, 190, 80); // bottom-center
+    b(160, cy, 110, 170); // left-mid
+    b(2240, cy, 110, 170); // right-mid
+    c(cx - 280, cy - 140, 130, 26);
+    c(cx + 280, cy + 140, 130, 26);
+    p(cx - 160, cy - 120);
+    p(cx + 160, cy - 120);
+    p(cx - 160, cy + 120);
+    p(cx + 160, cy + 120);
     p(cx, cy);
   }
 
-  /** 赛博都市 — tall vertical strips in the corners + mid, neon arches at center. */
+  /** 赛博都市 — vertical towers, neon arches at center, balanced server nodes. */
   private layoutCyber(
     b: (x: number, y: number, w: number, h: number, hp?: number) => void,
     c: (x: number, y: number, w: number, h: number) => void,
@@ -2266,18 +2469,98 @@ export class GameEngine {
     cx: number,
     cy: number,
   ) {
-    b(420, 360, 160, 320); // TL tower
-    b(1980, 360, 160, 320); // TR tower
-    b(420, 840, 160, 320); // BL tower
-    b(1980, 840, 160, 320); // BR tower
-    b(760, cy, 120, 240); // left-mid tower
-    b(1640, cy, 120, 240); // right-mid tower
-    b(cx, 280, 200, 100); // top-center
-    b(cx, 920, 200, 100); // bottom-center
+    b(420, 340, 150, 260); // TL tower
+    b(1980, 340, 150, 260); // TR tower
+    b(420, 860, 150, 260); // BL tower
+    b(1980, 860, 150, 260); // BR tower
+    b(720, cy, 110, 200); // left-mid tower
+    b(1680, cy, 110, 200); // right-mid tower
+    b(cx, 270, 190, 90); // top-center
+    b(cx, 930, 190, 90); // bottom-center
     c(cx, cy - 160, 170, 26); // top neon arch
     c(cx, cy + 160, 170, 26); // bottom neon arch
     p(cx - 220, cy);
     p(cx + 220, cy);
+    p(cx, cy);
+  }
+
+  /** 西部牛仔 — Frontier town with saloon structures, central well, crate barriers. */
+  private layoutWildWest(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    b(400, 270, 190, 140); // Saloon TL
+    b(2000, 270, 190, 140); // Bank TR
+    b(400, 930, 190, 140); // Sheriff BL
+    b(2000, 930, 190, 140); // Hotel BR
+    b(cx, 260, 180, 80); // Top storehouse
+    b(cx, 940, 180, 80); // Bottom storehouse
+    b(160, cy, 110, 170); // Left outpost
+    b(2240, cy, 110, 170); // Right outpost
+    // Wooden crate cover walls along the main street
+    c(cx - 280, cy - 130, 130, 28);
+    c(cx + 280, cy + 130, 130, 28);
+    c(cx - 150, cy, 28, 140);
+    c(cx + 150, cy, 28, 140);
+    p(cx, cy); // Central well
+    p(cx - 180, cy + 140);
+    p(cx + 180, cy - 140);
+  }
+
+  /** 幽静丛林 — Overgrown stone temple ruins with mossy walls & ancient obelisks. */
+  private layoutJungle(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    b(420, 280, 180, 150); // TL temple
+    b(1980, 280, 180, 150); // TR temple
+    b(420, 920, 180, 150); // BL temple
+    b(1980, 920, 180, 150); // BR temple
+    b(180, cy, 120, 170); // Left shrine
+    b(2220, cy, 120, 170); // Right shrine
+    b(cx, 260, 190, 80); // Top altar
+    b(cx, 940, 190, 80); // Bottom altar
+    // Mossy ruin walls
+    c(cx - 260, cy - 150, 140, 28);
+    c(cx + 260, cy + 150, 140, 28);
+    c(cx, cy - 160, 180, 26);
+    c(cx, cy + 160, 180, 26);
+    p(cx - 200, cy - 120);
+    p(cx + 200, cy - 120);
+    p(cx - 200, cy + 120);
+    p(cx + 200, cy + 120);
+    p(cx, cy); // Central obelisk
+  }
+
+  /** 极寒地带 — Glacial canyon shelters, ice wall barriers & crystal pillars. */
+  private layoutArcticZone(
+    b: (x: number, y: number, w: number, h: number, hp?: number) => void,
+    c: (x: number, y: number, w: number, h: number) => void,
+    p: (x: number, y: number) => void,
+    cx: number,
+    cy: number,
+  ) {
+    b(430, 280, 180, 140); // TL ice shelter
+    b(1970, 280, 180, 140); // TR ice shelter
+    b(430, 920, 180, 140); // BL ice shelter
+    b(1970, 920, 180, 140); // BR ice shelter
+    b(750, cy, 120, 170); // Left research node
+    b(1650, cy, 120, 170); // Right research node
+    b(cx, 260, 190, 80); // Top barrier
+    b(cx, 940, 190, 80); // Bottom barrier
+    c(cx - 300, cy - 140, 150, 26);
+    c(cx + 300, cy + 140, 150, 26);
+    c(cx, cy - 160, 200, 26);
+    c(cx, cy + 160, 200, 26);
+    p(cx - 180, cy);
+    p(cx + 180, cy);
+    p(cx, cy); // Central glacier core
   }
 
   private attach() {
@@ -2315,7 +2598,8 @@ export class GameEngine {
     const rect = this.canvas.getBoundingClientRect();
     this.W = Math.max(320, rect.width);
     this.H = Math.max(240, rect.height);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const maxDpr = this.quality === "low" ? 1 : this.quality === "medium" ? 1.5 : 2;
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     this.canvas.width = Math.floor(this.W * dpr);
     this.canvas.height = Math.floor(this.H * dpr);
     this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2325,6 +2609,12 @@ export class GameEngine {
    *  (every mode uses the expanded RUNTIME world), so there is nothing to
    *  re-sync here — the camera simply keeps following the player. */
   private onResize() {
+    this.resize();
+  }
+
+  public setQuality(q: "low" | "medium" | "high") {
+    if (this.quality === q) return;
+    this.quality = q;
     this.resize();
   }
 
@@ -2491,7 +2781,7 @@ export class GameEngine {
         p.bladeReflectRange = g.reflectRange ?? 96;
         p.bladeReflectSelf = g.reflectSelfDamage ?? 0.05;
         p.bladeReflectGlow = g.glow;
-        sound.swing();
+        sound.swing(g.id);
         e.preventDefault();
         return;
       }
@@ -2499,6 +2789,13 @@ export class GameEngine {
         const p = this.player;
         p.thrustCharging = true;
         p.thrustCharge = 0;
+        e.preventDefault();
+        return;
+      }
+      if (this.gun.id === "throwing_knife" && !this.paused && !this.gameOver) {
+        const p = this.player;
+        p.knifeCharging = true;
+        p.knifeCharge = 0;
         e.preventDefault();
         return;
       }
@@ -2532,6 +2829,8 @@ export class GameEngine {
       this.secondaryFiring = false;
       // release the thrust longsword dash (if it was charging)
       if (this.player.thrustCharging) this.thrustRelease();
+      // release the throwing knife charged throw (if it was charging)
+      if (this.player.knifeCharging) this.knifeRelease();
       // lower the dual blades
       this.player.bladeRaising = false;
     }
@@ -2573,6 +2872,41 @@ export class GameEngine {
       this.hudAccum = 0;
       this.emit(false);
     }
+    for (let i = this.effects.length - 1; i >= 0; i--) {
+      this.effects[i].t += dt;
+      if (this.effects[i].t > this.effects[i].duration) {
+        this.effects.splice(i, 1);
+      }
+    }
+    for (let i = this.meleeTrails.length - 1; i >= 0; i--) {
+      this.meleeTrails[i].life -= dt;
+      if (this.meleeTrails[i].life <= 0) {
+        this.meleeTrails.splice(i, 1);
+      }
+    }
+    
+    if (this.weather === "rain" && Math.random() < 0.6) {
+      // spawn raindrops
+      for (let i = 0; i < (this.quality === "high" ? 4 : 2); i++) {
+        const rx = this.localPlayer ? this.localPlayer.x + (Math.random() - 0.5) * 1600 : Math.random() * this.W;
+        const ry = this.localPlayer ? this.localPlayer.y + (Math.random() - 0.5) * 1200 : Math.random() * this.H;
+        this.raindrops.push({
+          x: rx, y: ry,
+          vx: -300 - Math.random() * 100,
+          vy: 800 + Math.random() * 200,
+          life: 0.6, maxLife: 0.6
+        });
+      }
+    }
+    for (let i = this.raindrops.length - 1; i >= 0; i--) {
+      this.raindrops[i].x += this.raindrops[i].vx * dt;
+      this.raindrops[i].y += this.raindrops[i].vy * dt;
+      this.raindrops[i].life -= dt;
+      if (this.raindrops[i].life <= 0) {
+        this.raindrops.splice(i, 1);
+      }
+    }
+
     this.raf = requestAnimationFrame(this.loop);
   };
 
@@ -2683,7 +3017,7 @@ export class GameEngine {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
         const selfC = this.combatants.find(c => c.id === 0);
-        if (this.gameMode === "cashout" && selfC && (selfC.coins ?? 0) > 0) {
+        if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && selfC && (selfC.coins ?? 0) > 0) {
           this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活 (复活币: ${selfC.coins})`, t: 0.4 };
         } else {
           this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
@@ -2803,7 +3137,7 @@ export class GameEngine {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
         const selfC = this.combatants.find(c => c.id === 0);
-        if (this.gameMode === "cashout" && selfC && (selfC.coins ?? 0) > 0) {
+        if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && selfC && (selfC.coins ?? 0) > 0) {
           this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活 (复活币: ${selfC.coins})`, t: 0.4 };
         } else {
           this.banner = { text: `你被击败！${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
@@ -2841,6 +3175,7 @@ export class GameEngine {
 
     // ---- deathmatch: simulate the human + 3 AI bots through the
     // same per-player combat code (context-switching in `simulateBot`) ----
+    sound.setListenerPos(this.player.x, this.player.y);
     if (this.isDM) {
       this.activeId = this.mode === "local" ? 0 : this.selfPid;
       this.updatePlayer(dt);
@@ -2941,6 +3276,8 @@ export class GameEngine {
   private updatePlayer(dt: number) {
     const p = this.player;
     const g = this.gun;
+    // 对手（机器人 / 远程玩家）行动时，其武器音效整体降低 20%，让玩家更清楚听见自己的
+    sound.setEnemyDampen(this.simulatingOther);
     p.t += dt;
     // downed avatar waiting to respawn: freeze it (no movement / firing)
     if (p.deadTimer && p.deadTimer > 0) {
@@ -2955,6 +3292,13 @@ export class GameEngine {
     if (p.slamCd > 0) p.slamCd -= dt;
     if (p.swingTimer > 0) p.swingTimer -= dt;
     if (p.slowT && p.slowT > 0) p.slowT -= dt;
+    if (p.burnT && p.burnT > 0) {
+      p.burnT -= dt;
+      this.damagePlayerEntity(p, (p.burnDps ?? 30) * dt, undefined, 0, 0, p.burnOwnerId ?? -1, p.burnWeapon);
+      if (Math.random() < 0.3) {
+        this.spawnParticles(p.x, p.y, "#fb923c", 1, 50, 0.2);
+      }
+    }
     if (p.stunTime && p.stunTime > 0) p.stunTime -= dt;
     if (p.comboTimer > 0) {
       p.comboTimer -= dt;
@@ -2995,7 +3339,7 @@ export class GameEngine {
           const q = it.ref as Player;
           if (!q.deadTimer || q.deadTimer <= 0) {
             if (Math.hypot(q.x - p.x, q.y - p.y) < hitR + q.size) {
-              this.damagePlayerEntity(q, ramDmg, undefined, kx, ky, p.cid ?? this.activeId);
+              this.damagePlayerEntity(q, ramDmg, undefined, kx, ky, p.cid ?? this.activeId, "charge_slam");
             }
           }
         }
@@ -3067,6 +3411,21 @@ export class GameEngine {
 
     if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
 
+    // throwing knife: charge while right-click held, throw on release
+    if (this.gun.id === "throwing_knife") {
+      if (this.secondaryFiring) {
+        if (!p.knifeCharging) {
+          p.knifeCharging = true;
+          p.knifeCharge = 0;
+        }
+      } else if (p.knifeCharging) {
+        this.knifeRelease();
+      }
+      if (p.knifeCharging) p.knifeCharge = (p.knifeCharge ?? 0) + dt;
+    } else {
+      p.knifeCharging = false;
+    }
+
     // dual blades parry / reflect management
     if (this.gun.id === "dual_blades") {
       if (this.secondaryFiring) {
@@ -3135,8 +3494,8 @@ export class GameEngine {
     }
 
     // Ranked Cashout carried box / statue throwing & block fire
-    const carriedBox = this.gameMode === "cashout" ? this.cashBoxes.find(b => b.carriedByCid === this.activeId) : null;
-    const carriedStatue = this.gameMode === "cashout" ? this.statues.find(s => s.carriedByCid === this.activeId) : null;
+    const carriedBox = (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.cashBoxes.find(b => b.carriedByCid === this.activeId) : null;
+    const carriedStatue = (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.statues.find(s => s.carriedByCid === this.activeId) : null;
     const carriedItem = carriedBox || carriedStatue;
     
     if (carriedItem) {
@@ -3317,7 +3676,53 @@ export class GameEngine {
           });
           continue;
         }
-        const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
+        if (g.kind === "boomerang") {
+      // cap simultaneous live boomerangs owned by this player at 3
+      const liveBoom = this.bullets.reduce(
+        (n, b) => n + (b.kind === "boomerang" && b.ownerId === this.activeId && (b.life ?? 0) > 0 ? 1 : 0),
+        0
+      );
+      if (liveBoom >= 3) continue;
+      const bsp = g.bulletSpeed * 1.2 * (0.92 + Math.random() * 0.12);
+      const outDist = g.range ?? 240;
+      this.bullets.push({
+        x: bx, y: by,
+        vx: Math.cos(base) * bsp, vy: Math.sin(base) * bsp,
+        life: g.life,
+        damage: dmg,
+        size: g.bulletSize ?? 11,
+        color: g.color, glow: g.glow,
+        pierce: 999, knockback: g.knockback ?? 0,
+        explosive: false, explosionRadius: 0,
+        kind: "boomerang",
+        hit: new Set(),
+        owner: this.player === this.foe ? "foe" : "self",
+        ownerId: this.activeId,
+        trail: false, ignoreWalls: true, weapon: g.id,
+        boomerang: true, outDist, returning: false, traveled: 0, boomSpeed: bsp,
+      });
+      continue;
+    }
+      if (g.kind === "knife") {
+        const kdmg = (this.knifeChargingActive ? Math.round(g.damage * 1.3) : g.damage) * this.character.damageMult * spinMult;
+        for (let k = 0; k < 2; k++) {
+          const ka = base + (k === 0 ? -0.035 : 0.035) + (Math.random() - 0.5) * g.spread;
+          const kx = p.x + Math.cos(ka) * (p.size + g.barrel);
+          const ky = p.y + Math.sin(ka) * (p.size + g.barrel);
+          const ksp = g.bulletSpeed * 1.2 * (0.92 + Math.random() * 0.12);
+          this.bullets.push({
+            x: kx, y: ky,
+            vx: Math.cos(ka) * ksp, vy: Math.sin(ka) * ksp,
+            life: g.life, damage: kdmg, size: g.bulletSize,
+            color: g.color, glow: g.glow, pierce: g.pierce, knockback: g.knockback,
+            explosive: false, explosionRadius: 0, kind: "knife",
+            hit: new Set(), owner: this.player === this.foe ? "foe" : "self",
+            ownerId: this.activeId, trail: true, weapon: g.id,
+          });
+        }
+        continue;
+      }
+    const sp = g.bulletSpeed * 1.2 * (0.92 + Math.random() * 0.12);
         this.bullets.push({
           x: bx,
           y: by,
@@ -3347,7 +3752,7 @@ export class GameEngine {
       }
       if (g.magazine !== undefined) ws.ammo -= 1;
     }
-    sound.shoot(g.id);
+    sound.shoot(g.id, p.x, p.y);
     this.spawnParticles(
       p.x + Math.cos(base) * (p.size + g.barrel),
       p.y + Math.sin(base) * (p.size + g.barrel),
@@ -3418,6 +3823,44 @@ export class GameEngine {
 
   // ------------------------------------------------------------- melee
   /** The human opponent of whoever is currently `this.player` (the melee attacker). */
+  /** Geometrically test whether a circle (cx, cy, r) intersects a 2D sector area wedge
+   *  centered at (px, py) with radius R, direction angle `dirAngle`, and sweep arc `arc`. */
+  private sectorIntersectsCircle(
+    px: number, py: number,
+    cx: number, cy: number, r: number,
+    R: number, dirAngle: number, arc: number,
+    pSize: number
+  ): boolean {
+    const dx = cx - px;
+    const dy = cy - py;
+    const distSq = dx * dx + dy * dy;
+    const maxDist = R + r;
+    if (distSq > maxDist * maxDist) return false;
+
+    const dist = Math.sqrt(distSq);
+    // 1. Point-blank / body touch check (if enemy overlaps player, always hit!)
+    if (dist <= r + pSize * 0.8) return true;
+
+    // 2. Sector interior angle test (center inside the wedge)
+    const centerAng = Math.atan2(dy, dx);
+    const diff = Math.abs(this.angleDiff(centerAng, dirAngle));
+    if (diff <= arc / 2) return true;
+
+    // 3. Boundary rays intersection test (distance from circle center to sector edge rays)
+    const halfArc = arc / 2;
+    const rayAngles = [dirAngle - halfArc, dirAngle + halfArc];
+    for (const a of rayAngles) {
+      const rx = Math.cos(a);
+      const ry = Math.sin(a);
+      const proj = dx * rx + dy * ry;
+      if (proj >= 0 && proj <= R) {
+        const perpDistSq = distSq - proj * proj;
+        if (perpDistSq <= r * r) return true;
+      }
+    }
+    return false;
+  }
+
   private meleeOpponent(): Player | null {
     if (this.isDM) {
       let best: Player | null = null;
@@ -3452,7 +3895,7 @@ export class GameEngine {
     const isWhip = !!g.whip;
     const isDual = g.id === "dual_blades";
     const slowOnHit = g.slowOnHit ?? 0;
-    sound.swing();
+    sound.swing(g.id);
     p.swingTimer = p.swingDur;
 
     // lightning whip: alternate the swing side left/right so it reads as a
@@ -3495,6 +3938,9 @@ export class GameEngine {
     }
 
     const dmgMult = isSpear ? 1 + p.comboStep * 0.35 : 1;
+    const hitRange = (range + p.size) * (isDual && p.comboStep === 5 ? 1.35 : 1.0);
+    const hitArc = Math.max(arc, 2.3);
+
     this.effects.push({
       type: isWhip ? "whip" : isSaber ? "saberswing" : isDual ? "dual_slash" : "slash",
       x: p.x,
@@ -3503,66 +3949,66 @@ export class GameEngine {
       arc: isWhip ? this.whipToggle ? 0.6 : -0.6 : arc,
       range: range * (isDual && p.comboStep === 5 ? 1.3 : 1.0),
       t: 0,
-      duration: isDual ? (p.comboStep === 5 ? 0.36 : 0.18) : isWhip ? 0.18 : isSaber ? 0.32 : 0.22,
+      duration: isWhip ? 0.08 : 0.12,
+      color: g.glow || g.color,
       radius: range * (isDual && p.comboStep === 5 ? 1.3 : 1.0),
-      color: g.glow,
-      style: isDual ? String(p.comboStep) : undefined,
-      dirX: isDual ? (this.whipToggle ? 1 : -1) : undefined,
     });
-    if (isDual && p.comboStep === 5 && !this.simulatingOther) {
-      this.shake = Math.min(20, this.shake + 14);
+
+    if (isSaber || g.id === "thrust_sword") {
+      this.meleeTrails.push({
+        x: p.x, y: p.y, angle: swingAngle, weapon: g.id,
+        life: 0.25, maxLife: 0.25, arc: isWhip ? (this.whipToggle ? 0.6 : -0.6) : arc, range: range * (isDual && p.comboStep === 5 ? 1.3 : 1.0)
+      });
     }
+
     for (const e of this.enemies) {
-      const dx = e.x - p.x;
-      const dy = e.y - p.y;
-      const d = Math.hypot(dx, dy);
-      if (d <= range + e.size) {
+      if (this.sectorIntersectsCircle(p.x, p.y, e.x, e.y, e.size, hitRange, swingAngle, hitArc, p.size)) {
+        const dx = e.x - p.x;
+        const dy = e.y - p.y;
         const ang = Math.atan2(dy, dx);
-        if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          this.damageEnemy(e, dmg * dmgMult, 0, 0, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
-          if (isSaber) {
-            e.electrifiedTime = 0.7;
-            e.electrifiedGlow = g.glow;
-          }
-          if (isWhip && slowOnHit > 0) {
-            e.slowT = Math.max(e.slowT, slowOnHit);
-          }
+        this.damageEnemy(e, dmg * dmgMult, 0, 0, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
+        if (isSaber) {
+          e.electrifiedTime = 0.7;
+          e.electrifiedGlow = g.glow;
+        }
+        if (isWhip && slowOnHit > 0) {
+          e.slowT = Math.max(e.slowT, slowOnHit);
         }
       }
     }
-    // player-vs-player melee (now that AI is gone)
+    // player-vs-player / bot melee
     const opp = this.meleeOpponent();
     if (opp && !(opp.deadTimer && opp.deadTimer > 0)) {
-      const dx = opp.x - p.x;
-      const dy = opp.y - p.y;
-      const d = Math.hypot(dx, dy);
-      if (d <= range + opp.size) {
-        const ang = Math.atan2(dy, dx);
-        if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          const kx = 0;
-          const ky = 0;
-          this.damagePlayerEntity(opp, dmg * dmgMult, undefined, kx, ky, this.activeId);
-          if (isSaber) {
-            opp.electrifiedTime = 0.7;
-            opp.electrifiedGlow = g.glow;
-          }
-          if (isWhip && slowOnHit > 0) {
-            opp.slowT = Math.max(opp.slowT ?? 0, slowOnHit);
-          }
+      if (this.sectorIntersectsCircle(p.x, p.y, opp.x, opp.y, opp.size, hitRange, swingAngle, hitArc, p.size)) {
+        this.damagePlayerEntity(opp, dmg * dmgMult, undefined, 0, 0, this.activeId, g.id);
+        if (isSaber) {
+          opp.electrifiedTime = 0.7;
+          opp.electrifiedGlow = g.glow;
         }
+        if (isWhip && slowOnHit > 0) {
+          opp.slowT = Math.max(opp.slowT ?? 0, slowOnHit);
+        }
+      }
+    }
+    // deployables (turrets / mines / stations) melee hit check
+    const candDeployables = this.queryGrid(p.x, p.y, hitRange + this.gridMaxR + 4)
+      .filter((it) => it.kind === "deployable");
+    for (const it of candDeployables) {
+      const d = it.ref as Deployable;
+      if (this.isTeammate(this.activeId, d.ownerId)) continue;
+      if (this.sectorIntersectsCircle(p.x, p.y, d.x, d.y, d.size, hitRange, swingAngle, hitArc, p.size)) {
+        this.damageDeployable(d, dmg * dmgMult, this.activeId);
       }
     }
     for (const w of this.walls) {
       if (!w.destructible) continue;
-      // buildings can only be struck by the 大锤 (hammer) in melee — all other
-      // melee weapons (sword/bat/spear/whip/etc.) deal no damage to buildings.
       if (w.building && g.id !== "hammer") continue;
       const cx = Math.max(w.x, Math.min(p.x, w.x + w.w));
       const cy = Math.max(w.y, Math.min(p.y, w.y + w.h));
       const d = Math.hypot(cx - p.x, cy - p.y);
-      if (d <= range) {
+      if (d <= hitRange) {
         const ang = Math.atan2(cy - p.y, cx - p.x);
-        if (Math.abs(this.angleDiff(ang, p.angle)) <= arc / 2) {
+        if (Math.abs(this.angleDiff(ang, p.angle)) <= hitArc / 2) {
           this.damageWall(w, g.id === "hammer" ? 40 : 16);
         }
       }
@@ -3603,7 +4049,19 @@ export class GameEngine {
       const d = Math.hypot(opp.x - p.x, opp.y - p.y);
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
-        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), undefined, 0, 0, this.activeId);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), undefined, 0, 0, this.activeId, g.id);
+      }
+    }
+    // deployable slam damage
+    const candDeployables = this.queryGrid(p.x, p.y, radius + this.gridMaxR + 4)
+      .filter((it) => it.kind === "deployable");
+    for (const it of candDeployables) {
+      const d = it.ref as Deployable;
+      if (this.isTeammate(this.activeId, d.ownerId)) continue;
+      const dist = Math.hypot(d.x - p.x, d.y - p.y);
+      if (dist <= radius + d.size) {
+        const fall = 1 - dist / (radius + d.size);
+        this.damageDeployable(d, dmg * (0.55 + fall * 0.5), this.activeId);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -3637,7 +4095,7 @@ export class GameEngine {
     p.thrustDashDmg = dmg;
     p.thrustHitIds = new Set();
     p.iframes = Math.max(p.iframes, 0.18);
-    sound.swing();
+    sound.swing(g.id);
     this.spawnParticles(p.x, p.y, g.glow, 14, 280, 0.4);
     this.effects.push({
       type: "slash",
@@ -3646,11 +4104,42 @@ export class GameEngine {
       angle: ang,
       arc: 0.5,
       range: g.chargeDashRange ?? 34,
-      t: 0,
       duration: 0.18,
       radius: g.chargeDashRange ?? 34,
       color: g.glow,
     });
+    this.effects.push({
+      type: "dash",
+      x: p.x,
+      y: p.y,
+      angle: ang,
+      arc: 0,
+      range: dist,
+      t: 0,
+      duration: 0.15,
+      radius: g.chargeDashRange ?? 34,
+    });
+    this.meleeTrails.push({
+      x: p.x, y: p.y, angle: ang, weapon: g.id,
+      life: 0.35, maxLife: 0.35, length: dist
+    });
+  }
+
+  /** Release the charged throw for the throwing knife (called on right-click up). */
+  private knifeRelease() {
+    const p = this.player;
+    const g = this.gun;
+    if (g.kind !== "knife") return;
+    if (!p.knifeCharging) return; // guard against double release
+    const charge = p.knifeCharge ?? 0;
+    p.knifeCharging = false;
+    p.knifeCharge = 0;
+    if (charge < (g.chargeMin ?? 0.15)) return; // not charged enough -> no throw
+    const ws = this.weaponStates.get(g.id);
+    if (!ws) return;
+    this.knifeChargingActive = true;
+    this.fireGun(ws);
+    this.knifeChargingActive = false;
   }
 
   /** Advance the thrust-sword dash each frame, hitting enemies along the path. */
@@ -3687,7 +4176,23 @@ export class GameEngine {
       const fwd = rx * ca + ry * sa;
       if (d <= range + opp.size && fwd > -range) {
         p.thrustHitIds?.add(opp.cid);
-        this.damagePlayerEntity(opp, dmg, undefined, ca * 240, sa * 240, this.activeId);
+        this.damagePlayerEntity(opp, dmg, undefined, ca * 240, sa * 240, this.activeId, g.id);
+      }
+    }
+    // deployable dash damage
+    const candDeployables = this.queryGrid(p.x, p.y, range + this.gridMaxR + 4)
+      .filter((it) => it.kind === "deployable");
+    for (const it of candDeployables) {
+      const d = it.ref as Deployable;
+      const dKey = -d.id - 1000;
+      if (p.thrustHitIds?.has(dKey) || this.isTeammate(this.activeId, d.ownerId)) continue;
+      const rx = d.x - p.x;
+      const ry = d.y - p.y;
+      const dist = Math.hypot(rx, ry);
+      const fwd = rx * ca + ry * sa;
+      if (dist <= range + d.size && fwd > -range) {
+        p.thrustHitIds?.add(dKey);
+        this.damageDeployable(d, dmg, this.activeId);
       }
     }
     this.spawnParticles(p.x, p.y, g.glow, 2, 140, 0.2);
@@ -3722,7 +4227,7 @@ export class GameEngine {
         if (Math.random() < 0.5)
           this.spawnParticles(hit.point.x, hit.point.y, g.glow, 1, 90, 0.2);
       } else if (hit.combatant) {
-        this.damagePlayerEntity(hit.combatant, g.damage * this.character.damageMult * dt, undefined, 0, 0, this.activeId);
+        this.damagePlayerEntity(hit.combatant, g.damage * this.character.damageMult * dt, undefined, 0, 0, this.activeId, g.id);
         if (Math.random() < 0.7)
           this.spawnParticles(hit.combatant.x, hit.combatant.y, g.glow, 2, 120, 0.22);
       } else if (hit.deployable) {
@@ -3839,8 +4344,8 @@ export class GameEngine {
           if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone || d <= e.size + this.player.size) {
             const fall = 1 - d / (range + e.size);
             this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0, false, { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) });
-            e.burnT = Math.max(e.burnT, 1.2);
-            e.burnDps = Math.max(e.burnDps, dps * 0.25);
+            e.burnT = Math.max(e.burnT, 1.5);
+            e.burnDps = Math.max(e.burnDps, dps * 0.45);
           }
         }
       }
@@ -3857,7 +4362,11 @@ export class GameEngine {
             const ang = Math.atan2(ddy, ddx);
             if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
               const fall = 1 - d / (range + q.size);
-              this.damagePlayerEntity(q, dps * dt * (0.4 + fall * 0.6), undefined, 0, 0, this.activeId);
+              this.damagePlayerEntity(q, dps * dt * (0.4 + fall * 0.6), undefined, 0, 0, this.activeId, g.id);
+              q.burnT = Math.max(q.burnT ?? 0, 1.5);
+              q.burnDps = Math.max(q.burnDps ?? 0, dps * 0.45);
+              q.burnOwnerId = this.activeId;
+              q.burnWeapon = g.id;
             }
           }
         }
@@ -3880,9 +4389,25 @@ export class GameEngine {
           size: 4 + Math.random() * 5,
           shrink: true,
         });
+
+        // High quality smoke clouds
+        if (this.quality === "high" && Math.random() > 0.5) {
+          const sa = this.player.angle + (Math.random() - 0.5) * cone * 4;
+          const ssp = range * (0.8 + Math.random() * 1.0);
+          this.particles.push({
+            x: ox,
+            y: oy,
+            vx: Math.cos(sa) * ssp,
+            vy: Math.sin(sa) * ssp,
+            life: 0.6 + Math.random() * 0.4,
+            maxLife: 1.0,
+            color: "rgba(80, 80, 80, 0.4)",
+            size: 10 + Math.random() * 10,
+          });
+        }
       }
       if (this.flameSndCd <= 0) {
-        sound.shoot("rocket");
+        sound.shoot("flamethrower");
         this.flameSndCd = 0.12;
       }
       // cone visual effect
@@ -3995,7 +4520,7 @@ export class GameEngine {
           knockback: 0,
           hit: new Set<number>(),
         });
-        sound.shoot();
+        sound.shoot("rpg", p.x, p.y);
         p.fireTimer = 1.0;
         this.gadgetCd.set(g.id, g.cooldown);
         this.clearGadgetSelection(); // Put it away after firing
@@ -4027,7 +4552,7 @@ export class GameEngine {
           explosionRadius: 0,
           stunDuration: g.ccDuration ?? 3.0 // special property we'll check on hit
         });
-        sound.shoot();
+        sound.shoot("stun_gun", p.x, p.y);
         p.fireTimer = 0.5;
         this.gadgetCd.set(g.id, g.cooldown);
         this.clearGadgetSelection(); // Put it away after firing
@@ -4056,6 +4581,8 @@ export class GameEngine {
         color: g.glow,
         dps,
         slow: 0.5,
+        ownerId: this.activeId,
+        weapon: g.id,
       });
       // directly ramp poison on enemies caught in the forward cone, so the
       // longer they linger the more damage they take (matches poison gas mine)
@@ -4084,7 +4611,7 @@ export class GameEngine {
           if (d <= range + q.size) {
             const ang = Math.atan2(ddy, ddx);
             if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
-              this.damagePlayerEntity(q, dps * dt * 0.5, undefined, 0, 0, this.activeId);
+              this.damagePlayerEntity(q, dps * dt * 0.5, undefined, 0, 0, this.activeId, g.id);
             }
           }
         }
@@ -4110,7 +4637,7 @@ export class GameEngine {
         });
       }
       if (this.flameSndCd <= 0) {
-        sound.shoot("rocket");
+        sound.shoot("flamethrower");
         this.flameSndCd = 0.14;
       }
     }
@@ -4143,7 +4670,7 @@ export class GameEngine {
     const dmgMult = minMult + (maxMult - minMult) * chargePct;
     const speedMult = 1 + chargePct * ((g.maxChargeSpeedMult ?? 2) - 1);
     const dmg = g.damage * dmgMult * this.character.damageMult;
-    const sp = g.bulletSpeed * speedMult;
+    const sp = g.bulletSpeed * speedMult * 1.2;
     const a = p.angle + (Math.random() - 0.5) * g.spread;
     const bx = p.x + Math.cos(a) * (p.size + g.barrel);
     const by = p.y + Math.sin(a) * (p.size + g.barrel);
@@ -4169,7 +4696,7 @@ export class GameEngine {
     // point-blank "swat": a crawler clinging to the face is behind the arrow's
     // spawn point too, so fire still hits it.
     this.swatPointBlank(dmg, g.knockback * dmgMult);
-    sound.shoot("sniper");
+    sound.shoot(g.id); // 弓的释放声（recurve_bow 专用音效）
     this.spawnParticles(bx, by, g.glow, 4, 120, 0.25);
     if (chargePct >= 0.85) {
       // shake only when player is hit
@@ -4381,7 +4908,7 @@ export class GameEngine {
       b.x += (b.driftX ?? 0) * dt;
       b.y += (b.driftY ?? 0) * dt;
       b.life -= dt;
-      if (b.trail && Math.random() < 0.7) {
+      if (this.quality !== "low" && b.trail && Math.random() < 0.7) {
         this.particles.push({
           x: b.x,
           y: b.y,
@@ -4396,12 +4923,37 @@ export class GameEngine {
       }
       let dead = b.life <= 0;
       if (
-        b.x < -40 ||
+        !b.boomerang &&
+        (b.x < -40 ||
         b.x > this.worldW + 40 ||
         b.y < -40 ||
-        b.y > this.worldH + 40
+        b.y > this.worldH + 40)
       )
         dead = true;
+
+      // ---- boomerang: 飞出后回旋归来，沿途留下火焰 ----
+      if (b.boomerang) {
+        const bs = b.boomSpeed ?? 500;
+        if (!b.returning) {
+          b.traveled = (b.traveled ?? 0) + bs * dt;
+          if ((b.traveled ?? 0) >= (b.outDist ?? 240)) {
+            b.returning = true;
+            b.hit.clear(); // 回程可再次命中同一目标
+          }
+        } else {
+          const o = this.ownerPos(b);
+          const ang = Math.atan2(o.y - b.y, o.x - b.x);
+          b.vx = Math.cos(ang) * bs;
+          b.vy = Math.sin(ang) * bs;
+          if (Math.hypot(o.x - b.x, o.y - b.y) < b.size + 22) dead = true; // 被主人接住
+        }
+        if (Math.random() < 0.85) {
+          this.particles.push({
+            x: b.x, y: b.y, vx: 0, vy: 0,
+            life: 0.22, maxLife: 0.22, color: b.glow, size: b.size * 1.3, shrink: true,
+          });
+        }
+      }
 
       // wall collision / bounce
       if (!dead && !b.ignoreWalls) {
@@ -4477,6 +5029,11 @@ export class GameEngine {
               { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) },
               b.ownerId
             );
+            if (b.weapon === "dragon_breath" || b.weapon === "flamethrower") {
+              e.burnT = Math.max(e.burnT, 1.5);
+              e.burnDps = Math.max(e.burnDps, b.damage * 2.5 * 0.45);
+              e.burnOwnerId = b.ownerId;
+            }
             if (b.pierce <= 0) {
               dead = true;
               break;
@@ -4505,7 +5062,7 @@ export class GameEngine {
             // parrying a bullet still costs 5% of its damage to the blademaster
             const selfDmg = b.damage * (q.bladeReflectSelf ?? 0.05);
             if (selfDmg > 0)
-              this.damagePlayerEntity(q, selfDmg, undefined, 0, 0, b.ownerId ?? 2);
+              this.damagePlayerEntity(q, selfDmg, undefined, 0, 0, b.ownerId ?? 2, b.weapon);
             // bounce the bullet back and re-own it to the reflector
             b.vx = -b.vx;
             b.vy = -b.vy;
@@ -4514,7 +5071,7 @@ export class GameEngine {
             b.reflected = true;
             b.hit.clear();
             this.spawnParticles(b.x, b.y, q.bladeReflectGlow ?? "#22d3ee", 6, 160, 0.25);
-            sound.swing();
+            sound.swing(this.gun.id);
             break;
           }
         }
@@ -4528,7 +5085,7 @@ export class GameEngine {
             .filter((it) => it.kind === "player")
             .sort((a, b2) => a.idx - b2.idx);
           for (const it of players) {
-            if (it.ownerId === oid) continue;
+            if (it.ownerId === oid || this.isTeammate(oid, it.ownerId)) continue;
             const q = it.ref as Player;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if (this.hitsPlayer(b, q)) {
@@ -4636,6 +5193,7 @@ export class GameEngine {
             dps: 90,
             tickT: 0,
             ownerId: gr.ownerId,
+            weapon: "fire_grenade",
           });
           this.spawnParticles(gr.x, gr.y, "#fb923c", 20, 200, 0.5);
         } else if (gr.kind === "poison") {
@@ -4652,8 +5210,27 @@ export class GameEngine {
             slow: 0.5,
             tickT: 0,
             ownerId: gr.ownerId,
+            weapon: "poison_grenade",
           });
           this.spawnParticles(gr.x, gr.y, "#84cc16", 20, 200, 0.5);
+        } else if (gr.kind === "cluster") {
+          this.explode(gr.x, gr.y, 40, 0, "#f97316", undefined, gr.ownerId);
+          for (let i = 0; i < 4; i++) {
+            const a = i * Math.PI / 2 + Math.random() * 0.5;
+            this.deployables.push({
+              kind: "mine_explosive",
+              x: gr.x + Math.cos(a) * 45,
+              y: gr.y + Math.sin(a) * 45,
+              angle: 0,
+              hp: 20, maxHp: 20,
+              life: 25, timer: 0, armed: 0.6,
+              radius: 48, size: 12,
+              color: "#f87171",
+              targets: [],
+              owner: "self", // Fallback, not strictly critical
+              ownerId: gr.ownerId,
+            });
+          }
         } else {
           this.explode(gr.x, gr.y, 120, 180, "#fb923c", undefined, gr.ownerId);
         }
@@ -4667,7 +5244,7 @@ export class GameEngine {
   private gadgetRange(def: GadgetDef): number {
     if (def.range) return def.range;
     const k = def.kind;
-    if (k === "glue_grenade" || k === "fire_grenade" || k === "poison_grenade")
+    if (k === "glue_grenade" || k === "fire_grenade" || k === "poison_grenade" || k === "cluster_grenade")
       return GADGET_THROW_DIST;
     return GADGET_DEPLOY_DIST;
   }
@@ -4770,6 +5347,15 @@ export class GameEngine {
           timer: 1.2,
           size: 18,
         });
+      case "turret_sniper":
+        this.deployables.push({
+          ...base,
+          hp: def.hp ?? 120,
+          maxHp: def.hp ?? 120,
+          life: Infinity,
+          radius: 400,
+          timer: 2.5,
+        });
         break;
       case "mine_explosive":
         this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 56, armed: 0.8 });
@@ -4779,6 +5365,9 @@ export class GameEngine {
         break;
       case "mine_fire":
         this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 70, armed: 0.8 });
+        break;
+      case "mine_stun":
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 65, armed: 0.8 });
         break;
       case "glue_grenade": {
         // throw a grenade that lands and forms a glue wall
@@ -4821,6 +5410,20 @@ export class GameEngine {
           life: sim.fuse,
           fuse: sim.fuse,
           kind: "poison",
+          ownerId: this.activeId,
+        });
+        break;
+      }
+      case "cluster_grenade": {
+        const sim = this.simulateThrow(p.x, p.y, px, py);
+        this.grenades.push({
+          x: p.x,
+          y: p.y,
+          vx: sim.vx,
+          vy: sim.vy,
+          life: sim.fuse,
+          fuse: sim.fuse,
+          kind: "cluster",
           ownerId: this.activeId,
         });
         break;
@@ -4873,7 +5476,7 @@ export class GameEngine {
       d.life -= dt;
       d.armed -= dt;
       // find nearest enemy in range for turrets
-      if (d.kind === "turret_mg" || d.kind === "turret_cannon") {
+      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
         d.timer -= dt;
         let target: { x: number; y: number } | null = null;
         let bestD = d.radius;
@@ -4941,6 +5544,30 @@ export class GameEngine {
                 weapon: "turret_mg",
               });
               this.spawnParticles(d.x + Math.cos(d.angle) * 14, d.y + Math.sin(d.angle) * 14, d.color, 2, 80, 0.15);
+            } else if (d.kind === "turret_sniper") {
+              d.timer = 2.5;
+              const sp = 2000;
+              this.bullets.push({
+                x: d.x + Math.cos(d.angle) * 16,
+                y: d.y + Math.sin(d.angle) * 16,
+                vx: Math.cos(d.angle) * sp,
+                vy: Math.sin(d.angle) * sp,
+                life: 1.0,
+                damage: 180,
+                size: 7,
+                color: "#fecdd3",
+                glow: d.color,
+                pierce: 99,
+                knockback: 100,
+                explosive: false,
+                explosionRadius: 0,
+                kind: "tracer",
+                hit: new Set(),
+                owner: d.owner,
+                ownerId: d.ownerId,
+                weapon: "turret_sniper",
+              });
+              this.spawnParticles(d.x + Math.cos(d.angle) * 16, d.y + Math.sin(d.angle) * 16, d.color, 4, 150, 0.2);
             } else {
               // cannon: lob an AOE bomb
               d.timer = 1.1;
@@ -4996,7 +5623,7 @@ export class GameEngine {
         continue;
       }
       // mines
-      if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
+      if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire" || d.kind === "mine_stun") {
         // a mine destroyed by gunfire / explosions also goes off (triggered)
         let triggered = d.hp <= 0;
         if (d.armed <= 0) {
@@ -5032,7 +5659,25 @@ export class GameEngine {
               dps: 60,
               slow: 0.5,
               tickT: 0,
+              ownerId: d.ownerId,
+              weapon: "mine_poison",
             });
+          } else if (d.kind === "mine_stun") {
+            this.spawnParticles(d.x, d.y, "#fde047", 30, 250, 0.5);
+            const r = d.radius;
+            for (const e of this.enemies) {
+              if (Math.hypot(e.x - d.x, e.y - d.y) < r + e.size) e.ccTimer = 3.5;
+            }
+            if (this.isDM) {
+              for (const c of this.combatants) {
+                if (c.id === (d.ownerId ?? -1)) continue;
+                const q = c.player;
+                if (Math.hypot(q.x - d.x, q.y - d.y) < r + q.size) q.ccTimer = 3.5;
+              }
+            } else if (this.mode !== "local" && d.owner) {
+              const foe = d.owner === "foe" ? this.player : this.foe;
+              if (foe && Math.hypot(foe.x - d.x, foe.y - d.y) < r + foe.size) foe.ccTimer = 3.5;
+            }
           } else {
             this.effects.push({
               type: "firefield",
@@ -5044,6 +5689,8 @@ export class GameEngine {
               color: d.color,
               dps: 90,
               tickT: 0,
+              ownerId: d.ownerId,
+              weapon: "mine_fire",
             });
           }
           d.life = 0;
@@ -5359,8 +6006,8 @@ export class GameEngine {
               e.slowT = Math.max(e.slowT, 0.3);
             } else {
               this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true, undefined, fx.ownerId);
-              e.burnT = Math.max(e.burnT, 1);
-              e.burnDps = Math.max(e.burnDps, 20);
+              e.burnT = Math.max(e.burnT, 1.5);
+              e.burnDps = Math.max(e.burnDps, (fx.dps ?? 20) * 0.45);
               e.burnOwnerId = fx.ownerId;
             }
           }
@@ -5372,7 +6019,13 @@ export class GameEngine {
             if (q.deadTimer && q.deadTimer > 0) continue;
             if ((q.x - fx.x) ** 2 + (q.y - fx.y) ** 2 < (fx.radius + q.size) ** 2) {
               // pass the effect ownerId (if any) so kills are properly credited
-              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, undefined, 0, 0, fx.ownerId ?? -1);
+              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, undefined, 0, 0, fx.ownerId ?? -1, fx.weapon);
+              if (fx.type === "firefield") {
+                q.burnT = Math.max(q.burnT ?? 0, 1.5);
+                q.burnDps = Math.max(q.burnDps ?? 0, (fx.dps ?? 80) * 0.45);
+                q.burnOwnerId = fx.ownerId;
+                q.burnWeapon = fx.weapon;
+              }
             }
           }
         }
@@ -5395,11 +6048,12 @@ export class GameEngine {
     e.hp -= dmg;
     // score reflects the ACTUAL damage dealt (overkill is capped to remaining hp)
     const dealt = before - Math.max(e.hp, 0);
-    const finalAttackerId = attackerId !== undefined ? attackerId : (this.activeId ?? 0);
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = (attackerId !== undefined && attackerId >= 0) ? attackerId : (this.activeId ?? localId);
+    const isLocalAttacker = finalAttackerId === localId;
+
     if (dealt > 0) {
       this.awardDamageScore(finalAttackerId, dealt);
-      const isLocalAttacker = (this.mode === "local" && finalAttackerId === 0) ||
-                              (this.mode !== "local" && finalAttackerId === this.selfPid);
       if (isLocalAttacker) {
         this.playerDamageDealt += dealt;
         this.recordDamageLog(
@@ -5414,7 +6068,9 @@ export class GameEngine {
 
     if (!silent) e.hitFlash = 1;
     if (!silent && this.hitSndCd <= 0) {
-      sound.hit();
+      // 本地玩家命中敌人：清脆的提示音；其余情况用通用受击声
+      if (isLocalAttacker) sound.hitConfirm();
+      else sound.hit();
       this.hitSndCd = 0.04;
     }
     const kbScale = 0.045 / (e.type === "boss" ? 6 : 1);
@@ -5507,40 +6163,48 @@ export class GameEngine {
   }
 
   private killEnemy(e: Enemy, attackerId?: number) {
-    this.score += e.score;
-    this.kills += 1;
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = (attackerId !== undefined && attackerId >= 0) ? attackerId : localId;
+    const isLocal = finalAttackerId === localId;
+
+    const killerC = this.combatants.find(c => c.id === finalAttackerId);
+    if (killerC) {
+      killerC.kills += 1;
+      killerC.score += e.score;
+    }
+
+    if (isLocal) {
+      this.score += e.score;
+      this.kills += 1;
+    }
 
     // Determine killer identity
     let killerName = "未知";
-    let isLocal = false;
-    let killerC: Combatant | undefined;
-
-    if (attackerId !== undefined) {
-      isLocal = (this.mode === "local" && attackerId === 0) ||
-                (this.mode !== "local" && attackerId === this.selfPid);
-
-      if (isLocal) {
-        killerName = "你";
-      } else if (attackerId === this.peerPid) {
-        killerName = this.peerName || "队友";
-      } else {
-        killerC = this.combatants.find(c => c.id === attackerId);
-        if (killerC) {
-          killerC.kills += 1;
-          killerName = killerC.name;
-        }
-      }
+    if (isLocal) {
+      killerName = "你";
+    } else if (finalAttackerId === this.peerPid) {
+      killerName = this.peerName || "队友";
+    } else if (killerC) {
+      killerName = killerC.name;
     } else {
-      const active = this.activeId ?? 0;
-      isLocal = (this.mode === "local" && active === 0) ||
-                (this.mode !== "local" && active === this.selfPid);
-      killerName = isLocal ? "你" : (this.peerName || "队友");
+      killerName = "队友";
     }
 
     const victimName = e.name || (e.type === "monster" ? "怪物" : "敌人");
 
     // Add to kill feed
     this.addKillFeed(killerName, victimName, e.lastSrc?.weapon, killerC);
+    // mirror to clients (co-op AI kill)
+    this.pushFeedEvent({
+      kind: "kill",
+      pid: finalAttackerId,
+      victimPid: -1,
+      killerName: killerC?.name,
+      victimName,
+      weaponId: e.lastSrc?.weapon,
+      amount: e.score,
+      kills: killerC?.kills,
+    });
 
     // Trigger local score feedback & banner if the local player is the killer
     if (isLocal) {
@@ -5736,6 +6400,19 @@ export class GameEngine {
     return (p.x - b.x) ** 2 + (p.y - b.y) ** 2 <= rr * rr;
   }
 
+  /** Helper to check if two combatant IDs are on the same team (no friendly fire in team modes) */
+  private isTeammate(cid1: number | undefined, cid2: number | undefined): boolean {
+    if (cid1 === undefined || cid2 === undefined || cid1 < 0 || cid2 < 0) return false;
+    if (cid1 === cid2) return true; // Self is always on same team
+    if (this.gameMode !== "team_deathmatch" && this.gameMode !== "cashout" && this.gameMode !== "cashout_5v5") return false;
+    const c1 = this.combatants.find((c) => c.id === cid1);
+    const c2 = this.combatants.find((c) => c.id === cid2);
+    if (c1 && c2 && c1.teamId !== undefined && c2.teamId !== undefined) {
+      return c1.teamId === c2.teamId;
+    }
+    return false;
+  }
+
   /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
   private damagePlayerEntity(
     p: Player,
@@ -5743,24 +6420,20 @@ export class GameEngine {
     _b?: Bullet,
     knockX = 0,
     knockY = 0,
-    attackerId?: number
+    attackerId?: number,
+    weaponHint?: string
   ) {
     // already downed and waiting to respawn -> ignore further hits
     if (p.deadTimer && p.deadTimer > 0) return;
 
-    // team deathmatch: teammates must not be able to damage each other
-    // (no friendly fire). Resolve both teams via the combatant roster so we
-    // don't depend on Player carrying its own teamId.
-    if (this.gameMode === "team_deathmatch" && attackerId !== undefined) {
-      const victim = this.combatants.find((c) => c.id === (p.cid ?? -1));
-      const atk = this.combatants.find((c) => c.id === attackerId);
-      if (
-        victim && atk &&
-        victim.teamId !== undefined && atk.teamId !== undefined &&
-        victim.teamId === atk.teamId
-      ) {
-        return;
-      }
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = (attackerId !== undefined && attackerId >= 0) ? attackerId : (this.activeId ?? localId);
+    const victimC = this.combatants.find(c => c.player === p || (p.cid !== undefined && c.id === p.cid));
+    const victimCid = victimC ? victimC.id : (p.cid ?? -1);
+
+    // Block friendly fire in all team modes (team_deathmatch, cashout, etc.)
+    if (this.isTeammate(finalAttackerId, victimCid) && finalAttackerId !== victimCid) {
+      return;
     }
 
     // 冲撞 (charge_slam) 进行中：所受伤害降低 35%
@@ -5781,13 +6454,13 @@ export class GameEngine {
         p.shieldHp = 0;
         p.shieldBlockTime = 0;
         p.shieldCd = this.gun.shieldRechargeTime ?? 8;
-        const isLocalVictimShield = (p === this.localPlayer) || (p.cid !== undefined && ((this.mode === "local" && p.cid === 0) || (this.mode !== "local" && p.cid === this.selfPid)));
+        const isLocalVictimShield = (p === this.localPlayer) || (p.cid !== undefined && p.cid === localId);
         if (isLocalVictimShield) this.shake = 12;
         sound.explosion();
       }
       // Track score for shield damage (actual absorbed damage)
       const shieldDiff = prevShield - p.shieldHp;
-      this.awardDamageScore(attackerId, shieldDiff);
+      this.awardDamageScore(finalAttackerId, shieldDiff);
       return;
     }
     p.hp -= dmg;
@@ -5805,7 +6478,7 @@ export class GameEngine {
     p.lastHitTime = this.time;
     sound.hurt();
     // Only shake screen when the LOCAL player is hit
-    const isLocalVictim = (p === this.localPlayer) || (p.cid !== undefined && ((this.mode === "local" && p.cid === 0) || (this.mode !== "local" && p.cid === this.selfPid)));
+    const isLocalVictim = (p === this.localPlayer) || (p.cid !== undefined && p.cid === localId);
     if (isLocalVictim) {
       this.shake = Math.min(16, this.shake + dmg * 0.4);
     }
@@ -5818,22 +6491,21 @@ export class GameEngine {
 
     // Track score for health damage (actual damage dealt)
     const hpDiff = prevHp - p.hp;
-    this.awardDamageScore(attackerId, hpDiff);
+    this.awardDamageScore(finalAttackerId, hpDiff);
 
-    const victimC = this.combatants.find(c => c.player === p || c.id === p.cid);
-    const attackerC = this.combatants.find(c => c.id === attackerId);
+    const attackerC = this.combatants.find(c => c.id === finalAttackerId);
 
     if (victimC) victimC.damageTaken = (victimC.damageTaken ?? 0) + hpDiff;
     if (attackerC) attackerC.damageDealt = (attackerC.damageDealt ?? 0) + hpDiff;
 
-    const isLocalAttacker = (this.mode === "local" && attackerId === 0) || (this.mode !== "local" && attackerId === this.selfPid);
+    const isLocalAttacker = finalAttackerId === localId;
 
     if (hpDiff > 0) {
       if (isLocalAttacker && !isLocalVictim) {
         this.playerDamageDealt += hpDiff;
         this.recordDamageLog(
           hpDiff,
-          this.gun.id,
+          _b?.weapon || weaponHint || this.gun.id,
           victimC ? victimC.name : "对手",
           "你",
           true
@@ -5842,7 +6514,7 @@ export class GameEngine {
         this.playerDamageTaken += hpDiff;
         this.recordDamageLog(
           hpDiff,
-          "combatant_attack",
+          _b?.weapon || weaponHint || this.getAttackerWeaponId(attackerC) || "combatant_attack",
           "你",
           attackerC ? attackerC.name : "对手",
           false
@@ -5857,16 +6529,13 @@ export class GameEngine {
       if (victimC) victimC.deaths = (victimC.deaths ?? 0) + 1;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
       
-      const isLocal = (this.mode === "local" && p.cid === 0) ||
-                      (this.mode !== "local" && p.cid === this.selfPid);
-      if (isLocal) {
+      if (isLocalVictim) {
         this.playerDeaths++;
         this.eliminatedBy = attackerC ? attackerC.name : "对手";
         sound.playDeath();
       }
 
-
-      if (this.gameMode === "cashout") {
+      if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
         const c = this.combatants.find(comb => comb.id === p.cid);
         if (c) {
           c.player.deadTimer = 20;
@@ -5889,10 +6558,7 @@ export class GameEngine {
 
       // coin burst on every non-biohazard enemy death (deathmatch bots / PvP foe)
       if (this.gameMode !== "biohazard") {
-        const killer =
-          attackerId !== undefined && attackerId >= 0
-            ? this.combatants.find((c) => c.id === attackerId)?.player ?? null
-            : null;
+        const killer = attackerC ? attackerC.player : null;
         const kdx = killer ? p.x - killer.x : 0;
         const kdy = killer ? p.y - killer.y : 0;
         this.spawnCoinBurstFX(p.x, p.y, p.size, false, true, "", kdx, kdy);
@@ -5904,33 +6570,39 @@ export class GameEngine {
         this.flameActive = false;
       }
       if (this.isDM) {
-        const victim =
-          this.combatants.find((c) => c.id === (p.cid ?? 0)) ?? null;
-        const killer =
-          attackerId !== undefined && attackerId >= 0
-            ? this.combatants.find((c) => c.id === attackerId) ?? undefined
-            : undefined;
+        const victim = victimC ?? (this.combatants.find((c) => c.id === (p.cid ?? 0)) ?? null);
+        const killer = attackerC ?? (this.combatants.find((c) => c.id === finalAttackerId) ?? undefined);
         if (killer && victim && killer.id !== victim.id) {
           killer.kills += 1;
           killer.score += 250;
-          if (this.gameMode === "cashout") {
+          if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && killer.teamId !== undefined) {
             this.teamCash[killer.teamId] += 500;
           }
-          const kName = killer.id === this.selfPid ? "你" : killer.name;
-          const vName = victim.id === this.selfPid ? "你" : victim.name;
+          const kName = killer.id === localId ? "你" : killer.name;
+          const vName = victim.id === localId ? "你" : victim.name;
           
-          this.addKillFeed(kName, vName, _b?.weapon, killer);
-          if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
+          this.addKillFeed(kName, vName, _b?.weapon || weaponHint, killer);
+          // mirror to clients (deathmatch PvP/bot kill)
+          this.pushFeedEvent({
+            kind: "kill",
+            pid: killer.id,
+            victimPid: victim.id,
+            killerName: killer.name,
+            victimName: victim.name,
+            weaponId: _b?.weapon || weaponHint,
+            amount: 250,
+            kills: killer.kills,
+          });
+          if (killer.id === localId) {
+            this.kills += 1;
+            this.score += 250;
             this.addScoreFeed("淘汰", 250, vName, 250, killer.kills);
-            if (this.gameMode === "cashout") {
+            if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
               this.addScoreFeed("淘汰赏金", 500); // UI feedback for the cash
             }
             sound.playKillConfirm();
-          }
-
-          if (killer.id === this.selfPid || (this.mode === "local" && killer.id === 0)) {
             this.banner = { text: `击杀 ${vName}！`, t: 1.6 };
-          } else if (victim.id === this.selfPid || (this.mode === "local" && victim.id === 0)) {
+          } else if (victim.id === localId) {
             this.banner = { text: `你被 ${kName} 击败！`, t: 1.6 };
           }
 
@@ -5938,7 +6610,7 @@ export class GameEngine {
           if (this.gameMode === "team_deathmatch" && killer.teamId !== undefined) {
              teamKills = this.combatants.filter(c => c.teamId === killer.teamId).reduce((sum, c) => sum + c.kills, 0);
           }
-          if (teamKills >= this.dmKillLimit && !this.gameOver) {
+          if (teamKills >= this.dmKillLimit && !this.gameOver && this.gameMode !== "cashout" && this.gameMode !== "cashout_5v5") {
              if (this.gameMode === "team_deathmatch") {
                  const isMyTeam = (killer.teamId === 0);
                  this.endGame(isMyTeam ? "胜利！你的队伍赢得了比赛！" : "失败！其他队伍率先达到了目标！");
@@ -5953,8 +6625,18 @@ export class GameEngine {
         // you downed the opponent
         this.kills += 1;
         this.score += 250;
-        this.addKillFeed("你", this.peerName || "对手", _b?.weapon);
+        this.addKillFeed("你", this.peerName || "对手", _b?.weapon || weaponHint);
         this.addScoreFeed("淘汰", 250, this.peerName || "对手", 250, this.kills);
+        // mirror to the guest (host downed the opponent in base-battle PvP)
+        this.pushFeedEvent({
+          kind: "kill",
+          pid: this.selfPid,
+          victimPid: this.peerPid,
+          victimName: this.peerName || "对手",
+          weaponId: _b?.weapon || weaponHint,
+          amount: 250,
+          kills: this.kills,
+        });
         this.banner = { text: `击杀 ${this.peerName || "对手"}！`, t: 1.6 };
         sound.playKillConfirm();
       } else {
@@ -5963,7 +6645,91 @@ export class GameEngine {
     }
   }
 
-  /** Count down downed avatars and revive them after RESPAWN_TIME. */
+  /** Generate well-distributed spawn points across the entire map, avoiding building walls. */
+  private generateDistributedSpawns(): { x: number; y: number }[] {
+    const spawns: { x: number; y: number }[] = [];
+    const marginX = Math.min(240, this.worldW * 0.1);
+    const marginY = Math.min(160, this.worldH * 0.14);
+    const useW = this.worldW - marginX * 2;
+    const useH = this.worldH - marginY * 2;
+
+    const cols = 5;
+    const rows = 4;
+    const stepX = useW / (cols - 1);
+    const stepY = useH / (rows - 1);
+
+    const isInsideBuilding = (x: number, y: number) => {
+      for (const w of this.walls) {
+        if (w.invisible) continue;
+        if (x >= w.x - 30 && x <= w.x + w.w + 30 && y >= w.y - 30 && y <= w.y + w.h + 30) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let x = marginX + c * stepX + Math.sin(r * 2.5 + c * 3.7) * 35;
+        let y = marginY + r * stepY + Math.cos(r * 4.1 + c * 1.9) * 25;
+
+        x = Math.max(100, Math.min(this.worldW - 100, x));
+        y = Math.max(80, Math.min(this.worldH - 80, y));
+
+        if (isInsideBuilding(x, y)) {
+          x += 50;
+          y += 50;
+        }
+        spawns.push({ x: Math.round(x), y: Math.round(y) });
+      }
+    }
+    return spawns;
+  }
+
+  /** Pick the safest spawn point from dmSpawns that is furthest from active enemies. */
+  private getSafestSpawnPoint(teamId?: number, selfCid?: number): { x: number; y: number } {
+    if (!this.dmSpawns || this.dmSpawns.length === 0) {
+      this.dmSpawns = this.generateDistributedSpawns();
+    }
+    const pool = this.dmSpawns;
+
+    // Collect positions of living enemies
+    const enemyPositions: { x: number; y: number }[] = [];
+    if (this.isDM) {
+      for (const c of this.combatants) {
+        if (c.id === selfCid) continue;
+        if (teamId !== undefined && c.teamId === teamId) continue;
+        const q = c.player;
+        if (q && (!q.deadTimer || q.deadTimer <= 0)) {
+          enemyPositions.push({ x: q.x, y: q.y });
+        }
+      }
+    } else if (this.foe && (!this.foe.deadTimer || this.foe.deadTimer <= 0)) {
+      enemyPositions.push({ x: this.foe.x, y: this.foe.y });
+    }
+
+    if (enemyPositions.length === 0) {
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    let bestSpawn = pool[0];
+    let maxMinDistSq = -1;
+
+    for (const sp of pool) {
+      let minDistSq = Infinity;
+      for (const ep of enemyPositions) {
+        const d2 = (sp.x - ep.x) ** 2 + (sp.y - ep.y) ** 2;
+        if (d2 < minDistSq) minDistSq = d2;
+      }
+      if (minDistSq > maxMinDistSq) {
+        maxMinDistSq = minDistSq;
+        bestSpawn = sp;
+      }
+    }
+
+    return bestSpawn;
+  }
+
   /** Pick a random respawn point for the PvE foe that is well away from the
    *  player, so it doesn't keep coming back at the same center-top spot and
    *  face-hug the player. Uses squared distance for the min-distance check. */
@@ -5995,12 +6761,8 @@ export class GameEngine {
           this.reviveIfReady(p, p.x, p.y, dt, c.guns, c.weaponStates);
           continue;
         }
-        // Fully random respawn mode: pick any DM spawn point at random (the
-        // player may even come back near an enemy — that's the intent).
-        const pool = this.dmSpawns;
-        const sp = pool.length
-          ? pool[Math.floor(Math.random() * pool.length)]
-          : { x: this.worldW / 2, y: this.worldH / 2 };
+        // Dynamically select the safest spawn point furthest from active enemies
+        const sp = this.getSafestSpawnPoint(c.teamId, c.id);
         this.reviveIfReady(p, sp.x, sp.y, dt, c.guns, c.weaponStates);
       }
       return;
@@ -6038,7 +6800,7 @@ export class GameEngine {
       // cashout mode: a downed player leaves a revive statue. If they come
       // back via the auto-respawn timer (no teammate revive), the statue must
       // be removed too — otherwise it lingers forever at the death spot.
-      if (this.gameMode === "cashout" && p.cid !== undefined) {
+      if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && p.cid !== undefined) {
         this.statues = this.statues.filter((s) => s.deadCid !== p.cid);
       }
       p.x = spawnX;
@@ -6239,6 +7001,7 @@ export class GameEngine {
       this.firing = false;
       const intent = this.botThink(c, dt);
       c.aiTimer = this.aiStep;
+      this.botAimFire(c, dt);
       c.aiMvx = this.virtualMove.x;
       c.aiMvy = this.virtualMove.y;
       this.updatePlayer(dt);
@@ -6314,9 +7077,151 @@ export class GameEngine {
     if (g.weaponClass === "flamethrower") return g.flameRange ?? 260;
     if (g.weaponClass === "poison_mist") return 320;
     if (g.weaponClass === "melee" || g.weaponClass === "shield")
-      return (g.meleeRange ?? 64) + 12;
-    // bow / ranged: travel = speed * lifetime
-    return (g.bulletSpeed ?? 700) * (g.life ?? 1);
+      return (g.meleeRange ?? 64) + 24;
+    return Math.max(1000, (g.bulletSpeed ?? 700) * (g.life ?? 1.5));
+  }
+
+  /** Simple & fast A* pathfinding for bot navigation around obstacles */
+  private findBotPath(startX: number, startY: number, targetX: number, targetY: number, pSize = 24): { x: number; y: number } {
+    if (this.botLOS(startX, startY, targetX, targetY)) {
+      const ang = Math.atan2(targetY - startY, targetX - startX);
+      return { x: Math.cos(ang), y: Math.sin(ang) };
+    }
+
+    const CELL = 60;
+    const cols = Math.ceil(this.worldW / CELL);
+    const rows = Math.ceil(this.worldH / CELL);
+
+    const startCol = Math.max(0, Math.min(cols - 1, Math.floor(startX / CELL)));
+    const startRow = Math.max(0, Math.min(rows - 1, Math.floor(startY / CELL)));
+    const targetCol = Math.max(0, Math.min(cols - 1, Math.floor(targetX / CELL)));
+    const targetRow = Math.max(0, Math.min(rows - 1, Math.floor(targetY / CELL)));
+
+    if (startCol === targetCol && startRow === targetRow) {
+      const ang = Math.atan2(targetY - startY, targetX - startX);
+      return { x: Math.cos(ang), y: Math.sin(ang) };
+    }
+
+    const isCellBlocked = (c: number, r: number): boolean => {
+      if (c < 0 || c >= cols || r < 0 || r >= rows) return true;
+      const cx = (c + 0.5) * CELL;
+      const cy = (r + 0.5) * CELL;
+      return this.pointInWall(cx, cy, pSize + 10);
+    };
+
+    const totalCells = cols * rows;
+    const openSet: number[] = [];
+    const gScore = new Float32Array(totalCells).fill(Infinity);
+    const fScore = new Float32Array(totalCells).fill(Infinity);
+    const cameFrom = new Int32Array(totalCells).fill(-1);
+    const inOpen = new Uint8Array(totalCells);
+
+    const startIdx = startRow * cols + startCol;
+    const targetIdx = targetRow * cols + targetCol;
+
+    gScore[startIdx] = 0;
+    fScore[startIdx] = Math.hypot(startCol - targetCol, startRow - targetRow);
+    openSet.push(startIdx);
+    inOpen[startIdx] = 1;
+
+    let steps = 0;
+    const maxSteps = 250;
+
+    while (openSet.length > 0 && steps++ < maxSteps) {
+      let bestIdx = 0;
+      let minF = fScore[openSet[0]];
+      for (let i = 1; i < openSet.length; i++) {
+        if (fScore[openSet[i]] < minF) {
+          minF = fScore[openSet[i]];
+          bestIdx = i;
+        }
+      }
+
+      const current = openSet[bestIdx];
+      if (current === targetIdx) break;
+
+      openSet[bestIdx] = openSet[openSet.length - 1];
+      openSet.pop();
+      inOpen[current] = 0;
+
+      const curR = Math.floor(current / cols);
+      const curC = current % cols;
+
+      const neighbors = [
+        [curC + 1, curR, 1], [curC - 1, curR, 1],
+        [curC, curR + 1, 1], [curC, curR - 1, 1],
+        [curC + 1, curR + 1, 1.414], [curC - 1, curR + 1, 1.414],
+        [curC + 1, curR - 1, 1.414], [curC - 1, curR - 1, 1.414]
+      ];
+
+      for (const [nc, nr, dist] of neighbors) {
+        if (isCellBlocked(nc, nr)) continue;
+        const nIdx = nr * cols + nc;
+        const tentativeG = gScore[current] + dist;
+
+        if (tentativeG < gScore[nIdx]) {
+          cameFrom[nIdx] = current;
+          gScore[nIdx] = tentativeG;
+          fScore[nIdx] = tentativeG + Math.hypot(nc - targetCol, nr - targetRow);
+          if (!inOpen[nIdx]) {
+            openSet.push(nIdx);
+            inOpen[nIdx] = 1;
+          }
+        }
+      }
+    }
+
+    let curr = targetIdx;
+    if (cameFrom[curr] === -1 && curr !== startIdx) {
+      let closestIdx = startIdx;
+      let minH = Infinity;
+      for (let i = 0; i < totalCells; i++) {
+        if (gScore[i] < Infinity && fScore[i] < minH) {
+          minH = fScore[i];
+          closestIdx = i;
+        }
+      }
+      curr = closestIdx;
+    }
+
+    if (curr === startIdx) {
+      const ang = Math.atan2(targetY - startY, targetX - startX);
+      return { x: Math.cos(ang), y: Math.sin(ang) };
+    }
+
+    while (cameFrom[curr] !== -1 && cameFrom[curr] !== startIdx) {
+      curr = cameFrom[curr];
+    }
+
+    const wayR = Math.floor(curr / cols);
+    const wayC = curr % cols;
+    const wayX = (wayC + 0.5) * CELL;
+    const wayY = (wayR + 0.5) * CELL;
+
+    const ang = Math.atan2(wayY - startY, wayX - startX);
+    return { x: Math.cos(ang), y: Math.sin(ang) };
+  }
+
+  /** Wall avoidance helper to steer bot velocity vector away from obstacle collisions */
+  private botAvoidWalls(p: Player, vx: number, vy: number): { x: number; y: number } {
+    if (vx === 0 && vy === 0) return { x: 0, y: 0 };
+    const speed = Math.hypot(vx, vy);
+    const ang = Math.atan2(vy, vx);
+    const checkDist = p.size + 36;
+    const tx = p.x + Math.cos(ang) * checkDist;
+    const ty = p.y + Math.sin(ang) * checkDist;
+    if (!this.pointInWall(tx, ty, p.size)) {
+      return { x: vx, y: vy };
+    }
+    const angles = [ang + Math.PI / 4, ang - Math.PI / 4, ang + Math.PI / 2, ang - Math.PI / 2];
+    for (const a of angles) {
+      const cx = p.x + Math.cos(a) * checkDist;
+      const cy = p.y + Math.sin(a) * checkDist;
+      if (!this.pointInWall(cx, cy, p.size)) {
+        return { x: Math.cos(a) * speed, y: Math.sin(a) * speed };
+      }
+    }
+    return { x: vx, y: vy };
   }
 
   /** Bot decision-making: pick a target, lead-aim, pick the best weapon for the
@@ -6331,25 +7236,82 @@ export class GameEngine {
       weaponSwitch: boolean; skill: boolean; reload: boolean; gadget: number;
       gadgetX?: number; gadgetY?: number;
     };
-    // pick the nearest living opponent (ignore teammates in Cashout mode)
+    // 1. Pick the nearest living opponent player or AI bot
     let target: Player | null = null;
     let bestD = Infinity;
     for (const o of this.combatants) {
-      if (o.id === c.id) continue;
-      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
+      if (o.id === c.id || this.isTeammate(c.id, o.id)) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
-      if (q.isCloaked) continue; // 隐身玩家对 AI 不可见，跳过作为目标
+      if (q.isCloaked) continue;
       const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
       if (d < bestD) { bestD = d; target = q; }
+    }
+
+    // 2. If no enemy combatant found or in biohazard mode, target PvE monsters (enemies)
+    if (!target || this.gameMode === "biohazard") {
+      for (const e of this.enemies) {
+        if (e.hp <= 0) continue;
+        const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          target = { x: e.x, y: e.y, vx: e.vx ?? 0, vy: e.vy ?? 0, hp: e.hp, maxHp: e.maxHp, deadTimer: 0 } as any;
+        }
+      }
     }
 
     // Cashout mode objective decision (Vault, Cash Box, Cashout Station)
     let objX: number | null = null;
     let objY: number | null = null;
     let isInsertingBox = false;
+    let isRevivingTeammate = false;
 
-    if (this.gameMode === "cashout") {
+    // 3. Teammate Support: Check for downed teammates to revive (or statues)
+    if (!target || bestD > 400 * 400) {
+      // Check statues for team revives
+      const downedStatue = this.statues.find(s => this.isTeammate(c.id, s.deadCid));
+      if (downedStatue) {
+        objX = downedStatue.x;
+        objY = downedStatue.y;
+        isRevivingTeammate = true;
+      } else {
+        // Check downed teammate combatants
+        const downedAlly = this.combatants.find(o => o.id !== c.id && this.isTeammate(c.id, o.id) && o.player.deadTimer && o.player.deadTimer > 0);
+        if (downedAlly) {
+          objX = downedAlly.player.x;
+          objY = downedAlly.player.y;
+          isRevivingTeammate = true;
+        }
+      }
+    }
+
+    // 4. Teammate Healing Check: deploy healing station / support for injured teammates
+    if (!isRevivingTeammate) {
+      const injuredAlly = this.combatants.find(o => this.isTeammate(c.id, o.id) && o.player.hp < o.player.maxHp * 0.75 && (!o.player.deadTimer || o.player.deadTimer <= 0));
+      if (injuredAlly && c.gadgets.length && (c.gadgetTimer ?? 0) <= 0) {
+        const healGadgetIdx = c.gadgets.findIndex(g => g.kind === "healing_station" && (c.gadgetCd.get(g.id) ?? 0) <= 0);
+        if (healGadgetIdx >= 0) {
+          intent.gadget = healGadgetIdx;
+          intent.gadgetX = injuredAlly.player.x;
+          intent.gadgetY = injuredAlly.player.y;
+          c.gadgetTimer = 3;
+        }
+      }
+    }
+
+    // 5. Squad Formation: Follow nearby teammate if out of combat and no objective
+    if (!target && objX === null && objY === null) {
+      const ally = this.combatants.find(o => o.id !== c.id && this.isTeammate(c.id, o.id) && (!o.player.deadTimer || o.player.deadTimer <= 0));
+      if (ally) {
+        const ad = Math.hypot(ally.player.x - p.x, ally.player.y - p.y);
+        if (ad > 180) {
+          objX = ally.player.x;
+          objY = ally.player.y;
+        }
+      }
+    }
+
+    if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && !isRevivingTeammate) {
       const carriedBox = this.cashBoxes.find(b => b.carriedByCid === c.id);
       if (carriedBox) {
         let bestStDist = Infinity;
@@ -6364,7 +7326,7 @@ export class GameEngine {
         if (bestStDist < 120) {
           isInsertingBox = true;
         }
-      } else {
+      } else if (objX === null) {
         // Find loose cashbox
         let bestBoxDist = Infinity;
         for (const box of this.cashBoxes) {
@@ -6434,7 +7396,6 @@ export class GameEngine {
         } else {
           score = dps * 0.05 - (dist - r);
         }
-        // 贴脸时优先选无需换弹的近战 / 霰弹武器，避免换弹空窗导致"贴脸不开枪"
         if (dist < 120 && (gg.weaponClass === "melee" || gg.weaponClass === "shield" || (gg.pellets ?? 1) > 1)) {
           score += 5000;
         }
@@ -6452,38 +7413,72 @@ export class GameEngine {
       const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
       this.mouse.x = target.x + target.vx * lead;
       this.mouse.y = target.y + target.vy * lead;
+      p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
     } else if (objX !== null && objY !== null) {
       this.mouse.x = objX;
       this.mouse.y = objY;
+      p.angle = Math.atan2(objY - p.y, objX - p.x);
     }
 
-    // ---- movement: navigate to objective or combat strafe ----
-    if (objX !== null && objY !== null && (!target || dist > 250)) {
-      const objAng = Math.atan2(objY - p.y, objX - p.x);
-      this.virtualMove.x = Math.cos(objAng);
-      this.virtualMove.y = Math.sin(objAng);
-    } else if (target) {
-      c.strafeTimer = (c.strafeTimer ?? 0) - dt;
-      if (c.strafeTimer <= 0) {
-        c.strafeTimer = 0.6 + Math.random() * 1.0;
-        const r = Math.random();
-        if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1;
-        else if (r < 0.82) c.strafeDir = 0;
-        else c.strafeDir = 2;
-      }
-      let mvx = 0, mvy = 0;
-      if (c.strafeDir === 0) {
-        mvx = Math.cos(ang); mvy = Math.sin(ang);
-        if (dist < 150) { mvx = 0; mvy = 0; }
-      } else if (c.strafeDir === 2) {
-        mvx = -Math.cos(ang); mvy = -Math.sin(ang);
+    // ---- movement: navigate to objective / teammate using A* pathfinding or combat strafe ----
+    let rawMvx = 0, rawMvy = 0;
+    if (isRevivingTeammate && objX !== null && objY !== null) {
+      const dToTeammate = Math.hypot(objX - p.x, objY - p.y);
+      if (dToTeammate < 45) {
+        // Hold position next to downed teammate to complete revive
+        rawMvx = 0;
+        rawMvy = 0;
       } else {
-        const sa = ang + (c.strafeDir ?? 1) * Math.PI / 2;
-        mvx = Math.cos(sa); mvy = Math.sin(sa);
+        const pathDir = this.getAsyncPath(c, objX, objY);
+        rawMvx = pathDir.x;
+        rawMvy = pathDir.y;
       }
-      this.virtualMove.x = mvx;
-      this.virtualMove.y = mvy;
+    } else if (objX !== null && objY !== null && (!target || dist > 250)) {
+      const pathDir = this.getAsyncPath(c, objX, objY);
+      rawMvx = pathDir.x;
+      rawMvy = pathDir.y;
+    } else if (target) {
+      // If LOS to target is blocked, use A* pathfinding to reach LOS
+      if (!this.botLOS(p.x, p.y, target.x, target.y)) {
+        const pathDir = this.getAsyncPath(c, target.x, target.y);
+        rawMvx = pathDir.x;
+        rawMvy = pathDir.y;
+      } else {
+        c.pathfindingReqId = undefined; // clear request
+        c.strafeTimer = (c.strafeTimer ?? 0) - dt;
+        if (c.strafeTimer <= 0) {
+          c.strafeTimer = 0.8 + Math.random() * 1.2;
+          const r = Math.random();
+          if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1;
+          else if (r < 0.8) c.strafeDir = 0;
+          else c.strafeDir = 2;
+        }
+
+        // --- FIX: Override strafe logic at extremely close range to prevent orbital jitter ---
+        let effectiveStrafe = c.strafeDir;
+        if (dist < 45) {
+           const isMelee = g.weaponClass === "melee" || g.weaponClass === "shield";
+           effectiveStrafe = isMelee ? 0 : 2; // melee approach, ranged retreat
+        }
+
+        if (effectiveStrafe === 0) {
+          rawMvx = Math.cos(ang); rawMvy = Math.sin(ang);
+          const stopDist = (g.weaponClass === "melee" || g.weaponClass === "shield") ? ((g.meleeRange ?? 64) * 0.5) : 140;
+          if (dist < stopDist) { rawMvx = 0; rawMvy = 0; }
+        } else if (effectiveStrafe === 2) {
+          rawMvx = -Math.cos(ang); rawMvy = -Math.sin(ang);
+        } else {
+          const sa = ang + (effectiveStrafe ?? 1) * Math.PI / 2;
+          rawMvx = Math.cos(sa); rawMvy = Math.sin(sa);
+        }
+      }
     }
+
+    const steer = this.botAvoidWalls(p, rawMvx, rawMvy);
+    c.aiMvx = (c.aiMvx ?? 0) * 0.65 + steer.x * 0.35;
+    c.aiMvy = (c.aiMvy ?? 0) * 0.65 + steer.y * 0.35;
+    this.virtualMove.x = c.aiMvx;
+    this.virtualMove.y = c.aiMvy;
 
     if (isInsertingBox) {
       this.firing = true; // throw cash box at station!
@@ -6494,11 +7489,9 @@ export class GameEngine {
     let inRange = false;
     if (target) {
       los = this.botLOS(p.x, p.y, target.x, target.y);
-      inRange = dist < this.gunEffRange(g) + 40;
-      const facing = Math.abs(this.angleDiff(ang, p.angle));
-      // 同 botAimFire：贴脸 / 冲撞时放宽限制强制开火
-      const close = dist < 120 || p.isChargingSlam === true;
-      this.firing = (los || close) && inRange && (close || facing < 1.2);
+      inRange = dist < this.gunEffRange(g) + 60;
+      const close = dist < 140 || p.isChargingSlam === true;
+      this.firing = (los || close) && inRange;
     } else if (!isInsertingBox) {
       this.firing = false;
     }
@@ -6515,7 +7508,7 @@ export class GameEngine {
 
     // ---- gadget usage: situational, spaced out so bots don't spam ----
     c.gadgetTimer = (c.gadgetTimer ?? 0) - dt;
-    if (c.gadgets.length && (c.gadgetTimer ?? 0) <= 0) {
+    if (c.gadgets.length && (c.gadgetTimer ?? 0) <= 0 && intent.gadget < 0) {
       for (const gd of c.gadgets) {
         if ((c.gadgetCd.get(gd.id) ?? 0) > 0) continue;
         let deploy = false;
@@ -6523,24 +7516,27 @@ export class GameEngine {
         switch (gd.kind) {
           case "healing_station":
             deploy = p.hp < p.maxHp * 0.7;
-            tx = p.x; ty = p.y; // stand in it
+            tx = p.x; ty = p.y;
             break;
           case "turret_mg":
           case "turret_cannon":
-            deploy = target ? dist > 180 && los : false; // add ranged suppression
+          case "turret_sniper":
+            deploy = target ? dist > 180 && los : false;
             tx = p.x + Math.cos(ang) * 130;
             ty = p.y + Math.sin(ang) * 130;
             break;
           case "mine_explosive":
           case "mine_poison":
           case "mine_fire":
-            deploy = target ? dist < 220 : false; // trap a closing foe
+          case "mine_stun":
+            deploy = target ? dist < 220 : false;
             tx = p.x + Math.cos(ang) * 90;
             ty = p.y + Math.sin(ang) * 90;
             break;
           case "glue_grenade":
           case "fire_grenade":
           case "poison_grenade":
+          case "cluster_grenade":
             deploy = target ? dist < 360 && los : false;
             tx = target ? target.x : p.x; ty = target ? target.y : p.y;
             break;
@@ -6560,41 +7556,45 @@ export class GameEngine {
 
     // ---- reload / swap if the current mag is dry ----
     const ws = this.weaponStates.get(g.id)!;
-    if (g.magazine !== undefined && ws.ammo <= 0 && ws.reload <= 0) {
+    if (g.magazine !== undefined && ws && ws.ammo <= 0 && ws.reload <= 0) {
       if (c.guns.length > 1) {
         const alt = c.guns.findIndex(
           (gg, i) => i !== this.gunIndex && ((this.weaponStates.get(gg.id)?.ammo ?? 0) > 0 || gg.magazine === undefined)
         );
-        if (alt >= 0) this.gunIndex = alt; // switch to a loaded gun
+        if (alt >= 0) this.gunIndex = alt;
         else intent.reload = true;
       } else intent.reload = true;
     }
     return intent;
   }
 
-  /** Cheap, per-frame aim + fire control for a bot. The heavy movement/weapon/
-   *  gadget brain (`botThink`) is throttled, but AIM + FIRE must stay responsive
-   *  or bots look braindead (the original throttle cached firing and bots would
-   *  stand there not shooting when an enemy entered view between decisions).
-   *  Only does a nearest-target scan (O(combatants)) + a single LOS ray, then
-   *  mirrors `botThink`'s fire gate (LOS && inRange && facing). */
+  /** Cheap, per-frame aim + fire control for a bot. */
   private botAimFire(c: Combatant, dt: number) {
     const p = c.player;
     let target: Player | null = null;
     let bestD = Infinity;
     for (const o of this.combatants) {
-      if (o.id === c.id) continue;
-      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
+      if (o.id === c.id || this.isTeammate(c.id, o.id)) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
-      if (q.isCloaked) continue; // 隐身玩家对 AI 不可见，跳过作为目标
+      if (q.isCloaked) continue;
       const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
       if (d < bestD) { bestD = d; target = q; }
     }
+    // Also scan PvE enemies if no combatant target found or biohazard mode
+    if (!target || this.gameMode === "biohazard") {
+      for (const e of this.enemies) {
+        if (e.hp <= 0) continue;
+        const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          target = { x: e.x, y: e.y, vx: e.vx ?? 0, vy: e.vy ?? 0, hp: e.hp, maxHp: e.maxHp, deadTimer: 0 } as any;
+        }
+      }
+    }
     if (!target) {
       this.firing = false;
-      // cashout: keep throwing the carried box at the nearest station
-      if (this.gameMode === "cashout") {
+      if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
         const carried = this.cashBoxes.find((b) => b.carriedByCid === c.id);
         if (carried) {
           let bestSt = Infinity, sx = p.x, sy = p.y;
@@ -6613,19 +7613,16 @@ export class GameEngine {
     }
     const g = this.gun;
     const dist = Math.sqrt(bestD);
-    const ang = Math.atan2(target.y - p.y, target.x - p.x);
-    // light target leading so moving foes still get hit
     const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
     this.mouse.x = target.x + target.vx * lead;
     this.mouse.y = target.y + target.vy * lead;
-    // ---- line-of-sight gate ----
-    // `botLOS` is the single most expensive call here: it casts a ray against
-    // EVERY wall (a ray-vs-AABB test per wall). Cache the result for ~0.1s while
-    // the nearest target is unchanged, so the replay branch (which runs every
-    // render frame) doesn't re-cast the ray each frame.
+    if (dist > 5) {
+      p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+    }
+
     let los: boolean;
     if ((c.losTtl ?? 0) > 0 && c.losTarget === target) {
-      los = c.losResult ?? false;
+      los = c.losResult ?? true;
     } else {
       los = this.botLOS(p.x, p.y, target.x, target.y);
       c.losTarget = target;
@@ -6633,12 +7630,16 @@ export class GameEngine {
       c.losTtl = 0.1;
     }
     c.losTtl = Math.max(0, (c.losTtl ?? 0) - dt);
-    const inRange = dist < this.gunEffRange(g) + 40;
-    const facing = Math.abs(this.angleDiff(ang, p.angle));
-    // 贴脸（敌人就在身上）或冲撞中（p.angle 不跟随鼠标、朝向偏移）时，
-    // 放宽朝向 / 视线限制，强制开火，避免"冲到脸上却站着不开枪"
-    const close = dist < 120 || p.isChargingSlam === true;
-    this.firing = (los || close) && inRange && (close || facing < 1.2);
+    const inRange = dist < this.gunEffRange(g) + 60;
+    const close = dist < 140 || p.isChargingSlam === true;
+    
+    // release trigger for semi-auto guns during cooldown so they can fire again (prevents "stops firing" bug)
+    const wState = c.weaponStates[this.gunIndex];
+    if (g.semiAuto && wState && wState.cd > 0) {
+      this.firing = false;
+    } else {
+      this.firing = (los || close) && inRange;
+    }
   }
 
   /** Line-of-sight test: true if the segment (x0,y0)->(x1,y1) is not blocked by a wall. */
@@ -6812,6 +7813,9 @@ export class GameEngine {
           : [this.combatants.find(c => c.id === 1)?.kills ?? 0, this.combatants.find(c => c.id === 2)?.kills ?? 0])
         : undefined,
       dmTarget: this.isDM ? this.dmKillLimit : undefined,
+      // always present (even when empty) so clients can initialise their
+      // feed watermark on the FIRST snapshot and never swallow the first kill
+      feed: this.feedBuf.slice(),
     };
   }
 
@@ -6956,6 +7960,8 @@ export class GameEngine {
 
   /** Advance the shared world state (entities, bullets, waves, respawns). */
   private simulateWorld(dt: number) {
+    // 世界阶段用玩家自身音量（命中/受击/爆炸都按玩家音量播放）
+    sound.setEnemyDampen(false);
     this.time += dt;
     this.base.t += dt;
     if (this.base.flash > 0) this.base.flash -= dt * 3;
@@ -6971,7 +7977,7 @@ export class GameEngine {
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.tickRespawns(dt);
-    if (this.gameMode === "cashout") {
+    if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
       this.updateCashoutMode(dt);
     }
     if (this.matchLive && this.gameMode !== "cashout") this.updateWaves(dt);
@@ -7037,18 +8043,16 @@ export class GameEngine {
     this.peerLatch.clear();
     this.foe = this.makeFoe();
 
-    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
-      const isTeam = this.gameMode === "team_deathmatch";
+    this.peerLoadout = loadoutB;
+    this.applyPeerLoadout();
+
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch" || this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
+      const isTeam = this.gameMode === "team_deathmatch" || this.gameMode === "cashout" || this.gameMode === "cashout_5v5";
       const pCount = this.loadout.dmPlayerCount || 4;
       this.player.cid = this.selfPid;
       this.foe.cid = this.peerPid;
 
-      this.dmSpawns = [
-        { x: this.worldW * 0.5, y: this.worldH - 200 },
-        { x: this.worldW * 0.15, y: this.worldH * 0.2 },
-        { x: this.worldW * 0.85, y: this.worldH * 0.2 },
-        { x: this.worldW * 0.5, y: this.worldH * 0.16 },
-      ];
+      this.dmSpawns = this.generateDistributedSpawns();
 
       const hostSpawn = this.dmSpawns[0];
       const guestSpawn = this.dmSpawns[1];
@@ -7071,14 +8075,14 @@ export class GameEngine {
       };
 
       const c2: Combatant = {
-        id: 2, isBot: false, name: "玩家2", color: isTeam ? "#8b5cf6" : "#f472b6",
+        id: 2, isBot: false, name: this.peerName || "玩家2", color: isTeam ? "#8b5cf6" : "#f472b6",
         player: this.foe,
         character: this.foeChar!,
         outfit: this.foeOutfit!,
         skill: getSkill(loadoutB.skillId ?? "dash"),
         guns: this.foeGuns,
         gunIndex: 0,
-        weaponStates: new Map(),
+        weaponStates: this.foeWeaponStates,
         gadgets: this.foeGadgets,
         selectedGadget: -1,
         skillCd: 0,
@@ -7087,12 +8091,12 @@ export class GameEngine {
         gadgetCd: new Map(),
         lastGadget: 0,
         kills: 0, score: 0, wander: 0, strafeDir: 1, strafeTimer: 0,
-        teamId: isTeam ? 0 : undefined
+        teamId: isTeam ? (this.gameMode === "team_deathmatch" ? 0 : 1) : undefined
       };
 
       this.combatants = [c1, c2];
 
-      if (isTeam) {
+      if (this.gameMode === "team_deathmatch") {
         const botColors = ["#8b5cf6", "#f472b6", "#a3e635", "#fbbf24"];
         const botNames = ["阿法", "贝塔", "伽马", "德塔", "艾普", "泽塔", "伊塔", "西塔"];
         const numTeams = pCount / 2;
@@ -7109,7 +8113,7 @@ export class GameEngine {
             botIdx++;
           }
         }
-      } else {
+      } else if (this.gameMode === "deathmatch") {
         const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
         const botNames = ["阿尔法", "贝塔", "伽马", "德尔塔", "艾普西龙", "泽塔", "伊塔", "西塔"];
         const botCount = pCount - 2;
@@ -7121,8 +8125,6 @@ export class GameEngine {
       }
     }
 
-    this.peerLoadout = loadoutB;
-    this.applyPeerLoadout();
     this.foe.gunIndex = 0;
     this.foe.skillCd = 0;
     this.foe.dashCharges = MAX_DASH_CHARGES;
@@ -7216,18 +8218,37 @@ export class GameEngine {
     this.enemiesLeft = s.enemiesLeft;
     // mirror enemy positions so the guest-side mobile aim assist can lock on
     this.snapEnemies = s.enemies.map((e) => ({ x: e.x, y: e.y }));
-    this.score = s.score;
-    this.kills = s.kills;
     this.gold = s.gold;
 
-    // Trigger local score feedback for guest client
-    if (this.mode === "guest" && this.score > oldScore) {
-      const diff = this.score - oldScore;
-      if (this.kills > oldKills) {
-        this.addScoreFeed("淘汰", diff, this.peerName || "对手", diff, this.kills);
-        sound.playKillConfirm();
+    // Score/kill feed: prefer the explicit event stream from the host/server
+    // (reliable per-player attribution). The snapshot's aggregate score/kills
+    // only reflect the SIMULATING side's own player, so when feed events are
+    // available each client accumulates its OWN score/kills from them instead.
+    if (s.feed) {
+      if (this.lastFeedId < 0) {
+        // first snapshot after (re)joining: fast-forward past history so we
+        // don't replay kills/damage that happened before we joined
+        this.lastFeedId = 0;
+        for (const ev of s.feed) if (ev.id > this.lastFeedId) this.lastFeedId = ev.id;
       } else {
-        this.addScoreFeed(diff >= 200 ? "金币收集" : "伤害击中", diff);
+        for (const ev of s.feed) {
+          if (ev.id <= this.lastFeedId) continue;
+          this.lastFeedId = ev.id;
+          this.consumeFeedEvent(ev);
+        }
+      }
+    } else {
+      // legacy host without feed events: mirror aggregates and guess (old path)
+      this.score = s.score;
+      this.kills = s.kills;
+      if (this.mode === "guest" && this.score > oldScore) {
+        const diff = this.score - oldScore;
+        if (this.kills > oldKills) {
+          this.addScoreFeed("淘汰", diff, this.peerName || "对手", diff, this.kills);
+          sound.playKillConfirm();
+        } else {
+          this.addScoreFeed(diff >= 200 ? "金币收集" : "伤害击中", diff);
+        }
       }
     }
 
@@ -7322,21 +8343,24 @@ export class GameEngine {
         if (hostC) hostC.kills = newHostKills;
         if (guestC) guestC.kills = newGuestKills;
 
-        if (this.mode === "guest") {
+        // legacy hosts only — when feed events are present they already
+        // produced properly attributed kill-feed entries in consumeFeedEvent()
+        if (this.mode === "guest" && !s.feed) {
           if (newHostKills > oldHostKills) {
             const isMe = this.selfPid === 1;
             const kName = isMe ? "你" : (this.peerName || "对手");
             const vName = isMe ? (this.peerName || "对手") : "你";
             const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
-            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+            this.killFeed.push({ id: this.nextKillFeedId++, type: "kill", killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, weaponId: gun.id, timer: 4.2 });
           }
           if (newGuestKills > oldGuestKills) {
             const isMe = this.selfPid === 2;
             const kName = isMe ? "你" : (this.peerName || "对手");
             const vName = isMe ? (this.peerName || "对手") : "你";
             const gun = isMe ? this.gun : (this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0]);
-            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+            this.killFeed.push({ id: this.nextKillFeedId++, type: "kill", killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, weaponId: gun.id, timer: 4.2 });
           }
+          if (this.killFeed.length > 5) this.killFeed.splice(0, this.killFeed.length - 5);
         }
       }
     }
@@ -7396,7 +8420,8 @@ export class GameEngine {
     name: string,
     hpPct: number,
     t: number,
-    size: number
+    size: number,
+    gadget?: GadgetDef
   ) {
     const char = getCharacter(charId);
     const outfit = getOutfit(outfitId);
@@ -7410,6 +8435,7 @@ export class GameEngine {
       size,
       t,
       gun,
+      gadget,
     });
     // hp bar
     const w = 32;
@@ -7431,6 +8457,8 @@ export class GameEngine {
     ctx.save();
     if (this.shake > 0.2) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
     ctx.translate(-this.camX, -this.camY);
+
+    this.drawDecorations(ctx);
 
     // age the mirrored effects by real frame time so they animate smoothly
     // between 30Hz snapshots (the host sends their current elapsed `t`).
@@ -7516,7 +8544,8 @@ export class GameEngine {
         isMe ? this.character.name : this.peerName || "对手",
         p.hp / p.maxHp,
         this.time,
-        size
+        size,
+        p.selectedGadget !== undefined && p.selectedGadget >= 0 ? (isMe ? this.gadgets[p.selectedGadget] : GADGETS[p.selectedGadget]) : undefined
       );
       if (p.electrified > 0) {
         this.drawElectricArcs(ctx, r.x, r.y, size, p.electrifiedGlow, this.time);
@@ -7537,17 +8566,20 @@ export class GameEngine {
       ctx.moveTo(b.x, b.y);
       ctx.lineTo(tx, ty);
       ctx.stroke();
-      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3.4);
-      rg.addColorStop(0, rgba(b.glow, 0.85));
-      rg.addColorStop(1, rgba(b.glow, 0));
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size * 3.4, 0, Math.PI * 2);
-      ctx.fill();
+      this.fillGlow(ctx, b.x, b.y, b.size * 3.4, `bn|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.85)], [1, rgba(b.glow, 0)]]);
       ctx.fillStyle = b.color;
+      const bLen = Math.max(b.size * 2.5, b.size);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+      if (ctx.ellipse) {
+        ctx.ellipse(0, 0, bLen, Math.max(1, b.size * 0.5), 0, 0, Math.PI * 2);
+      } else {
+        ctx.arc(0, 0, b.size, 0, Math.PI * 2);
+      }
       ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
     // draw particles
@@ -7751,7 +8783,7 @@ export class GameEngine {
       color,
     });
     // shake only when player is hit
-    sound.explosion();
+    sound.explosion(x, y);
     this.spawnParticles(x, y, color, 26, 260, 0.55);
     this.spawnParticles(x, y, "#fde68a", 14, 200, 0.4);
     if (damage > 0) {
@@ -7779,7 +8811,7 @@ export class GameEngine {
         // splash also hits other combatants (not the owner)
         for (const it of cand) {
           if (it.kind !== "player") continue;
-          if (it.ownerId === (ownerId ?? -1)) continue;
+          if (it.ownerId === (ownerId ?? -1) || this.isTeammate(ownerId, it.ownerId)) continue;
           const q = it.ref as Player;
           if (q.deadTimer && q.deadTimer > 0) continue;
           const d = Math.hypot(q.x - x, q.y - y);
@@ -7792,7 +8824,8 @@ export class GameEngine {
               undefined,
               0,
               0,
-              ownerId
+              ownerId,
+              srcWpn
             );
           }
         }
@@ -7809,7 +8842,8 @@ export class GameEngine {
             undefined,
             0,
             0,
-            ownerId
+            ownerId,
+            srcWpn
           );
         }
       }
@@ -7858,6 +8892,8 @@ export class GameEngine {
     ox?: number,
     oy?: number
   ) {
+    if (this.quality === "low") return;
+    if (this.quality === "medium") count = Math.ceil(count / 2);
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= MAX_PARTICLES) break; // pool saturated: drop
       const p = this.particlePool.pop() ?? ({} as Particle);
@@ -8427,10 +9463,10 @@ export class GameEngine {
       baseMaxHp: this.base ? (this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp) : 0,
       enemyBaseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)) : 0,
       enemyBaseMaxHp: this.base ? (this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp) : 0,
-      teamCash: this.gameMode === "cashout" ? this.teamCash : undefined,
-      cashoutTimeLeft: this.gameMode === "cashout" ? this.cashoutTimeLeft : undefined,
-      isOvertime: this.gameMode === "cashout" ? this.isOvertime : undefined,
-      combatantsData: this.gameMode === "cashout" ? this.combatants.map(c => ({
+      teamCash: (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.teamCash : undefined,
+      cashoutTimeLeft: (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.cashoutTimeLeft : undefined,
+      isOvertime: (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.isOvertime : undefined,
+      combatantsData: (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.combatants.map(c => ({
         id: c.id,
         name: c.name,
         hp: c.player.hp,
@@ -8481,7 +9517,7 @@ export class GameEngine {
       dmTarget: this.isDM ? this.dmKillLimit : undefined,
       deadTimer: p.deadTimer ?? 0,
       eliminatedBy: this.eliminatedBy,
-      damageLogs: this.damageLogs,
+      damageLogs: this.damageLogs.map(l => ({ ...l, amount: Math.round(l.amount) })),
       postGameStats: this.gameOver ? (
         this.combatants && this.combatants.length > 0 ? (
           (() => {
@@ -8545,9 +9581,10 @@ export class GameEngine {
     // camera offset for world-space rendering
     ctx.translate(-this.camX, -this.camY);
 
+    this.drawDecorations(ctx);
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    if (this.gameMode === "cashout") {
+    if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
       this.drawCashoutElements(ctx);
     }
     if (this.gameMode !== "biohazard" && this.gameMode !== "cashout" && !this.isDM) {
@@ -8570,8 +9607,8 @@ export class GameEngine {
         if (q.deadTimer && q.deadTimer > 0) continue;
         
         // Draw carried pickables (cash box or statue)
-        const hasBox = this.gameMode === "cashout" ? this.cashBoxes.find(b => b.carriedByCid === c.id) : null;
-        const hasStatue = this.gameMode === "cashout" ? this.statues.find(s => s.carriedByCid === c.id) : null;
+        const hasBox = (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.cashBoxes.find(b => b.carriedByCid === c.id) : null;
+        const hasStatue = (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") ? this.statues.find(s => s.carriedByCid === c.id) : null;
         
         if (hasBox || hasStatue) {
           ctx.save();
@@ -8629,7 +9666,8 @@ export class GameEngine {
           c.name,
           q.hp / q.maxHp,
           this.time,
-          q.size
+          q.size,
+          c.selectedGadget >= 0 ? c.gadgets[c.selectedGadget] : undefined
         );
         if (q.electrifiedTime && q.electrifiedTime > 0) {
           this.drawElectricArcs(ctx, q.x, q.y, q.size, q.electrifiedGlow ?? "#38bdf8", this.time);
@@ -8660,7 +9698,8 @@ export class GameEngine {
           this.peerName || "对手",
           this.foe.hp / this.foe.maxHp,
           this.time,
-          this.foe.size
+          this.foe.size,
+          this.foe.selectedGadget !== undefined && this.foe.selectedGadget >= 0 ? (this.foeGadgets?.[this.foe.selectedGadget] ?? GADGETS[this.foe.selectedGadget]) : undefined
         );
         if (this.foe.electrifiedTime && this.foe.electrifiedTime > 0) {
           this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
@@ -8672,7 +9711,9 @@ export class GameEngine {
     // weapon aim indicator (投射榴弹炮 — deployable-style target marker)
     if (this.gun.aimIndicator) this.drawLauncherIndicator(ctx);
     this.drawBullets(ctx);
+    this.drawMeleeTrails(ctx);
     this.drawEffects(ctx);
+    this.drawWeather(ctx);
 
     ctx.restore();
 
@@ -8685,11 +9726,18 @@ export class GameEngine {
 
   private drawBackground(ctx: CanvasRenderingContext2D) {
     const theme = this.sceneTheme;
-    const g = ctx.createLinearGradient(0, 0, 0, this.H);
-    g.addColorStop(0, theme.bgTop);
-    g.addColorStop(1, theme.bgBottom);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.W, this.H);
+    // static layer (scene gradient + vignette) is cached offscreen — avoids two
+    // fullscreen gradient fills every frame
+    const bgc = this.getBgCache();
+    if (bgc) {
+      ctx.drawImage(bgc, 0, 0);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, this.H);
+      g.addColorStop(0, theme.bgTop);
+      g.addColorStop(1, theme.bgBottom);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
 
     // blobs at base positions (in world space, but we draw in screen space)
     // own base glows blue, opponent's glows red — for both host and guest
@@ -8701,11 +9749,12 @@ export class GameEngine {
         [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"],
       ];
       for (const [bx, by, col] of blobs) {
-        const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
-        rg.addColorStop(0, rgba(col, 0.18));
-        rg.addColorStop(1, rgba(col, 0));
+        const rg = this.radialGlow(ctx, this.W * 0.4, `blob|${col}|${this.W}`, [[0, rgba(col, 0.18)], [1, rgba(col, 0)]]);
+        ctx.save();
+        ctx.translate(bx, by);
         ctx.fillStyle = rg;
-        ctx.fillRect(0, 0, this.W, this.H);
+        ctx.fillRect(-bx, -by, this.W, this.H);
+        ctx.restore();
       }
     }
 
@@ -8748,19 +9797,21 @@ export class GameEngine {
       ctx.stroke();
     }
 
-    // vignette
-    const vg = ctx.createRadialGradient(
-      this.W / 2,
-      this.H / 2,
-      this.H * 0.35,
-      this.W / 2,
-      this.H / 2,
-      this.H * 0.85
-    );
-    vg.addColorStop(0, "rgba(0,0,0,0)");
-    vg.addColorStop(1, "rgba(0,0,0,0.45)");
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, this.W, this.H);
+    // vignette (already baked into the cached background when available)
+    if (!bgc) {
+      const vg = ctx.createRadialGradient(
+        this.W / 2,
+        this.H / 2,
+        this.H * 0.35,
+        this.W / 2,
+        this.H / 2,
+        this.H * 0.85
+      );
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.45)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
   }
 
   /**
@@ -9106,47 +10157,6 @@ export class GameEngine {
    *  (sceneTheme.wallColor → wallDark); the *structure* drawn on top depends on
    *  the map (this.sceneIndex) so every map has its own building style. */
 
-  private bldWildWest(ctx: CanvasRenderingContext2D, w: Wall) {
-    ctx.fillStyle = "#8B4513";
-    ctx.fillRect(w.x, w.y, w.w, w.h);
-    ctx.strokeStyle = "#A0522D";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(w.x, w.y, w.w, w.h);
-    // Wooden planks
-    ctx.beginPath();
-    for (let y = w.y + 10; y < w.y + w.h; y += 20) {
-      ctx.moveTo(w.x, y);
-      ctx.lineTo(w.x + w.w, y);
-    }
-    ctx.stroke();
-  }
-
-  private bldJungle(ctx: CanvasRenderingContext2D, w: Wall) {
-    ctx.fillStyle = "#2E8B57";
-    ctx.fillRect(w.x, w.y, w.w, w.h);
-    ctx.fillStyle = "#228B22";
-    // Leaves pattern
-    for (let i = 0; i < 5; i++) {
-      ctx.beginPath();
-      ctx.arc(w.x + (w.w * Math.random()), w.y + (w.h * Math.random()), 10 + Math.random() * 15, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  private bldArcticZone(ctx: CanvasRenderingContext2D, w: Wall) {
-    ctx.fillStyle = "#F0F8FF";
-    ctx.fillRect(w.x, w.y, w.w, w.h);
-    ctx.strokeStyle = "#B0E0E6";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(w.x, w.y, w.w, w.h);
-    // Ice crystals
-    ctx.beginPath();
-    ctx.moveTo(w.x + 5, w.y + 5);
-    ctx.lineTo(w.x + w.w - 5, w.y + w.h - 5);
-    ctx.moveTo(w.x + w.w - 5, w.y + 5);
-    ctx.lineTo(w.x + 5, w.y + w.h - 5);
-    ctx.stroke();
-  }
 
   private drawBuilding(ctx: CanvasRenderingContext2D, w: Wall) {
     // ground shadow so the slab reads as a raised structure
@@ -9361,6 +10371,485 @@ export class GameEngine {
     ctx.stroke();
   }
 
+  /** 西部牛仔 — wooden saloon: horizontal timber planks, warm golden windows, saloon door arch. */
+  private bldWildWest(ctx: CanvasRenderingContext2D, w: Wall) {
+    const accent = this.sceneTheme.accent || "#fcd34d";
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, "#b45309");
+    g.addColorStop(1, "#78350f");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 6);
+    ctx.fill();
+    ctx.strokeStyle = "#451a03";
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 6);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1.5;
+    const plankStep = 20;
+    for (let py = w.y + plankStep; py < w.y + w.h; py += plankStep) {
+      ctx.beginPath();
+      ctx.moveTo(w.x + 2, py);
+      ctx.lineTo(w.x + w.w - 2, py);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "rgba(252,211,77,0.25)";
+    roundRect(ctx, w.x + 4, w.y + 4, w.w - 8, Math.max(10, w.h * 0.12), 4);
+    ctx.fill();
+
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 24, 0.5, 0.6);
+
+    ctx.fillStyle = "rgba(40,15,5,0.7)";
+    roundRect(ctx, w.x + w.w / 2 - 14, w.y + w.h - 22, 28, 22, 5);
+    ctx.fill();
+  }
+
+  /** 幽静丛林 — ancient mossy stone temple: carved stone blocks, vine trim, glowing green runes. */
+  private bldJungle(ctx: CanvasRenderingContext2D, w: Wall) {
+    const accent = this.sceneTheme.accent || "#86efac";
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, "#15803d");
+    g.addColorStop(1, "#064e3b");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 8);
+    ctx.fill();
+    ctx.strokeStyle = "#022c22";
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 8);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(134,239,172,0.3)";
+    for (let i = 0; i < 5; i++) {
+      const vx = w.x + 12 + i * ((w.w - 24) / 4);
+      ctx.beginPath();
+      ctx.arc(vx, w.y + 4, 6 + (i % 3) * 2, 0, Math.PI);
+      ctx.fill();
+    }
+
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 26, 0.4, 0.55);
+
+    const hw = Math.min(w.w, w.h) * 0.28;
+    ctx.fillStyle = "rgba(6,78,59,0.5)";
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.fill();
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.stroke();
+  }
+
+  /** 极寒地带 — glacial ice shelter: frosty ice sheen, snow cap, icy blue glowing vents. */
+  private bldArcticZone(ctx: CanvasRenderingContext2D, w: Wall) {
+    const accent = this.sceneTheme.accent || "#38bdf8";
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, "#93c5fd");
+    g.addColorStop(1, "#3b82f6");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.fill();
+    ctx.strokeStyle = "#1e3a8a";
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(240,249,255,0.95)";
+    roundRect(ctx, w.x + 2, w.y + 2, w.w - 4, Math.max(10, w.h * 0.18), 8);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(w.x + 8, w.y + w.h * 0.3);
+    ctx.lineTo(w.x + w.w * 0.4, w.y + 10);
+    ctx.moveTo(w.x + w.w * 0.5, w.y + w.h - 10);
+    ctx.lineTo(w.x + w.w - 10, w.y + w.h * 0.4);
+    ctx.stroke();
+
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 22, 0.45, 0.6);
+
+    ctx.strokeStyle = rgba(accent, 0.5);
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 8);
+    ctx.stroke();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Map Decorations System (Pure cosmetic non-colliding visual objects)
+  // ---------------------------------------------------------------------------
+  private mapDecorations: { x: number; y: number; kind: string; scale: number; angle: number }[] = [];
+  private mapDecorationsKey = "";
+
+  private getMapDecorations() {
+    const key = `${this.sceneIndex}_${Math.ceil(this.worldW)}_${Math.ceil(this.worldH)}`;
+    if (this.mapDecorationsKey === key && this.mapDecorations.length > 0) {
+      return this.mapDecorations;
+    }
+    const decs: { x: number; y: number; kind: string; scale: number; angle: number }[] = [];
+    let seed = (this.sceneIndex + 1) * 12345;
+    const rnd = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+
+    const count = 45;
+    const margin = 150;
+
+    const isInsideWall = (x: number, y: number) => {
+      for (const w of this.walls) {
+        if (x >= w.x - 20 && x <= w.x + w.w + 20 && y >= w.y - 20 && y <= w.y + w.h + 20) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    let kinds: string[] = [];
+    switch (this.sceneIndex) {
+      case 1:
+        kinds = ["skull", "rock", "crack", "cactus"];
+        break;
+      case 2:
+        kinds = ["snow_drift", "ice_crystal", "crack"];
+        break;
+      case 3:
+        kinds = ["crack", "rock", "neon_arrow"];
+        break;
+      case 4:
+        kinds = ["cable", "neon_arrow"];
+        break;
+      case 5:
+        kinds = ["fence", "barrel", "wagon_wheel", "cactus", "crack"];
+        break;
+      case 6:
+        kinds = ["tree", "glowing_mushroom", "stone_tile", "rock"];
+        break;
+      case 7:
+        kinds = ["ice_crystal", "snow_drift", "crack"];
+        break;
+      default:
+        kinds = ["neon_arrow", "cable"];
+        break;
+    }
+
+    for (let i = 0; i < count; i++) {
+      const rx = margin + rnd() * (this.worldW - margin * 2);
+      const ry = margin + rnd() * (this.worldH - margin * 2);
+      if (isInsideWall(rx, ry)) continue;
+
+      const kind = kinds[Math.floor(rnd() * kinds.length)];
+      const scale = 0.8 + rnd() * 0.5;
+      const angle = (rnd() - 0.5) * Math.PI;
+      decs.push({ x: rx, y: ry, kind, scale, angle });
+    }
+
+    this.mapDecorations = decs;
+    this.mapDecorationsKey = key;
+    return decs;
+  }
+
+  private drawDecorations(ctx: CanvasRenderingContext2D) {
+    const decs = this.getMapDecorations();
+    for (const d of decs) {
+      if (!this.inView(d.x, d.y, 60)) continue;
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.angle);
+      ctx.scale(d.scale, d.scale);
+
+      switch (d.kind) {
+        case "tree": {
+          ctx.fillStyle = "rgba(0,0,0,0.22)";
+          ctx.beginPath();
+          ctx.ellipse(5, 12, 28, 16, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(0, 0, 9, 0, Math.PI * 2);
+          ctx.fill();
+          const r1 = 28;
+          ctx.fillStyle = "rgba(22,101,52,0.85)";
+          ctx.beginPath();
+          ctx.arc(0, 0, r1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(21,128,61,0.85)";
+          ctx.beginPath();
+          ctx.arc(-8, -8, r1 * 0.65, 0, Math.PI * 2);
+          ctx.arc(10, -6, r1 * 0.6, 0, Math.PI * 2);
+          ctx.arc(6, 10, r1 * 0.65, 0, Math.PI * 2);
+          ctx.arc(-10, 6, r1 * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(134,239,172,0.5)";
+          ctx.beginPath();
+          ctx.arc(-5, -10, 6, 0, Math.PI * 2);
+          ctx.arc(8, -8, 5, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "fence": {
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.fillRect(-22, 2, 44, 6);
+          ctx.fillStyle = "#78350f";
+          ctx.strokeStyle = "#451a03";
+          ctx.lineWidth = 1.5;
+          ctx.fillRect(-20, -14, 6, 20);
+          ctx.strokeRect(-20, -14, 6, 20);
+          ctx.fillRect(14, -14, 6, 20);
+          ctx.strokeRect(14, -14, 6, 20);
+          ctx.fillStyle = "#b45309";
+          ctx.fillRect(-22, -10, 44, 4);
+          ctx.strokeRect(-22, -10, 44, 4);
+          ctx.fillRect(-22, -2, 44, 4);
+          ctx.strokeRect(-22, -2, 44, 4);
+          break;
+        }
+        case "barrel": {
+          ctx.fillStyle = "rgba(0,0,0,0.3)";
+          ctx.beginPath();
+          ctx.arc(2, 4, 12, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#78350f";
+          ctx.strokeStyle = "#451a03";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, 11, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.strokeStyle = "#94a3b8";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(0, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "wagon_wheel": {
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.beginPath();
+          ctx.ellipse(3, 4, 14, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = "#78350f";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(0, 0, 12, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = "#b45309";
+          ctx.lineWidth = 1;
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * 12, Math.sin(a) * 12);
+            ctx.stroke();
+          }
+          break;
+        }
+        case "cactus": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(2, 4, 12, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#15803d";
+          ctx.strokeStyle = "#14532d";
+          ctx.lineWidth = 1.5;
+          roundRect(ctx, -5, -12, 10, 24, 4);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, -12, -4, 8, 6, 2);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, -12, -10, 6, 8, 2);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, 4, 0, 8, 6, 2);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, 6, -6, 6, 8, 2);
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "skull": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(2, 3, 9, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#fef3c7";
+          ctx.strokeStyle = "#d97706";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(0, -2, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillRect(-3, 2, 6, 6);
+          ctx.strokeRect(-3, 2, 6, 6);
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(-2.5, -2, 1.5, 0, Math.PI * 2);
+          ctx.arc(2.5, -2, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "rock": {
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.beginPath();
+          ctx.ellipse(2, 3, 14, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#78716c";
+          ctx.strokeStyle = "#44403c";
+          ctx.lineWidth = 1;
+          roundRect(ctx, -10, -6, 12, 10, 3);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, 0, -4, 10, 8, 3);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, -4, 0, 9, 7, 2);
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "ice_crystal": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(0, 4, 12, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "rgba(56,189,248,0.7)";
+          ctx.strokeStyle = "#e0f2fe";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, -16);
+          ctx.lineTo(6, -2);
+          ctx.lineTo(0, 4);
+          ctx.lineTo(-6, -2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = "rgba(147,197,253,0.8)";
+          ctx.beginPath();
+          ctx.moveTo(-8, -10);
+          ctx.lineTo(-2, 0);
+          ctx.lineTo(-8, 6);
+          ctx.lineTo(-12, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "snow_drift": {
+          ctx.fillStyle = "rgba(224,242,254,0.35)";
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 26, 12, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.45)";
+          ctx.beginPath();
+          ctx.ellipse(-6, -2, 14, 7, 0.1, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "glowing_mushroom": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(0, 3, 10, 5, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          const mg = ctx.createRadialGradient(0, 0, 0, 0, 0, 16);
+          mg.addColorStop(0, "rgba(134,239,172,0.4)");
+          mg.addColorStop(1, "rgba(134,239,172,0)");
+          ctx.fillStyle = mg;
+          ctx.fillRect(-16, -16, 32, 32);
+
+          ctx.fillStyle = "#86efac";
+          ctx.strokeStyle = "#15803d";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(-4, -2, 4, Math.PI, 0);
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(4, 0, 3, Math.PI, 0);
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "stone_tile": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.fillRect(-16, -12, 32, 24);
+
+          ctx.fillStyle = "rgba(100,116,139,0.3)";
+          ctx.strokeStyle = "rgba(148,163,184,0.4)";
+          ctx.lineWidth = 1;
+          ctx.fillRect(-15, -11, 30, 22);
+          ctx.strokeRect(-15, -11, 30, 22);
+
+          ctx.fillStyle = "rgba(21,128,61,0.5)";
+          ctx.beginPath();
+          ctx.arc(-10, -6, 5, 0, Math.PI * 2);
+          ctx.arc(10, 4, 6, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "cable": {
+          ctx.strokeStyle = "rgba(34,211,238,0.4)";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-20, -10);
+          ctx.bezierCurveTo(-5, 10, 5, -10, 20, 10);
+          ctx.stroke();
+
+          ctx.fillStyle = "#22d3ee";
+          ctx.beginPath();
+          ctx.arc(0, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "neon_arrow": {
+          ctx.strokeStyle = "rgba(217,70,239,0.35)";
+          ctx.fillStyle = "rgba(217,70,239,0.2)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(-10, -12);
+          ctx.lineTo(10, 0);
+          ctx.lineTo(-10, 12);
+          ctx.lineTo(-4, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "crack": {
+          ctx.strokeStyle = "rgba(0,0,0,0.45)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(-14, -8);
+          ctx.lineTo(-4, 0);
+          ctx.lineTo(2, -6);
+          ctx.lineTo(12, 8);
+          ctx.stroke();
+          break;
+        }
+      }
+      ctx.restore();
+    }
+  }
+
   /** Is (x,y) within the camera viewport (plus margin)? Used to skip drawing\n   *  entities that are fully off-screen (cheap perf win when the world is large\n   *  but the viewport is small). */
   private inView(x: number, y: number, margin = 0): boolean {
     return (
@@ -9369,6 +10858,60 @@ export class GameEngine {
       y >= this.camY - margin &&
       y <= this.camY + this.H + margin
     );
+  }
+
+  /** Returns a radial gradient centred at the origin with radius `r`, cached by
+   *  `key`. Because gradient coordinates are resolved in the user space at paint
+   *  time, callers should `ctx.translate(x, y)` before using it to position the
+   *  glow anywhere — so the cached object is reusable across every instance. */
+  private radialGlow(ctx: CanvasRenderingContext2D, r: number, key: string, stops: [number, string][]): CanvasGradient {
+    const cached = this.glowCache.get(key);
+    if (cached) return cached;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    for (const [o, c] of stops) g.addColorStop(o, c);
+    this.glowCache.set(key, g);
+    return g;
+  }
+
+  /** Draw a cached radial glow as a filled disc at world (x, y). `alpha` fades
+   *  time-varying glows without rebuilding the gradient. */
+  private fillGlow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, key: string, stops: [number, string][], alpha = 1) {
+    const g = this.radialGlow(ctx, r, key, stops);
+    ctx.save();
+    if (alpha !== 1) ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Build (and cache) the static background layer (scene gradient + vignette)
+   *  into an offscreen canvas. Avoids two fullscreen gradient fills every frame. */
+  private getBgCache(): HTMLCanvasElement | null {
+    const t = this.sceneTheme;
+    const key = `${this.W}x${this.H}|${t.bgTop}|${t.bgBottom}`;
+    if (this.bgCache && this.bgCacheKey === key) return this.bgCache;
+    if (typeof document === "undefined") return null;
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, this.W);
+    c.height = Math.max(1, this.H);
+    const b = c.getContext("2d");
+    if (!b) return null;
+    const bg = b.createLinearGradient(0, 0, 0, this.H);
+    bg.addColorStop(0, t.bgTop);
+    bg.addColorStop(1, t.bgBottom);
+    b.fillStyle = bg;
+    b.fillRect(0, 0, this.W, this.H);
+    const vg = b.createRadialGradient(this.W / 2, this.H / 2, this.H * 0.35, this.W / 2, this.H / 2, this.H * 0.85);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,0,0.45)");
+    b.fillStyle = vg;
+    b.fillRect(0, 0, this.W, this.H);
+    this.bgCache = c;
+    this.bgCacheKey = key;
+    return c;
   }
 
   private drawDeployables(ctx: CanvasRenderingContext2D) {
@@ -9383,7 +10926,7 @@ export class GameEngine {
       ctx.fill();
 
       // range indicator for turrets (faint)
-      if (d.kind === "turret_mg" || d.kind === "turret_cannon") {
+      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
         ctx.strokeStyle = rgba(d.color, 0.12);
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 8]);
@@ -9393,17 +10936,16 @@ export class GameEngine {
         ctx.setLineDash([]);
       }
 
-      if (d.kind === "turret_mg") {
+      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
         ctx.rotate(d.angle + Math.PI / 2);
-        drawGadgetIcon(ctx, { iconShape: "turret_mg", color: d.color } as never, 0, 0, d.size * 2);
-      } else if (d.kind === "turret_cannon") {
-        ctx.rotate(d.angle + Math.PI / 2);
-        drawGadgetIcon(ctx, { iconShape: "turret_cannon", color: d.color } as never, 0, 0, d.size * 2);
-      } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
+        ctx.scale(1.5, 1.5);
+        drawGadgetModel(ctx, d.kind, d.color, this.time);
+      } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire" || d.kind === "mine_stun") {
         // Mine blink animation
         const blink = d.armed <= 0 ? (Math.floor(this.time * 4) % 2 === 0 ? 1 : 0.4) : 0.5;
         const colorWithBlink = rgba(d.color, blink);
-        drawGadgetIcon(ctx, { iconShape: d.kind, color: colorWithBlink } as never, 0, 0, d.size * 2.2);
+        ctx.scale(1.2, 1.2);
+        drawGadgetModel(ctx, d.kind, colorWithBlink, this.time);
 
         // Pulse ring when armed
         if (d.armed <= 0) {
@@ -9424,21 +10966,16 @@ export class GameEngine {
         ctx.setLineDash([]);
         // Pulsing aura
         const pulse = 0.5 + Math.sin(this.time * 3) * 0.2;
-        const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, d.size * 2);
-        rg.addColorStop(0, rgba(d.color, pulse * 0.5));
-        rg.addColorStop(1, rgba(d.color, 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size * 2, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, 0, 0, d.size * 2, `hs|${d.color}`, [[0, rgba(d.color, 0.5)], [1, rgba(d.color, 0)]], pulse);
 
-        // Render station icon
-        drawGadgetIcon(ctx, { iconShape: "healing_station", color: d.color } as never, 0, 0, d.size * 2);
+        // Render station model
+        ctx.scale(1.2, 1.2);
+        drawGadgetModel(ctx, d.kind, d.color, this.time);
       }
       ctx.restore();
 
       // hp bar for turrets & healing station
-      if ((d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "healing_station") && d.hp < d.maxHp) {
+      if ((d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper" || d.kind === "healing_station") && d.hp < d.maxHp) {
         ctx.fillStyle = "rgba(0,0,0,0.55)";
         ctx.fillRect(d.x - 14, d.y - d.size - 10, 28, 4);
         ctx.fillStyle = rgba(d.color, 0.9);
@@ -9454,13 +10991,7 @@ export class GameEngine {
         const k = 1 - e.t / e.duration;
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius);
-        rg.addColorStop(0, rgba(e.color, 0.35 * k));
-        rg.addColorStop(1, rgba(e.color, 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, e.x, e.y, e.radius, `pc|${e.color}`, [[0, rgba(e.color, 0.35)], [1, rgba(e.color, 0)]], k);
         // floating bubbles
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * Math.PI * 2 + this.time;
@@ -9480,14 +11011,7 @@ export class GameEngine {
         const k = 1 - e.t / e.duration;
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius);
-        rg.addColorStop(0, rgba("#fde68a", 0.4 * k));
-        rg.addColorStop(0.5, rgba(e.color, 0.35 * k));
-        rg.addColorStop(1, rgba(e.color, 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, e.x, e.y, e.radius, `ff|${e.color}`, [[0, rgba("#fde68a", 0.4)], [0.5, rgba(e.color, 0.35)], [1, rgba(e.color, 0)]], k);
         ctx.restore();
       }
     }
@@ -9525,13 +11049,7 @@ export class GameEngine {
     ctx.arc(0, 0, b.radius + 12, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
     ctx.stroke();
 
-    const halo = ctx.createRadialGradient(0, 0, b.radius * 0.3, 0, 0, b.radius * 2);
-    halo.addColorStop(0, rgba(col, 0.35));
-    halo.addColorStop(1, rgba(col, 0));
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(0, 0, b.radius * 2, 0, Math.PI * 2);
-    ctx.fill();
+    this.fillGlow(ctx, 0, 0, b.radius * 2, `baseh|${col}`, [[0, rgba(col, 0.35)], [1, rgba(col, 0)]]);
 
     ctx.rotate(b.t * 0.4);
     ctx.beginPath();
@@ -9543,11 +11061,7 @@ export class GameEngine {
       else ctx.lineTo(px, py);
     }
     ctx.closePath();
-    const cg = ctx.createRadialGradient(0, 0, 2, 0, 0, b.radius);
-    cg.addColorStop(0, b.flash > 0 ? "#ffffff" : "#dbeafe");
-    cg.addColorStop(0.6, col);
-    cg.addColorStop(1, shade(col, -0.3));
-    ctx.fillStyle = cg;
+    ctx.fillStyle = this.radialGlow(ctx, b.radius, `basec|${col}|${b.flash > 0 ? "w" : "c"}`, [[0, b.flash > 0 ? "#ffffff" : "#dbeafe"], [0.6, col], [1, shade(col, -0.3)]]);
     ctx.fill();
     ctx.strokeStyle = "rgba(8,10,25,0.6)";
     ctx.lineWidth = 2;
@@ -9654,7 +11168,7 @@ export class GameEngine {
       const color = gr.kind === "fire" ? "#f97316" : gr.kind === "glue" ? "#06b6d4" : gr.kind === "poison" ? "#22c55e" : "#fbbf24";
       // Spinning rotation effect for throwing grenades
       ctx.rotate(this.time * 6);
-      drawGadgetIcon(ctx, { iconShape: gr.kind + "_grenade", color: color } as never, 0, 0, 15);
+      drawGadgetModel(ctx, gr.kind + "_grenade", color, this.time);
       ctx.restore();
     }
   }
@@ -9675,13 +11189,7 @@ export class GameEngine {
       if (e.type === "elite") {
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.size * 2.5);
-        rg.addColorStop(0, rgba("#fb7185", 0.25));
-        rg.addColorStop(1, rgba("#fb7185", 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.size * 2.5, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, e.x, e.y, e.size * 2.5, `elite`, [[0, rgba("#fb7185", 0.25)], [1, rgba("#fb7185", 0)]]);
         ctx.restore();
       }
 
@@ -9795,13 +11303,7 @@ export class GameEngine {
     ctx.globalCompositeOperation = "lighter";
     for (const b of this.enemyBullets) {
       if (!this.inView(b.x, b.y, b.size * 3 + 6)) continue;
-      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3);
-      rg.addColorStop(0, rgba(b.color, 0.9));
-      rg.addColorStop(1, rgba(b.color, 0));
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size * 3, 0, Math.PI * 2);
-      ctx.fill();
+      this.fillGlow(ctx, b.x, b.y, b.size * 3, `eb|${b.color}|${b.size}`, [[0, rgba(b.color, 0.9)], [1, rgba(b.color, 0)]]);
       ctx.fillStyle = "#fff";
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.size * 0.7, 0, Math.PI * 2);
@@ -9854,11 +11356,7 @@ export class GameEngine {
     const oy = p.y + Math.sin(p.angle) * (p.size + g.barrel);
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const rg = ctx.createRadialGradient(ox, oy, 0, ox, oy, range);
-    rg.addColorStop(0, rgba("#fde68a", 0.5));
-    rg.addColorStop(0.4, rgba(g.glow, 0.35));
-    rg.addColorStop(1, rgba(g.glow, 0));
-    ctx.fillStyle = rg;
+    ctx.fillStyle = this.radialGlow(ctx, range, `flame|${g.glow}`, [[0, rgba("#fde68a", 0.5)], [0.4, rgba(g.glow, 0.35)], [1, rgba(g.glow, 0)]]);
     ctx.beginPath();
     ctx.moveTo(ox, oy);
     ctx.arc(ox, oy, range, p.angle - cone, p.angle + cone);
@@ -9974,8 +11472,11 @@ export class GameEngine {
       flash: p.flash > 0 ? Math.min(1, p.flash) : 0,
       glow,
       gun: this.gun,
+      gadget: this.selectedGadget >= 0 ? this.gadgets[this.selectedGadget] : undefined,
       meleeSwing: swing,
       lunge: p.lunge,
+      thrustCharging: p.thrustCharging,
+      thrustCharge: p.thrustCharge,
     });
 
     // electric arcs from a lightsaber hit
@@ -10151,6 +11652,16 @@ export class GameEngine {
     ctx.stroke();
   }
 
+  /** Resolve the current world position of a projectile's owner (for returning boomerangs). */
+  private ownerPos(b: Bullet): { x: number; y: number } {
+    if (this.combatants.length > 0) {
+      const c = this.combatants.find((c) => c.cid === b.ownerId);
+      if (c && c.player) return { x: c.player.x, y: c.player.y };
+    }
+    if (b.owner === "foe" && this.foe) return { x: this.foe.x, y: this.foe.y };
+    return { x: this.player.x, y: this.player.y };
+  }
+
   private drawBullets(ctx: CanvasRenderingContext2D) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -10165,30 +11676,69 @@ export class GameEngine {
         ctx.fill();
         // shell raised by its arc height (z-axis)
         ctx.globalCompositeOperation = "lighter";
-        const rg0 = ctx.createRadialGradient(b.x, b.y - b.z, 0, b.x, b.y - b.z, b.size * 3);
-        rg0.addColorStop(0, rgba(b.glow, 0.9));
-        rg0.addColorStop(1, rgba(b.glow, 0));
-        ctx.fillStyle = rg0;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y - b.z, b.size * 3, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, b.x, b.y - b.z, b.size * 3, `bz|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.9)], [1, rgba(b.glow, 0)]]);
         ctx.fillStyle = b.color;
         ctx.beginPath();
         ctx.arc(b.x, b.y - b.z, b.size, 0, Math.PI * 2);
         ctx.fill();
         continue;
       }
-      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3.4);
-      rg.addColorStop(0, rgba(b.glow, 0.85));
-      rg.addColorStop(1, rgba(b.glow, 0));
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size * 3.4, 0, Math.PI * 2);
-      ctx.fill();
+      if (b.kind === "boomerang") {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(this.time * 11);
+        ctx.fillStyle = this.radialGlow(ctx, b.size * 2.8, `bb|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.85)], [1, rgba(b.glow, 0)]]);
+        ctx.beginPath(); ctx.arc(0, 0, b.size * 2.8, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = b.size * 0.5;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(-b.size, b.size * 0.7);
+        ctx.quadraticCurveTo(0, -b.size * 1.2, b.size, b.size * 0.7);
+        ctx.stroke();
+        ctx.strokeStyle = "#fff4d6";
+        ctx.lineWidth = b.size * 0.18;
+        ctx.beginPath();
+        ctx.moveTo(-b.size, b.size * 0.7);
+        ctx.quadraticCurveTo(0, -b.size * 1.2, b.size, b.size * 0.7);
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      if (b.kind === "knife") {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(Math.atan2(b.vy, b.vx) + this.time * 9);
+        ctx.fillStyle = this.radialGlow(ctx, b.size * 2, `bk|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.7)], [1, rgba(b.glow, 0)]]);
+        ctx.beginPath(); ctx.arc(0, 0, b.size * 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.moveTo(b.size * 1.5, 0);
+        ctx.lineTo(-b.size * 0.5, -b.size * 0.55);
+        ctx.lineTo(-b.size * 1.2, 0);
+        ctx.lineTo(-b.size * 0.5, b.size * 0.55);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      this.fillGlow(ctx, b.x, b.y, b.size * 3.4, `bn|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.85)], [1, rgba(b.glow, 0)]]);
       ctx.fillStyle = b.color;
+      const bLen = Math.max(b.size * 2.5, b.size);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+      if (ctx.ellipse) {
+        ctx.ellipse(0, 0, bLen, Math.max(1, b.size * 0.5), 0, 0, Math.PI * 2);
+      } else {
+        ctx.arc(0, 0, b.size, 0, Math.PI * 2);
+      }
       ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -10237,10 +11787,88 @@ export class GameEngine {
     ctx.restore();
   }
 
+  private drawWeather(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    
+    // Draw raindrops
+    if (this.weather === "rain" && this.raindrops.length > 0) {
+      ctx.strokeStyle = "rgba(180, 200, 220, 0.4)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const r of this.raindrops) {
+        ctx.moveTo(r.x, r.y);
+        ctx.lineTo(r.x - r.vx * 0.05, r.y - r.vy * 0.05);
+      }
+      ctx.stroke();
+    }
+    
+    // Global tint / overlays
+    ctx.globalCompositeOperation = "source-over";
+    
+    // Time of day tint
+    if (this.timeOfDay === "morning") {
+      ctx.fillStyle = "rgba(255, 240, 200, 0.08)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.timeOfDay === "afternoon") {
+      ctx.fillStyle = "rgba(255, 180, 100, 0.04)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.timeOfDay === "night") {
+      ctx.fillStyle = "rgba(10, 15, 35, 0.35)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
+    
+    // Weather overlay
+    if (this.weather === "fog") {
+      ctx.fillStyle = "rgba(200, 210, 220, 0.25)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.weather === "overcast") {
+      ctx.fillStyle = "rgba(120, 130, 140, 0.15)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.weather === "rain") {
+      ctx.fillStyle = "rgba(90, 100, 110, 0.2)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
+    
+    ctx.restore();
+  }
+
+  private drawMeleeTrails(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const trail of this.meleeTrails) {
+      const alpha = Math.max(0, trail.life / trail.maxLife);
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.beginPath();
+      if (trail.weapon === "thrust_sword" && trail.length) {
+        ctx.strokeStyle = "#f472b6";
+        ctx.lineWidth = 14 * alpha;
+        ctx.lineCap = "round";
+        ctx.moveTo(trail.x, trail.y);
+        ctx.lineTo(trail.x + Math.cos(trail.angle) * trail.length, trail.y + Math.sin(trail.angle) * trail.length);
+        ctx.stroke();
+      } else if (trail.arc && trail.range) {
+        ctx.translate(trail.x, trail.y);
+        ctx.rotate(trail.angle);
+        const grad = ctx.createRadialGradient(0, 0, trail.range * 0.2, 0, 0, trail.range);
+        grad.addColorStop(0, trail.weapon === "lightsaber" ? "rgba(56,189,248,0)" : "rgba(255,255,255,0)");
+        grad.addColorStop(0.8, trail.weapon === "lightsaber" ? "rgba(56,189,248,0.5)" : "rgba(255,255,255,0.4)");
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = grad;
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, trail.range, -trail.arc, trail.arc);
+        ctx.fill();
+        ctx.rotate(-trail.angle);
+        ctx.translate(-trail.x, -trail.y);
+      }
+    }
+    ctx.restore();
+  }
+
   private drawEffects(ctx: CanvasRenderingContext2D, list: Effect[] = this.effects) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const e of list) {
+      if (!this.inView(e.x, e.y, (e.radius ?? 40) + 40)) continue;
       const k = e.t / e.duration;
       if (e.type === "explosion") {
         const r = e.radius * (0.3 + k * 0.9);
@@ -10821,7 +12449,7 @@ export class GameEngine {
     }
     
     // Draw interaction progress bar
-    if (this.gameMode === "cashout" && this.humanInteractProgress > 0) {
+    if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && this.humanInteractProgress > 0) {
       const cx = this.W / 2;
       const cy = this.H / 2 + 55;
       ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
@@ -10943,10 +12571,11 @@ export class GameEngine {
     this.exitMouseLock();
     
     // Sort teams by cash
-    const rank = [0, 1, 2, 3].sort((a, b) => this.teamCash[b] - this.teamCash[a]);
-    const isWin = rank[0] === 0 || rank[1] === 0; // Top 2 win
+    const teamIndices = Array.from({ length: this.teamCash.length }, (_, i) => i);
+    const rank = teamIndices.sort((a, b) => this.teamCash[b] - this.teamCash[a]);
+    const isWin = (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && this.gameMode === "cashout_5v5" ? (rank[0] === 0) : (rank[0] === 0 || rank[1] === 0); // Top 2 win for 4 teams, Top 1 for 2 teams
     
-    const teamNames = ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
+    const teamNames = this.gameMode === "cashout_5v5" ? ["蓝色小队", "赤红小队"] : ["玩家小队", "太阳小队", "闪电小队", "暗影小队"];
     const results = rank.map((tid, idx) => `${idx + 1}. ${teamNames[tid]} ($${this.teamCash[tid]})`).join("\n");
     const endMsg = isWin
       ? `恭喜获胜晋级！\n\n对局排名结算：\n${results}`
@@ -11190,8 +12819,8 @@ export class GameEngine {
                 // We'll let pickup happen if they interact and aren't holding V.
                 // But how to differentiate F and V? Right now `isInteracting` checks F.
                 // I will add V button logic later. For now, F picks up.
-                const isHoldingV = c.id === 0 ? this.keys.has("KeyV") : false; // For now bots don't use V
-                if (!isHoldingV) {
+                const isHoldingT = c.id === 0 ? this.keys.has("KeyT") : false;
+                if (!isHoldingT) {
                   st.carriedByCid = c.id;
                   st.vx = 0;
                   st.vy = 0;
@@ -11205,14 +12834,16 @@ export class GameEngine {
           }
         }
 
-        // Revive logic (V key)
+        // Revive logic (T key - 5s)
         let isBeingRevived = false;
+        let reviverCid: number | null = null;
         for (const c of this.combatants) {
           if (c.player.hp > 0 && c.teamId === st.teamId && c.id !== st.deadCid) {
             const d = Math.hypot(c.player.x - st.x, c.player.y - st.y);
-            const isHoldingV = c.id === 0 ? this.keys.has("KeyV") : false; // Bots don't revive yet
-            if (d < c.player.size + st.size + 30 && isHoldingV) {
+            const isHoldingT = c.id === 0 ? this.keys.has("KeyT") : (d < 80 && !this.enemies.some(e => Math.hypot(e.x - c.player.x, e.y - c.player.y) < 220));
+            if (d < c.player.size + st.size + 40 && isHoldingT) {
               isBeingRevived = true;
+              reviverCid = c.id;
               break;
             }
           }
@@ -11220,6 +12851,10 @@ export class GameEngine {
         
         if (isBeingRevived) {
           st.reviveProgress += dt;
+          if (reviverCid === 0) {
+            this.humanInteractProgress = Math.min(1, st.reviveProgress / 5.0);
+            this.humanInteractLabel = "正在复活队友 (5s)...";
+          }
           if (st.reviveProgress >= 5.0) {
             // Revive!
             const deadC = this.combatants.find(c => c.id === st.deadCid);
@@ -11230,7 +12865,7 @@ export class GameEngine {
               deadC.deadTimer = 0;
               deadC.respawnTimer = 0;
               this.statues = this.statues.filter(s => s.id !== st.id);
-              this.addScoreFeed(deadC.id === 0 ? "你已被复活" : `${deadC.name} 已被复活`, 0);
+              this.addScoreFeed(deadC.id === 0 ? "你已被复活！" : `${deadC.name} 已被复活！`, 0);
             }
           }
         } else {

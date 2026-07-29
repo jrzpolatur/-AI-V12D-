@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GameEngine, type HudState, type Loadout } from "../game/engine";
 import type { NetMode } from "../net/protocol";
 import type { Net } from "../net/Net";
-import { getCharacter, getOutfit, getGun } from "../game/content";
+import { getCharacter, getOutfit, getGun, findGun } from "../game/content";
 import { sound } from "../game/sound";
 import { drawWeaponIcon, drawWeaponModel, drawGadgetIcon } from "../game/draw";
 import { cn } from "../utils/cn";
@@ -115,7 +115,9 @@ function WeaponIcon({
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const q = getSettings().quality;
+    const maxDpr = q === "low" ? 1 : q === "medium" ? 1.5 : 2;
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     c.width = size * dpr;
     c.height = size * dpr;
     const ctx = c.getContext("2d");
@@ -152,7 +154,9 @@ function GadgetIcon({
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current!;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const q = getSettings().quality;
+    const maxDpr = q === "low" ? 1 : q === "medium" ? 1.5 : 2;
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     c.width = size * dpr;
     c.height = size * dpr;
     const ctx = c.getContext("2d")!;
@@ -375,7 +379,7 @@ export default function GameScreen({
               <span className="font-bold text-lime-300">{hud.kills}</span>
             </div>
           </div>
-        ) : hud.mode === "cashout" ? (
+        ) : (hud.mode === "cashout" || hud.mode === "cashout_5v5") ? (
           <div className="flex flex-col items-start gap-1.5 bg-black/55 p-3 rounded-xl border border-white/10 backdrop-blur min-w-[200px] pointer-events-auto">
             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-yellow-300">
               <span>💰</span>
@@ -383,11 +387,11 @@ export default function GameScreen({
             </div>
             
             <div className="w-full flex flex-col gap-1 mt-1">
-              {[0, 1, 2, 3]
+              {(hud.mode === "cashout_5v5" ? [0, 1] : [0, 1, 2, 3])
                 .map((tid) => ({
                   id: tid,
-                  name: ["我方小队", "太阳小队", "闪电小队", "暗影小队"][tid],
-                  color: ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"][tid],
+                  name: hud.mode === "cashout_5v5" ? ["蓝色小队", "赤红小队"][tid] : ["我方小队", "太阳小队", "闪电小队", "暗影小队"][tid],
+                  color: hud.mode === "cashout_5v5" ? ["#38bdf8", "#ef4444"][tid] : ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"][tid],
                   cash: hud.teamCash ? (hud.teamCash[tid] ?? 0) : 0,
                 }))
                 .sort((a, b) => b.cash - a.cash)
@@ -481,7 +485,7 @@ export default function GameScreen({
             </div>
           </div>
         )}
-        {hud.mode === "cashout" && hud.cashoutTimeLeft !== undefined && (
+        {(hud.mode === "cashout" || hud.mode === "cashout_5v5") && hud.cashoutTimeLeft !== undefined && (
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-3 rounded-xl bg-black/55 px-4 py-2 border border-white/10 backdrop-blur pointer-events-auto">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">剩余时间</span>
@@ -923,7 +927,14 @@ export default function GameScreen({
                 return logs.map((log, idx) => {
                   const delay = (idx * stepTime).toFixed(3) + "s";
                   const dur = animDuration.toFixed(3) + "s";
-                  const gun = getGun(log.weapon);
+                  const gun = findGun(log.weapon);
+                  // Friendly labels for non-gun weapon keys
+                  const genericLabel = !gun ? (
+                    log.weapon === "enemy_attack" ? "👾 怪物" :
+                    log.weapon === "combatant_attack" ? "⚔️ 攻击" :
+                    log.weapon === "charge_slam" ? "💥 冲撞" :
+                    "⚡ 攻击"
+                  ) : null;
 
                   return (
                     <div
@@ -956,7 +967,7 @@ export default function GameScreen({
                           {gun ? (
                             <WeaponIcon iconShape={gun.iconShape} glow={gun.glow} gunId={gun.id} size={22} />
                           ) : (
-                            <span className="text-amber-400 font-bold px-1 text-xs">⚡ 攻击</span>
+                            <span className="text-amber-400 font-bold px-1 text-xs">{genericLabel}</span>
                           )}
                         </div>
                       </div>
@@ -1000,7 +1011,8 @@ export default function GameScreen({
 
       {/* ============ BATTLEFIELD STYLE SCORE FEED ============ */}
       {hud.activeScoreFeed && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[32%] flex flex-col items-center justify-center gap-1 z-50 animate-score-pop"
+        <div key={`sf-${hud.activeScoreFeed.totalScore}-${hud.activeScoreFeed.events[0]?.id ?? 0}-${hud.activeScoreFeed.totalKills}`}
+             className="pointer-events-none absolute inset-x-0 bottom-[32%] flex flex-col items-center justify-center gap-1 z-50 animate-score-pop"
              style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.85))" }}>
           
           <div className="flex items-center gap-2 text-2xl font-black mb-1">
@@ -1060,11 +1072,14 @@ export default function GameScreen({
       )}
 
       <style>{`
+        /* Matches the engine's 5s activeScoreFeed lifetime. The wrapper is
+           keyed on the feed contents so every new hit/kill re-pops the
+           animation instead of merging into an already-faded-out element. */
         @keyframes bf-score-pop {
           0% { transform: translateY(15px) scale(0.85); opacity: 0; }
-          12% { transform: translateY(0) scale(1.05); opacity: 1; }
-          25% { transform: translateY(0) scale(1); opacity: 1; }
-          80% { transform: translateY(0) scale(1); opacity: 1; }
+          5% { transform: translateY(0) scale(1.05); opacity: 1; }
+          10% { transform: translateY(0) scale(1); opacity: 1; }
+          88% { transform: translateY(0) scale(1); opacity: 1; }
           100% { transform: translateY(-10px) scale(1); opacity: 0; }
         }
         @keyframes kf-slide-in {
@@ -1072,7 +1087,7 @@ export default function GameScreen({
           100% { transform: translateX(0); opacity: 1; }
         }
         .animate-score-pop {
-          animation: bf-score-pop 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: bf-score-pop 5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .animate-kf-slide {
           animation: kf-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;

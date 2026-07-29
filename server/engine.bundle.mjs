@@ -7,9 +7,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "pistol",
     iconShape: "pistol",
-    damage: 55,
+    damage: 37,
     fireRate: 7,
-    bulletSpeed: 1460,
+    bulletSpeed: 1860,
     bulletSize: 5,
     spread: 0.03,
     pellets: 1,
@@ -32,9 +32,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "mac11",
     iconShape: "mac11",
-    damage: 18,
+    damage: 16,
     fireRate: 16,
-    bulletSpeed: 840,
+    bulletSpeed: 1950,
     bulletSize: 4,
     spread: 0.13,
     pellets: 1,
@@ -56,9 +56,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "mp5",
     iconShape: "mp5",
-    damage: 24,
+    damage: 18,
     fireRate: 14,
-    bulletSpeed: 920,
+    bulletSpeed: 2220,
     bulletSize: 4.5,
     spread: 0.08,
     pellets: 1,
@@ -82,7 +82,7 @@ var guns_default = [
     iconShape: "mortar",
     damage: 78,
     fireRate: 1.6,
-    bulletSpeed: 520,
+    bulletSpeed: 1040,
     bulletSize: 11,
     spread: 0.03,
     pellets: 1,
@@ -93,7 +93,7 @@ var guns_default = [
     color: "#fdba74",
     glow: "#fb923c",
     explosive: true,
-    explosionRadius: 70,
+    explosionRadius: 140,
     kind: "grenade",
     bounces: 1,
     aimIndicator: true,
@@ -109,9 +109,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "sniper",
     iconShape: "sniper",
-    damage: 270,
+    damage: 162,
     fireRate: 0.9,
-    bulletSpeed: 1750,
+    bulletSpeed: 2750,
     bulletSize: 6,
     spread: 0,
     pellets: 1,
@@ -133,7 +133,7 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "rocket",
     iconShape: "rocket",
-    damage: 225,
+    damage: 115,
     fireRate: 0.72,
     bulletSpeed: 480,
     bulletSize: 9,
@@ -159,9 +159,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "akm",
     iconShape: "akm",
-    damage: 34,
+    damage: 20,
     fireRate: 10,
-    bulletSpeed: 1240,
+    bulletSpeed: 2270,
     bulletSize: 5,
     spread: 0.07,
     pellets: 1,
@@ -183,9 +183,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "fcar",
     iconShape: "fcar",
-    damage: 43,
+    damage: 23,
     fireRate: 9,
-    bulletSpeed: 1300,
+    bulletSpeed: 2350,
     bulletSize: 6,
     spread: 0.055,
     pellets: 1,
@@ -196,7 +196,7 @@ var guns_default = [
     glow: "#14b8a6",
     kind: "tracer",
     barrel: 28,
-    magazine: 20,
+    magazine: 24,
     reloadTime: 2.6,
     rangeTier: "\u4E2D"
   },
@@ -207,7 +207,7 @@ var guns_default = [
     weaponClass: "beam",
     shape: "pulse",
     iconShape: "pulse",
-    damage: 335,
+    damage: 185,
     fireRate: 1,
     bulletSpeed: 0,
     bulletSize: 0,
@@ -232,7 +232,7 @@ var guns_default = [
     weaponClass: "melee",
     shape: "lightsaber",
     iconShape: "lightsaber",
-    damage: 155,
+    damage: 110,
     fireRate: 3,
     bulletSpeed: 0,
     bulletSize: 0,
@@ -246,7 +246,7 @@ var guns_default = [
     kind: "bullet",
     barrel: 0,
     meleeRange: 82,
-    meleeArc: 2.5,
+    meleeArc: 2.705,
     rangeTier: "\u8FD1"
   },
   {
@@ -270,8 +270,8 @@ var guns_default = [
     kind: "bullet",
     barrel: 0,
     meleeRange: 74,
-    meleeArc: 1.8,
-    slamDamage: 280,
+    meleeArc: 2.705,
+    slamDamage: 260,
     explosionRadius: 100,
     rangeTier: "\u8FD1"
   },
@@ -295,8 +295,8 @@ var guns_default = [
     glow: "#f97316",
     kind: "flame",
     barrel: 24,
-    flameCone: 0.42,
-    flameRange: 150,
+    flameCone: 0.08,
+    flameRange: 300,
     heatPerShot: 0.35,
     coolRate: 0.55,
     rangeTier: "\u8FD1"
@@ -308,12 +308,12 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "sa1216",
     iconShape: "sa1216",
-    damage: 12,
-    fireRate: 5.5,
-    bulletSpeed: 810,
+    damage: 6,
+    fireRate: 3.5,
+    bulletSpeed: 1710,
     bulletSize: 4.5,
     spread: 0.18,
-    pellets: 8,
+    pellets: 12,
     pierce: 0,
     life: 0.45,
     knockback: 200,
@@ -332,7 +332,7 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "mgl32",
     iconShape: "mgl32",
-    damage: 110,
+    damage: 84,
     fireRate: 1.8,
     bulletSpeed: 1260,
     bulletSize: 8,
@@ -410,9 +410,9 @@ var guns_default = [
     weaponClass: "bow",
     shape: "recurve_bow",
     iconShape: "recurve_bow",
-    damage: 44,
+    damage: 46,
     fireRate: 1.5,
-    bulletSpeed: 600,
+    bulletSpeed: 1200,
     bulletSize: 5,
     spread: 0.01,
     pellets: 1,
@@ -437,7 +437,7 @@ var guns_default = [
     weaponClass: "shield",
     shape: "riot_shield",
     iconShape: "riot_shield",
-    damage: 126,
+    damage: 90,
     fireRate: 1.8,
     bulletSpeed: 0,
     bulletSize: 0,
@@ -466,9 +466,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "shak50",
     iconShape: "shak50",
-    damage: 35,
+    damage: 16,
     fireRate: 7,
-    bulletSpeed: 1100,
+    bulletSpeed: 1900,
     bulletSize: 6,
     spread: 0,
     pellets: 2,
@@ -493,9 +493,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "pistol",
     iconShape: "pistol",
-    damage: 122,
+    damage: 74,
     fireRate: 3.2,
-    bulletSpeed: 1600,
+    bulletSpeed: 2200,
     bulletSize: 5.5,
     spread: 0.012,
     pellets: 1,
@@ -518,9 +518,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "sniper",
     iconShape: "sniper",
-    damage: 320,
+    damage: 175,
     fireRate: 0.85,
-    bulletSpeed: 1900,
+    bulletSpeed: 2900,
     bulletSize: 7,
     spread: 0,
     pellets: 1,
@@ -542,9 +542,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "gatling",
     iconShape: "gatling",
-    damage: 21,
+    damage: 12,
     fireRate: 19,
-    bulletSpeed: 1550,
+    bulletSpeed: 2650,
     bulletSize: 4.5,
     spread: 0.135,
     pellets: 1,
@@ -637,7 +637,13 @@ var guns_default = [
     meleeRange: 78,
     meleeArc: 2,
     comboLength: 5,
-    comboDamage: [55, 55, 70, 70, 200],
+    comboDamage: [
+      55,
+      55,
+      70,
+      70,
+      200
+    ],
     reflectRange: 96,
     reflectSelfDamage: 0.05,
     rangeTier: "\u8FD1"
@@ -657,17 +663,40 @@ var guns_default = [
     pellets: 0,
     pierce: 0,
     life: 0,
-    knockback: 220,
+    knockback: 0,
     color: "#fbcfe8",
     glow: "#f472b6",
     kind: "bullet",
     barrel: 0,
     meleeRange: 88,
-    meleeArc: 1.6,
+    meleeArc: 2.705,
     chargeMin: 0.5,
     chargeDashDamage: 140,
     chargeDashDist: 210,
     chargeDashRange: 34,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "dragon_breath",
+    name: "\u9F99\u606F\u55B7",
+    desc: "\u9F99\u606F\u8FDE\u53D1\u6563\u5F39\xB7\u55B7\u5C04\u5BC6\u96C6\u4EA4\u7EC7\u7684\u9F99\u606F\u706B\u7FBD\u4E0E\u660E\u706B\uFF0C\u9644\u5E26\u5F3A\u529B\u707C\u70E7(1.5s)",
+    weaponClass: "shotgun",
+    shape: "dragon_breath",
+    iconShape: "dragon_breath",
+    damage: 26,
+    fireRate: 3.2,
+    bulletSpeed: 720,
+    bulletSize: 6,
+    spread: 0.24,
+    pellets: 6,
+    pierce: 0,
+    life: 0.38,
+    knockback: 60,
+    color: "#ea580c",
+    glow: "#fb923c",
+    magazine: 8,
+    reloadTime: 1.8,
+    kind: "bullet",
     rangeTier: "\u8FD1"
   },
   {
@@ -677,9 +706,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "plasma_rifle",
     iconShape: "plasma_rifle",
-    damage: 34,
+    damage: 22,
     fireRate: 4.5,
-    bulletSpeed: 980,
+    bulletSpeed: 2280,
     bulletSize: 8,
     spread: 0.02,
     pellets: 1,
@@ -705,9 +734,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "lewis",
     iconShape: "lewis",
-    damage: 30,
+    damage: 24,
     fireRate: 8.5,
-    bulletSpeed: 1500,
+    bulletSpeed: 1900,
     bulletSize: 6,
     spread: 0.085,
     pellets: 1,
@@ -729,9 +758,9 @@ var guns_default = [
     weaponClass: "ranged",
     shape: "sniper",
     iconShape: "sniper",
-    damage: 68,
+    damage: 55,
     fireRate: 2.8,
-    bulletSpeed: 1700,
+    bulletSpeed: 2460,
     bulletSize: 5,
     spread: 0.012,
     pellets: 1,
@@ -748,6 +777,182 @@ var guns_default = [
     magazine: 15,
     reloadTime: 2.3,
     rangeTier: "\u8FDC"
+  },
+  {
+    id: "m1887",
+    name: "M1887 \u6CF5\u52A8\u9730\u5F39\u67AA",
+    desc: "\u7ECF\u5178\u6CF5\u52A8\u9730\u5F39\u67AA\uFF1A\u8FD1\u8DDD\u79BB\u77AC\u95F4\u9AD8\u7206\u53D1\uFF0C\u4E2D\u8FDC\u8DDD\u79BB\u8870\u51CF\u660E\u663E\uFF0C\u9002\u5408\u8D34\u8138\u538B\u5236\u3002",
+    weaponClass: "ranged",
+    shape: "m1887",
+    damage: 14,
+    fireRate: 1.7,
+    bulletSpeed: 2e3,
+    bulletSize: 4.6,
+    spread: 0.09,
+    pellets: 9,
+    pierce: 0,
+    life: 0.72,
+    knockback: 8,
+    color: "#ffd9a0",
+    glow: "#ff9d3c",
+    kind: "pellet",
+    semiAuto: true,
+    barrel: 16,
+    magazine: 6,
+    reloadTime: 1.8,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "throwing_knife",
+    name: "\u98DE\u5200",
+    desc: "\u53EF\u6295\u63B7\u7684\u5229\u5203\uFF1A\u98DE\u884C\u6781\u5FEB\u3001\u53EF\u7A7F\u900F\u4E00\u540D\u654C\u4EBA\uFF0C\u9002\u5408\u7075\u6D3B\u8865\u5200\u4E0E\u7ED5\u540E\u5077\u88AD\u3002",
+    weaponClass: "ranged",
+    shape: "knife",
+    damage: 60,
+    fireRate: 3.2,
+    bulletSpeed: 1480,
+    bulletSize: 9.1,
+    spread: 0.03,
+    pellets: 1,
+    pierce: 1,
+    life: 0.6,
+    knockback: 3,
+    color: "#dfe7ef",
+    glow: "#9fd0ff",
+    kind: "knife",
+    barrel: 8,
+    chargeMin: 0.15,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "flame_boomerang",
+    name: "\u706B\u7130\u56DE\u65CB\u9556",
+    desc: "\u63B7\u51FA\u540E\u5411\u524D\u98DE\u51FA\u518D\u56DE\u65CB\u5F52\u6765\uFF0C\u6CBF\u9014\u707C\u70E7\u654C\u4EBA\uFF0C\u53BB\u7A0B\u4E0E\u56DE\u7A0B\u5404\u9020\u6210\u4E00\u6B21\u4F24\u5BB3\u4E14\u53EF\u591A\u6B21\u7A7F\u900F\u3002",
+    weaponClass: "ranged",
+    shape: "boomerang",
+    damage: 76,
+    fireRate: 1.5,
+    bulletSpeed: 1120,
+    bulletSize: 14.3,
+    spread: 0,
+    pellets: 1,
+    pierce: 999,
+    life: 2,
+    knockback: 5,
+    color: "#ff8a3c",
+    glow: "#ff5a1f",
+    kind: "boomerang",
+    barrel: 10,
+    range: 562.5,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "railgun",
+    name: "\u8F68\u9053\u72D9\u51FB\u70AE",
+    desc: "\u5C04\u901F\u6781\u6162\u4F46\u62E5\u6709\u8D85\u9AD8\u5355\u53D1\u4F24\u5BB3\u4E0E\u7A7F\u900F\u80FD\u529B\u7684\u80FD\u91CF\u72D9\u51FB\u67AA",
+    weaponClass: "ranged",
+    shape: "sniper",
+    damage: 280,
+    fireRate: 0.8,
+    bulletSpeed: 2500,
+    bulletSize: 12,
+    spread: 0,
+    pellets: 1,
+    pierce: 99,
+    life: 1.5,
+    knockback: 80,
+    color: "#f3e8ff",
+    glow: "#a855f7",
+    kind: "tracer",
+    barrel: 24,
+    rangeTier: "\u8FDC"
+  },
+  {
+    id: "plasma_repeater",
+    name: "\u7B49\u79BB\u5B50\u8FDE\u53D1\u67AA",
+    desc: "\u53D1\u5C04\u80FD\u5728\u5899\u58C1\u4E0A\u53CD\u5F39\u7684\u7B49\u79BB\u5B50\u5F39",
+    weaponClass: "ranged",
+    shape: "rifle",
+    damage: 42,
+    fireRate: 6,
+    bulletSpeed: 750,
+    bulletSize: 8,
+    spread: 0.05,
+    pellets: 1,
+    pierce: 0,
+    bounces: 3,
+    life: 1.2,
+    knockback: 10,
+    color: "#cffafe",
+    glow: "#67e8f9",
+    kind: "bullet",
+    barrel: 18,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "chemical_sprayer",
+    name: "\u5316\u5B66\u55B7\u5C04\u5668",
+    desc: "\u6301\u7EED\u55B7\u5C04\u5267\u6BD2\u7269\u8D28\uFF0C\u9020\u6210\u9AD8\u9891\u7387\u4F24\u5BB3\u5E76\u7A7F\u900F\u654C\u4EBA",
+    weaponClass: "ranged",
+    shape: "heavy",
+    damage: 18,
+    fireRate: 15,
+    bulletSpeed: 450,
+    bulletSize: 16,
+    spread: 0.15,
+    pellets: 1,
+    pierce: 99,
+    life: 0.6,
+    knockback: 2,
+    color: "#f7fee7",
+    glow: "#a3e635",
+    kind: "flame",
+    barrel: 22,
+    rangeTier: "\u8FD1"
+  },
+  {
+    id: "shuriken",
+    name: "\u5F71\u6D41\u624B\u91CC\u5251",
+    desc: "\u4E00\u6B21\u63B7\u51FA3\u679A\u5448\u6247\u5F62\u7684\u7A7F\u900F\u624B\u91CC\u5251",
+    weaponClass: "ranged",
+    shape: "knife",
+    damage: 35,
+    fireRate: 3,
+    bulletSpeed: 900,
+    bulletSize: 10,
+    spread: 0.15,
+    pellets: 3,
+    pierce: 2,
+    life: 0.8,
+    knockback: 10,
+    color: "#e0f2fe",
+    glow: "#38bdf8",
+    kind: "boomerang",
+    barrel: 10,
+    rangeTier: "\u4E2D"
+  },
+  {
+    id: "chainsaw",
+    name: "\u72C2\u6012\u7535\u952F",
+    desc: "\u6309\u4F4F\u653B\u51FB\u53EF\u50CF\u7535\u952F\u4E00\u6837\u6781\u901F\u5207\u5272\u524D\u65B9\u7684\u654C\u4EBA",
+    weaponClass: "melee",
+    shape: "sword",
+    damage: 22,
+    fireRate: 12,
+    bulletSpeed: 0,
+    bulletSize: 0,
+    spread: 0,
+    pellets: 0,
+    pierce: 0,
+    life: 0,
+    knockback: 5,
+    color: "#fee2e2",
+    glow: "#ef4444",
+    kind: "bullet",
+    barrel: 0,
+    meleeRange: 55,
+    meleeArc: 1,
+    rangeTier: "\u8FD1"
   }
 ];
 
@@ -918,6 +1123,74 @@ var OUTFITS = [
     speedBonus: 0,
     hpBonus: 0,
     fireRateBonus: 0.05
+  },
+  {
+    id: "medic",
+    name: "\u6218\u5730\u533B\u7597\u5175",
+    suit: "#f8fafc",
+    suitDark: "#cbd5e1",
+    accent: "#ef4444",
+    hat: "helmet",
+    perk: "\u8840\u91CF +12",
+    speedBonus: 0,
+    hpBonus: 12
+  },
+  {
+    id: "cyber_ninja",
+    name: "\u8D5B\u535A\u5FCD\u8005",
+    suit: "#0f172a",
+    suitDark: "#020617",
+    accent: "#4ade80",
+    hat: "hood",
+    perk: "\u79FB\u901F +8%",
+    speedBonus: 0.08,
+    hpBonus: 0
+  },
+  {
+    id: "pirate",
+    name: "\u661F\u9645\u6D77\u76D7",
+    suit: "#78350f",
+    suitDark: "#451a03",
+    accent: "#fbbf24",
+    hat: "cap",
+    perk: "\u5C04\u901F +4%\uFF0C\u79FB\u901F +2%",
+    speedBonus: 0.02,
+    hpBonus: 0,
+    fireRateBonus: 0.04
+  },
+  {
+    id: "royal_guard",
+    name: "\u7687\u5BB6\u536B\u58EB",
+    suit: "#7f1d1d",
+    suitDark: "#450a0a",
+    accent: "#fcd34d",
+    hat: "visor",
+    perk: "\u8840\u91CF +15",
+    speedBonus: 0,
+    hpBonus: 15
+  },
+  {
+    id: "hazard",
+    name: "\u9632\u5316\u6E05\u9053\u592B",
+    suit: "#eab308",
+    suitDark: "#a16207",
+    accent: "#171717",
+    hat: "visor",
+    perk: "\u65E0\u989D\u5916\u52A0\u6210",
+    speedBonus: 0,
+    hpBonus: 0
+  },
+  {
+    id: "ghost",
+    name: "\u5E7D\u7075\u7279\u5DE5",
+    suit: "#f8fafc",
+    suitDark: "#94a3b8",
+    accent: "#60a5fa",
+    hat: "hood",
+    perk: "\u79FB\u901F +5%\uFF0C\u5C04\u901F +3%",
+    speedBonus: 0.05,
+    hpBonus: 0,
+    fireRateBonus: 0.03
   }
 ];
 var GUNS = guns_default;
@@ -1133,6 +1406,40 @@ var GADGETS = [
     projectileDamage: 20,
     projectileSpeed: 1e3,
     ccDuration: 3
+  },
+  {
+    id: "turret_sniper",
+    kind: "turret_sniper",
+    name: "\u72D9\u51FB\u70AE\u5854",
+    desc: "\u90E8\u7F72\u4E00\u53F0\u9AD8\u4EAE\u7EA2\u5916\u7EBF\u7684\u70AE\u5854\uFF0C\u5C04\u901F\u6781\u6162\uFF0C\u4F46\u6BCF\u6B21\u53D1\u5C04\u9AD8\u4F24\u5BB3\u7A7F\u900F\u5F39\uFF08\u6C38\u4E45\u5B58\u5728\uFF09",
+    cooldown: 25,
+    iconShape: "turret_sniper",
+    color: "#f43f5e",
+    // rose
+    maxStack: 2,
+    hp: 120
+  },
+  {
+    id: "mine_stun",
+    kind: "mine_stun",
+    name: "\u9707\u64BC\u5730\u96F7",
+    desc: "\u89E6\u53D1\u540E\u7206\u70B8\u8303\u56F4\u8F83\u5C0F\uFF0C\u4F46\u4F1A\u4F7F\u8303\u56F4\u5185\u6240\u6709\u654C\u4EBA\u9677\u5165\u957F\u65F6\u95F4\u762B\u75EA",
+    cooldown: 22,
+    iconShape: "mine_stun",
+    color: "#fde047",
+    // yellow
+    maxStack: 3
+  },
+  {
+    id: "cluster_grenade",
+    kind: "cluster_grenade",
+    name: "\u96C6\u675F\u624B\u96F7",
+    desc: "\u6295\u63B7\u4E00\u679A\u624B\u96F7\uFF0C\u843D\u5730\u7206\u70B8\u540E\u5411\u56DB\u5468\u6563\u5E034\u679A\u5FAE\u578B\u70B8\u5F39",
+    cooldown: 28,
+    iconShape: "cluster_grenade",
+    color: "#f97316",
+    // orange
+    maxStack: 2
   }
 ];
 var MONSTERS = [
@@ -1402,14 +1709,23 @@ var STEEL_L = "#5a6478";
 var STEEL_X = "#727d93";
 var WOOD = "#a9743a";
 var WOOD_D = "#6e4a24";
+var glowCache = /* @__PURE__ */ new Map();
+function glow(ctx, r, key, stops) {
+  const g = glowCache.get(key);
+  if (g) return g;
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  for (const [o, c] of stops) grad.addColorStop(o, c);
+  glowCache.set(key, grad);
+  return grad;
+}
 function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   const body = (x, y, w, h, c1, c2, r = 2) => {
-    const g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, c1);
-    g.addColorStop(1, c2);
-    ctx.fillStyle = g;
+    const g2 = ctx.createLinearGradient(0, y, 0, y + h);
+    g2.addColorStop(0, c1);
+    g2.addColorStop(1, c2);
+    ctx.fillStyle = g2;
     roundRect(ctx, x, y, w, h, r);
     ctx.fill();
     ctx.strokeStyle = DARK;
@@ -1425,9 +1741,13 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
     ctx.stroke();
   };
   if (gun.weaponClass === "melee") {
-    const swingArc = (gun.meleeArc ?? 2) * 0.8;
-    ctx.rotate(-swingArc / 2 + swing * swingArc);
+    if (swing > 0) {
+      const full = gun.meleeArc ?? 2.4;
+      ctx.rotate(-full / 2 + swing * full);
+      ctx.translate(Math.sin(swing * Math.PI) * 14, 0);
+    }
   }
+  const g = gun.barrel ?? 13;
   switch (gun.shape) {
     // ---------------- PISTOL (手枪) ----------------
     case "pistol": {
@@ -1827,6 +2147,26 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
       ctx.moveTo(16 - pull, -3);
       ctx.lineTo(21 - pull, 0);
       ctx.lineTo(16 - pull, 3);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    // ---------------- DRAGON'S BREATH (龙息喷) ----------------
+    case "dragon_breath": {
+      body(-7, -4, 18, 8, "#7c2d12", "#451a03", 2);
+      body(11, -2.4, 12, 4.8, STEEL_X, STEEL, 1);
+      block(11, -3, 3, 6, "#ea580c", 0.6);
+      ctx.fillStyle = gun.glow;
+      for (let i = 0; i < 3; i++) {
+        roundRect(ctx, 13 + i * 3, -1.8, 1.8, 3.6, 0.4);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#f97316";
+      ctx.beginPath();
+      ctx.moveTo(21, -3);
+      ctx.lineTo(24, -6);
+      ctx.lineTo(23, -2);
+      ctx.closePath();
       ctx.fill();
       break;
     }
@@ -1924,7 +2264,7 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
     }
     // ---------------- DUAL BLADES (双刃) ----------------
     case "dual_blades": {
-      const glow = rgba(gun.glow, 0.85);
+      const glow2 = rgba(gun.glow, 0.85);
       const flick = 1 + Math.sin(t * 26) * 0.06;
       const len = (gun.meleeRange ?? 78) * 0.52;
       ctx.save();
@@ -1939,7 +2279,7 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
       ctx.stroke();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = glow;
+      ctx.strokeStyle = glow2;
       ctx.lineWidth = 1.6 * flick;
       ctx.stroke();
       ctx.restore();
@@ -1956,7 +2296,7 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
       ctx.stroke();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = glow;
+      ctx.strokeStyle = glow2;
       ctx.lineWidth = 1.6 * flick;
       ctx.stroke();
       ctx.restore();
@@ -1991,6 +2331,57 @@ function drawWeapon(ctx, gun, accent, t = 0, swing = 0) {
       ctx.lineTo(len - 3, 0);
       ctx.stroke();
       ctx.restore();
+      break;
+    }
+    case "m1887": {
+      block(-g * 0.5, -g * 0.2, g * 1.5, g * 0.4, "#3b3f4b", "#23262e", 2);
+      block(g * 0.7, -g * 0.13, g * 0.5, g * 0.26, gun.color, STEEL_D, 1);
+      block(-g * 0.5, g * 0.05, g * 0.6, g * 0.34, "#23262e", "#000000", 1);
+      break;
+    }
+    case "knife": {
+      ctx.fillStyle = gun.color;
+      ctx.beginPath();
+      ctx.moveTo(g * 0.9, 0);
+      ctx.lineTo(-g * 0.5, -g * 0.22);
+      ctx.lineTo(-g * 0.7, 0);
+      ctx.lineTo(-g * 0.5, g * 0.22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#23262e";
+      ctx.fillRect(-g * 0.85, -g * 0.1, g * 0.25, g * 0.2);
+      break;
+    }
+    case "boomerang": {
+      ctx.strokeStyle = gun.color;
+      ctx.lineWidth = g * 0.26;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-g * 0.7, g * 0.5);
+      ctx.quadraticCurveTo(0, -g * 0.8, g * 0.7, g * 0.5);
+      ctx.stroke();
+      break;
+    }
+    case "sword": {
+      const len = (gun.meleeRange ?? 55) * 0.9;
+      body(-8, -5, 12, 10, "#fb923c", "#c2410c", 2);
+      block(-6, -2, 6, 4, STEEL_D, 1);
+      body(4, -2.5, len, 5, STEEL, STEEL_D, 1);
+      ctx.fillStyle = "#1e293b";
+      const shift = t * 60 % 6;
+      for (let i = 0; i < len; i += 6) {
+        if (i - shift > 0) {
+          ctx.fillRect(4 + i - shift, -3.5, 3, 1.5);
+          ctx.fillRect(4 + i - shift, 2, 3, 1.5);
+        }
+      }
+      break;
+    }
+    case "heavy": {
+      body(-10, -6, 24, 12, STEEL_X, STEEL, 2);
+      body(-6, -4, 14, 8, "#bef264", "#4d7c0f", 2);
+      body(14, -2, 14, 4, STEEL_L, STEEL_D, 1);
+      body(28, -3.5, 6, 7, STEEL_D, "#0f172a", 1);
       break;
     }
     default: {
@@ -2131,10 +2522,7 @@ function drawCharacter(ctx, opts) {
   ctx.translate(x + Math.cos(angle) * (opts.lunge ?? 0), y + Math.sin(angle) * (opts.lunge ?? 0));
   ctx.rotate(angle);
   if (opts.glow) {
-    const g = ctx.createRadialGradient(0, 0, size * 0.4, 0, 0, size * 2.2);
-    g.addColorStop(0, rgba(opts.glow, 0.35));
-    g.addColorStop(1, rgba(opts.glow, 0));
-    ctx.fillStyle = g;
+    ctx.fillStyle = glow(ctx, size * 2.2, `char|${opts.glow}|${Math.round(size)}`, [[0, rgba(opts.glow, 0.35)], [1, rgba(opts.glow, 0)]]);
     ctx.beginPath();
     ctx.arc(0, 0, size * 2.2, 0, Math.PI * 2);
     ctx.fill();
@@ -2205,9 +2593,15 @@ function drawCharacter(ctx, opts) {
   ctx.moveTo(r * 0.1, -r * 0.5);
   ctx.lineTo(-r * 0.1, -r * 0.85);
   ctx.stroke();
+  const isCharging = opts.thrustCharging ?? false;
+  const chargeVal = opts.thrustCharge ?? 0;
+  const chargePct = isCharging ? Math.min(1, chargeVal / 0.5) : 0;
+  const chargeBack = chargePct * r * 0.75;
+  const weaponHandX = isCharging ? r * 0.55 - chargeBack : r * 0.55;
+  const weaponHandY = isCharging ? r * 0.62 - chargePct * r * 0.15 : r * 0.62;
   ctx.beginPath();
   ctx.moveTo(r * 0.2, r * 0.5);
-  ctx.lineTo(r * 0.55, r * 0.62);
+  ctx.lineTo(weaponHandX, weaponHandY);
   ctx.stroke();
   ctx.lineCap = "butt";
   ctx.fillStyle = shade(suit, 0.1);
@@ -2215,7 +2609,7 @@ function drawCharacter(ctx, opts) {
   ctx.arc(-r * 0.12, -r * 0.85, r * 0.16, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(r * 0.55, r * 0.62, r * 0.16, 0, Math.PI * 2);
+  ctx.arc(weaponHandX, weaponHandY, r * 0.16, 0, Math.PI * 2);
   ctx.fill();
   const headX = r * 0.18;
   ctx.fillStyle = flash > 0 ? "#ffffff" : outfit.skin ?? character.skin;
@@ -2241,9 +2635,19 @@ function drawCharacter(ctx, opts) {
   ctx.translate(headX, 0);
   drawHat(ctx, outfit.hat, outfit.suit, r * 0.62);
   ctx.restore();
-  if (opts.gun) {
+  if (opts.gadget) {
     ctx.save();
-    ctx.translate(r * 0.55, r * 0.62);
+    ctx.translate(weaponHandX, weaponHandY);
+    ctx.scale(0.8, 0.8);
+    drawGadgetModel(ctx, opts.gadget.kind, opts.gadget.color, t);
+    ctx.restore();
+  } else if (opts.gun) {
+    ctx.save();
+    const vibr = isCharging && chargePct >= 1 ? (Math.random() - 0.5) * 1.8 : 0;
+    ctx.translate(weaponHandX + vibr, weaponHandY + vibr);
+    if (isCharging && chargePct > 0) {
+      ctx.rotate(-Math.PI * 0.38 * chargePct);
+    }
     drawWeapon(ctx, opts.gun, outfit.accent, t, swing);
     ctx.restore();
   }
@@ -2278,7 +2682,7 @@ function drawCharacter(ctx, opts) {
   }
 }
 function drawMonster(ctx, opts) {
-  const { behavior, size, color, glow, angle, t } = opts;
+  const { behavior, size, color, glow: glow2, angle, t } = opts;
   const flash = opts.flash ?? 0;
   const poison = opts.poison ?? false;
   const buffed = opts.buffed ?? false;
@@ -2311,7 +2715,7 @@ function drawMonster(ctx, opts) {
   const eye = (x, y, r = s * 0.13) => {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = glow;
+    ctx.fillStyle = glow2;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
@@ -2372,10 +2776,10 @@ function drawMonster(ctx, opts) {
         ctx.lineTo(s * 1.05, 0);
         ctx.lineTo(s * 0.5, s * 0.3);
         ctx.closePath();
-      }, glow);
+      }, glow2);
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.fillStyle = rgba(glow, 0.85);
+      ctx.fillStyle = rgba(glow2, 0.85);
       ctx.beginPath();
       ctx.arc(s * 0.7, 0, s * 0.18, 0, Math.PI * 2);
       ctx.fill();
@@ -2389,11 +2793,7 @@ function drawMonster(ctx, opts) {
       fillPath(() => ctx.ellipse(0, 0, s * 0.85, s * 0.8, 0, 0, Math.PI * 2));
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.5);
-      cg.addColorStop(0, "#ffffff");
-      cg.addColorStop(0.4, rgba(glow, 0.9));
-      cg.addColorStop(1, rgba(glow, 0));
-      ctx.fillStyle = cg;
+      ctx.fillStyle = glow2(ctx, s * 0.5, `abo|${glow2}|${Math.round(s)}`, [[0, "#ffffff"], [0.4, rgba(glow2, 0.9)], [1, rgba(glow2, 0)]]);
       ctx.beginPath();
       ctx.arc(0, 0, s * 0.5, 0, Math.PI * 2);
       ctx.fill();
@@ -2457,7 +2857,7 @@ function drawMonster(ctx, opts) {
       ctx.stroke();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = rgba(glow, 0.5 + Math.sin(t * 10) * 0.25);
+      ctx.strokeStyle = rgba(glow2, 0.5 + Math.sin(t * 10) * 0.25);
       ctx.lineWidth = 1.5;
       for (let i = 0; i < 3; i++) {
         const rr = s * (0.9 + i * 0.4 + t % 1 * 0.4);
@@ -2487,7 +2887,7 @@ function drawMonster(ctx, opts) {
       for (let i = 0; i < 6; i++) {
         const a = i / 6 * Math.PI * 2 + t * 0.6;
         const rr = s * 0.7 + Math.sin(t * 2 + i) * s * 0.2;
-        ctx.fillStyle = rgba(glow, 0.55);
+        ctx.fillStyle = rgba(glow2, 0.55);
         ctx.beginPath();
         ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr * 0.7, s * 0.08, 0, Math.PI * 2);
         ctx.fill();
@@ -2527,265 +2927,93 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
 }
-function drawGadgetIcon(ctx, gadget, cx, cy, s) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  const sc = s / 16;
-  ctx.scale(sc, sc);
+function drawGadgetModel(ctx, kind, color, t = 0) {
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  const G = gadget.color;
-  const body = (p) => {
-    ctx.save();
-    ctx.shadowColor = rgba(G, 0.65);
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = G;
-    ctx.lineWidth = 1.8;
-    p();
+  const body = (x, y, w, h, c1, c2, r = 2) => {
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c2);
+    ctx.fillStyle = g;
+    roundRect(ctx, x, y, w, h, r);
     ctx.fill();
+    ctx.strokeStyle = DARK;
+    ctx.lineWidth = 1.2;
     ctx.stroke();
-    ctx.restore();
   };
-  const cutout = (p, lw = 1.1) => {
-    ctx.save();
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.strokeStyle = "rgba(0,0,0,1)";
-    ctx.fillStyle = "rgba(0,0,0,1)";
-    ctx.lineWidth = lw;
-    p();
-    ctx.restore();
+  const block = (x, y, w, h, c, r = 2) => {
+    ctx.fillStyle = c;
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fill();
+    ctx.strokeStyle = DARK;
+    ctx.lineWidth = 1;
+    ctx.stroke();
   };
-  switch (gadget.iconShape) {
+  switch (kind) {
     case "turret_mg":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-6, 7);
-        ctx.lineTo(0, 2);
-        ctx.lineTo(6, 7);
-        ctx.lineTo(1.5, 3.5);
-        ctx.lineTo(0, 2);
-        ctx.lineTo(-1.5, 3.5);
-        ctx.closePath();
-        ctx.rect(-3.5, -4, 7, 6);
-        ctx.rect(-1.2, -10, 2.4, 6);
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.rect(-0.4, -9.2, 0.8, 1.8);
-        ctx.rect(-0.4, -6.8, 0.8, 1.8);
-        ctx.fill();
-        ctx.moveTo(-2, -2);
-        ctx.lineTo(2, -2);
-        ctx.moveTo(-2, 0);
-        ctx.lineTo(2, 0);
-        ctx.stroke();
-      });
-      break;
     case "turret_cannon":
-      body(() => {
-        ctx.beginPath();
-        ctx.rect(-8, 4.5, 16, 3);
-        ctx.rect(-3, 1.5, 6, 3);
-        ctx.arc(0, -1, 5.5, Math.PI, 0);
-        ctx.rect(-1.6, -11, 3.2, 7.5);
-        ctx.rect(-2.6, -12.5, 5.2, 1.5);
-        ctx.closePath();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.arc(0, -1, 3.5, Math.PI, 0);
-        ctx.stroke();
-        ctx.rect(-1.8, -12, 1, 0.8);
-        ctx.rect(0.8, -12, 1, 0.8);
+    case "turret_sniper": {
+      block(-6, -6, 12, 12, STEEL_D, 3);
+      if (kind === "turret_mg") {
+        body(2, -2, 12, 4, STEEL_X, STEEL, 1);
+        body(-4, -4, 8, 8, color, shade(color, -0.4), 2);
+      } else if (kind === "turret_cannon") {
+        body(2, -3, 16, 6, STEEL_X, STEEL, 1);
+        body(15, -4, 5, 8, STEEL_D, "#000", 1);
+        body(-5, -5, 10, 10, color, shade(color, -0.4), 2);
+      } else {
+        body(2, -1.5, 20, 3, STEEL_X, STEEL, 1);
+        body(-4, -3.5, 9, 7, color, shade(color, -0.4), 2);
+        ctx.fillStyle = "#ef4444";
+        roundRect(ctx, 4, 2, 6, 1.5, 0.5);
         ctx.fill();
-      });
+      }
       break;
+    }
     case "mine_explosive":
-      body(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, 3.5, 9, 3.8, 0, 0, Math.PI * 2);
-        ctx.ellipse(0, 1.5, 6, 2.6, 0, 0, Math.PI * 2);
-        ctx.closePath();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, 1.5, 4, 1.7, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.arc(0, 1.5, 1, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      break;
     case "mine_poison":
-      body(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, 3.2, 9.5, 4.2, 0, 0, Math.PI * 2);
-        ctx.ellipse(0, 1.2, 7, 3, 0, 0, Math.PI * 2);
-        ctx.arc(-8.2, 4.5, 1.6, 0, Math.PI * 2);
-        ctx.arc(-10.2, 7.2, 1.8, 0, Math.PI * 2);
-        ctx.closePath();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, 1.2, 2.5, 1.1, 0, 0, Math.PI * 2);
-        ctx.fill();
-        for (let i = 0; i < 8; i++) {
-          const angle = i / 8 * Math.PI * 2;
-          ctx.moveTo(Math.cos(angle) * 2.5, 1.2 + Math.sin(angle) * 1.1);
-          ctx.lineTo(Math.cos(angle) * 7, 1.2 + Math.sin(angle) * 3);
-        }
-        ctx.stroke();
-        ctx.arc(-8.2, 4.5, 0.7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.arc(-10.2, 6.8, 0.6, 0, Math.PI * 2);
-        ctx.rect(-10.5, 7.2, 0.6, 0.5);
-        ctx.fill();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.arc(-10.4, 6.8, 0.15, 0, Math.PI * 2);
-        ctx.arc(-10, 6.8, 0.15, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      break;
     case "mine_fire":
-      body(() => {
+    case "mine_stun": {
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, 0, Math.PI * 2);
+      ctx.fillStyle = STEEL_D;
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2;
+        ctx.fillStyle = STEEL_X;
         ctx.beginPath();
-        ctx.ellipse(0, 3.2, 9.5, 4.2, 0, 0, Math.PI * 2);
-        ctx.ellipse(0, 1.2, 7.5, 3.2, 0, 0, Math.PI * 2);
-        ctx.arc(-8.2, 4.5, 1.6, 0, Math.PI * 2);
-        ctx.arc(-10.2, 7.2, 1.8, 0, Math.PI * 2);
-        ctx.closePath();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.ellipse(0, 1.2, 5, 2.1, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.arc(-8.2, 4.5, 0.7, 0, Math.PI * 2);
+        ctx.arc(Math.cos(a) * 6, Math.sin(a) * 6, 1.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.moveTo(-10.2, 8.2);
-        ctx.quadraticCurveTo(-11.2, 7.2, -10.2, 6.4);
-        ctx.quadraticCurveTo(-9.8, 7.2, -10.2, 8.2);
-        ctx.fill();
-      });
+      }
       break;
+    }
+    case "healing_station": {
+      block(-7, -7, 14, 14, "#ffffff", 3);
+      ctx.fillStyle = color;
+      ctx.fillRect(-2, -5, 4, 10);
+      ctx.fillRect(-5, -2, 10, 4);
+      break;
+    }
     case "glue_grenade":
-      body(() => {
-        ctx.beginPath();
-        for (let i = 0; i < 12; i++) {
-          const a = i / 12 * Math.PI * 2;
-          const r = 5.2 + (i % 2 === 0 ? 1.2 : 0);
-          const x = Math.cos(a) * r;
-          const y = Math.sin(a) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        ctx.rect(-1.2, -8, 2.4, 3);
-        ctx.arc(2, -7.5, 1.5, 0, Math.PI * 2);
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.arc(2, -7.5, 0.6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.moveTo(-3, -2);
-        ctx.lineTo(3, 2);
-        ctx.moveTo(-3, 2);
-        ctx.lineTo(3, -2);
-        ctx.stroke();
-      });
-      break;
     case "fire_grenade":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-3.2, 1.5);
-        ctx.lineTo(3.2, 1.5);
-        ctx.lineTo(3.2, 7.5);
-        ctx.quadraticCurveTo(3.2, 9, 1.8, 9);
-        ctx.lineTo(-1.8, 9);
-        ctx.quadraticCurveTo(-3.2, 9, -3.2, 7.5);
-        ctx.closePath();
-        ctx.rect(-1.2, -4.5, 2.4, 6);
-        ctx.rect(-1.6, -5.2, 3.2, 1.2);
-        ctx.moveTo(-1, -4.5);
-        ctx.lineTo(-4.5, -7.5);
-        ctx.lineTo(-2.5, -9);
-        ctx.lineTo(0.5, -5.5);
-        ctx.closePath();
-        ctx.moveTo(-3.5, -8.2);
-        ctx.quadraticCurveTo(-6.5, -12, -2.5, -13);
-        ctx.quadraticCurveTo(-1.5, -11, -2.5, -9.5);
-        ctx.closePath();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.moveTo(-3, 4.5);
-        ctx.lineTo(3, 4.5);
-        ctx.rect(-2, 5.2, 4, 2.2);
-        ctx.stroke();
-      });
-      break;
-    case "healing_station":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-7.5, 7.5);
-        ctx.lineTo(7.5, 7.5);
-        ctx.lineTo(6.5, -2);
-        ctx.quadraticCurveTo(5, -6.5, 0, -6.5);
-        ctx.quadraticCurveTo(-5, -6.5, -6.5, -2);
-        ctx.closePath();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.rect(-1.4, -3.5, 2.8, 7);
-        ctx.rect(-3.5, -1.4, 7, 2.8);
-        ctx.fill();
-        ctx.rect(-4, 4.5, 2, 1);
-        ctx.rect(2, 4.5, 2, 1);
-        ctx.fill();
-      });
-      break;
     case "poison_grenade":
-      body(() => {
-        ctx.beginPath();
-        ctx.moveTo(-3.5, -3);
-        ctx.lineTo(3.5, -3);
-        ctx.lineTo(3.5, 7.5);
-        ctx.quadraticCurveTo(3.5, 8.5, 2.5, 8.5);
-        ctx.lineTo(-2.5, 8.5);
-        ctx.quadraticCurveTo(-3.5, 8.5, -3.5, 7.5);
-        ctx.closePath();
-        ctx.rect(-2, -4.5, 4, 1.5);
-        ctx.moveTo(1.2, -4);
-        ctx.lineTo(4.8, -3.5);
-        ctx.lineTo(4.8, 4.5);
-        ctx.lineTo(2.8, 4.8);
-        ctx.closePath();
-        ctx.arc(-3.5, -5.5, 2, 0, Math.PI * 2);
-        ctx.arc(-6.5, -2.5, 1.8, 0, Math.PI * 2);
-        ctx.closePath();
-      });
-      cutout(() => {
-        ctx.beginPath();
-        ctx.arc(-3.5, -5.5, 0.9, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.arc(-6.5, -2.9, 0.6, 0, Math.PI * 2);
-        ctx.rect(-6.8, -2.5, 0.6, 0.5);
-        ctx.fill();
-        ctx.rect(-2, -1, 4, 1.2);
-        ctx.rect(-2, 2.2, 4, 1.2);
-        ctx.rect(-2, 5.4, 4, 1.2);
-        ctx.fill();
-      });
+    case "cluster_grenade":
+    default: {
+      body(-4, -5, 8, 10, color, shade(color, -0.4), 3);
+      block(-2, -7, 4, 2, STEEL_D, 1);
+      ctx.strokeStyle = STEEL;
+      ctx.beginPath();
+      ctx.moveTo(2, -6);
+      ctx.lineTo(5, -4);
+      ctx.stroke();
       break;
-    default:
-      body(() => {
-        ctx.beginPath();
-        ctx.arc(0, 0, 7, 0, Math.PI * 2);
-        ctx.closePath();
-      });
+    }
   }
-  ctx.restore();
 }
 
 // src/game/sound.ts
@@ -2795,10 +3023,16 @@ var SoundManager = class _SoundManager {
   noise = null;
   killSounds = [];
   deathSound = null;
+  musicEl = null;
+  musicUrl = null;
   enabled = true;
   /** master volume 0..1 (scaled by BASE so the default 0.5 matches the old 0.3 gain) */
   volume = 0.5;
   static BASE = 0.6;
+  /** volume multiplier applied while an ENEMY/opponent (bot or remote foe) is
+   *  the active shooter, so the player can clearly hear their own weapons.
+   *  Set to 0.8 (i.e. -20%) during opponent simulation, 1 otherwise. */
+  enemyScale = 1;
   /** Create / resume the audio context. Call from a user gesture. */
   ensure() {
     try {
@@ -2831,6 +3065,43 @@ var SoundManager = class _SoundManager {
   }
   setEnabled(v) {
     this.enabled = v;
+    if (!v) this.stopMusic();
+  }
+  /** Play a looping external music track from a URL (e.g. matchmaking BGM).
+   *  Calling again with the same URL is a no-op if it is already playing. */
+  playMusic(url) {
+    if (!this.enabled || !url) return;
+    if (this.musicEl && this.musicUrl === url && !this.musicEl.paused) return;
+    this.stopMusic();
+    try {
+      const a = new Audio(url);
+      a.loop = true;
+      a.volume = this.volume;
+      a.play().catch(() => {
+      });
+      this.musicEl = a;
+      this.musicUrl = url;
+    } catch {
+      this.musicEl = null;
+      this.musicUrl = null;
+    }
+  }
+  /** Stop the currently playing external music track (if any). */
+  stopMusic() {
+    if (this.musicEl) {
+      try {
+        this.musicEl.pause();
+      } catch {
+      }
+      this.musicEl = null;
+    }
+    this.musicUrl = null;
+  }
+  /** Dampen all weapon/impact sounds by 20% while an enemy/opponent is acting
+   *  (true) so the local player's own sounds stay prominent. Pass false to
+   *  restore full volume (e.g. during world simulation / the player's turn). */
+  setEnemyDampen(v) {
+    this.enemyScale = v ? 0.8 : 1;
   }
   /** Set the master volume (0..1) and apply it immediately if the context exists. */
   setVolume(v) {
@@ -2840,6 +3111,7 @@ var SoundManager = class _SoundManager {
     }
     this.killSounds.forEach((s) => s.volume = this.volume);
     if (this.deathSound) this.deathSound.volume = this.volume;
+    if (this.musicEl) this.musicEl.volume = this.volume;
   }
   playKillConfirm() {
     console.log("[Audio] playKillConfirm invoked. enabled:", this.enabled, "count:", this.killSounds.length);
@@ -2856,11 +3128,32 @@ var SoundManager = class _SoundManager {
     this.deathSound.currentTime = 0;
     this.deathSound.play().then(() => console.log("[Audio] playDeath playing:", this.deathSound?.src)).catch((err) => console.error("[Audio] playDeath playback failed:", err));
   }
+  listenerPos = null;
+  hitStreak = 0;
+  lastHitTime = 0;
+  /** Set local player listener position in world space for spatial 2D audio attenuation. */
+  setListenerPos(x, y) {
+    this.listenerPos = { x, y };
+  }
+  /** Calculate volume attenuation factor (0..1) based on distance to local player. */
+  calcDistanceAttenuation(x, y) {
+    if (x === void 0 || y === void 0 || !this.listenerPos) return 1;
+    const dist = Math.hypot(x - this.listenerPos.x, y - this.listenerPos.y);
+    const minDist = 150;
+    const maxDist = 1250;
+    if (dist <= minDist) return 1;
+    if (dist >= maxDist) return 0;
+    const norm = 1 - (dist - minDist) / (maxDist - minDist);
+    return norm * norm;
+  }
   now() {
     return this.ctx ? this.ctx.currentTime : 0;
   }
-  tone(freq, dur, type, vol, slideTo) {
+  tone(freq, dur, type, vol, slideTo, x, y) {
     if (!this.enabled || !this.ctx || !this.master) return;
+    const atten = this.calcDistanceAttenuation(x, y);
+    vol *= this.enemyScale * atten;
+    if (vol < 1e-3) return;
     const t = this.now();
     const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
@@ -2880,8 +3173,11 @@ var SoundManager = class _SoundManager {
     osc.start(t);
     osc.stop(t + dur + 0.02);
   }
-  noiseBurst(dur, vol, freq, q = 1) {
+  noiseBurst(dur, vol, freq, q = 1, x, y) {
     if (!this.enabled || !this.ctx || !this.master || !this.noise) return;
+    const atten = this.calcDistanceAttenuation(x, y);
+    vol *= this.enemyScale * atten;
+    if (vol < 1e-3) return;
     const t = this.now();
     const src = this.ctx.createBufferSource();
     src.buffer = this.noise;
@@ -2902,75 +3198,229 @@ var SoundManager = class _SoundManager {
     src.start(t);
     src.stop(t + dur + 0.02);
   }
-  shoot(gunId) {
+  /** Electromagnetic particle hum & electric spark sound for electronic/energy weapons */
+  emParticle(freq = 2400, dur = 0.08, x, y) {
+    if (!this.enabled || !this.ctx || !this.master) return;
+    this.noiseBurst(dur, 0.09, freq, 3.2, x, y);
+    this.tone(freq, dur, "sawtooth", 0.07, freq * 0.35, x, y);
+    this.tone(freq * 1.6, dur * 0.6, "sine", 0.05, freq * 0.8, x, y);
+  }
+  /** High-voltage electric arc crackle / taser discharge sound */
+  electricZap(x, y) {
+    if (!this.enabled || !this.ctx || !this.master) return;
+    this.noiseBurst(0.06, 0.15, 4200, 4.5, x, y);
+    this.tone(1900, 0.05, "sawtooth", 0.12, 450, x, y);
+    setTimeout(() => {
+      this.noiseBurst(0.04, 0.13, 4800, 5, x, y);
+      this.tone(2600, 0.04, "square", 0.09, 650, x, y);
+    }, 25);
+  }
+  shoot(gunId, x, y) {
     switch (gunId) {
+      // ===== 1. 手枪 / 冲锋枪 =====
       case "pistol":
-        this.tone(420, 0.08, "square", 0.18, 180);
+        this.noiseBurst(0.03, 0.14, 1600, 1.2, x, y);
+        this.tone(380, 0.07, "square", 0.18, 120, x, y);
+        break;
+      case "silenced_pistol":
+        this.noiseBurst(0.04, 0.04, 1400, 1.5, x, y);
+        this.tone(240, 0.05, "sine", 0.08, 80, x, y);
+        break;
+      case "r357":
+        this.noiseBurst(0.06, 0.22, 1900, 0.9, x, y);
+        this.tone(180, 0.14, "sawtooth", 0.26, 45, x, y);
+        this.tone(480, 0.04, "square", 0.12, 200, x, y);
         break;
       case "mac11":
-        this.tone(520, 0.04, "square", 0.1, 280);
+        this.noiseBurst(0.025, 0.12, 2200, 1.4, x, y);
+        this.tone(490, 0.04, "square", 0.12, 220, x, y);
         break;
       case "mp5":
-        this.tone(480, 0.06, "square", 0.13, 240);
+        this.noiseBurst(0.035, 0.14, 1800, 1.1, x, y);
+        this.tone(420, 0.06, "square", 0.15, 160, x, y);
         break;
-      case "mortar":
-        this.tone(180, 0.18, "sawtooth", 0.2, 70);
-        this.noiseBurst(0.12, 0.12, 700, 0.5);
-        break;
-      case "shotgun":
-        this.noiseBurst(0.18, 0.35, 900, 0.6);
-        this.tone(160, 0.12, "sawtooth", 0.18, 70);
-        break;
-      case "rifle":
-        this.tone(680, 0.06, "sawtooth", 0.16, 300);
-        break;
-      case "sniper":
-        this.tone(300, 0.25, "sawtooth", 0.22, 90);
-        this.noiseBurst(0.12, 0.18, 1500, 0.8);
-        break;
-      case "rocket":
-        this.tone(220, 0.3, "sawtooth", 0.2, 60);
-        this.noiseBurst(0.3, 0.2, 500, 0.5);
-        break;
+      // ===== 2. 突击步枪 / 自动步枪 =====
       case "akm":
-        this.tone(360, 0.07, "square", 0.16, 160);
-        this.noiseBurst(0.05, 0.06, 1800, 1);
+        this.noiseBurst(0.06, 0.24, 1700, 0.8, x, y);
+        this.tone(260, 0.09, "sawtooth", 0.24, 55, x, y);
+        this.tone(680, 0.03, "square", 0.1, 320, x, y);
         break;
       case "fcar":
-        this.tone(240, 0.12, "sawtooth", 0.22, 90);
-        this.noiseBurst(0.08, 0.12, 700, 0.8);
+        this.noiseBurst(0.07, 0.26, 1200, 0.8, x, y);
+        this.tone(210, 0.12, "sawtooth", 0.25, 50, x, y);
+        break;
+      case "rifle":
+        this.noiseBurst(0.045, 0.18, 2e3, 1, x, y);
+        this.tone(580, 0.06, "sawtooth", 0.18, 220, x, y);
+        break;
+      case "lewis":
+        this.noiseBurst(0.07, 0.22, 1400, 0.8, x, y);
+        this.tone(220, 0.09, "square", 0.22, 60, x, y);
+        break;
+      case "gatling":
+        this.noiseBurst(0.03, 0.15, 2400, 1.3, x, y);
+        this.tone(480, 0.04, "square", 0.16, 180, x, y);
+        break;
+      // ===== 3. 霰弹枪 =====
+      case "shotgun":
+        this.noiseBurst(0.16, 0.38, 850, 0.5, x, y);
+        this.tone(140, 0.14, "sawtooth", 0.28, 35, x, y);
+        break;
+      case "sa1216":
+        this.noiseBurst(0.12, 0.32, 950, 0.6, x, y);
+        this.tone(160, 0.11, "sawtooth", 0.22, 45, x, y);
+        break;
+      case "dragon_breath":
+        this.noiseBurst(0.18, 0.42, 700, 0.4, x, y);
+        this.tone(130, 0.16, "sawtooth", 0.3, 30, x, y);
+        this.emParticle(850, 0.15, x, y);
+        break;
+      case "m1887":
+        this.noiseBurst(0.15, 0.36, 920, 0.5, x, y);
+        this.tone(150, 0.13, "sawtooth", 0.26, 38, x, y);
+        break;
+      // ===== 4. 狙击枪 / 反器材重炮 =====
+      case "sniper":
+        this.noiseBurst(0.14, 0.3, 1600, 0.7, x, y);
+        this.tone(240, 0.22, "sawtooth", 0.28, 40, x, y);
+        this.tone(850, 0.03, "sine", 0.12, 400, x, y);
+        break;
+      case "gold_barrett":
+        this.noiseBurst(0.2, 0.42, 1400, 0.5, x, y);
+        this.tone(160, 0.3, "sawtooth", 0.34, 25, x, y);
+        this.tone(1100, 0.04, "sine", 0.15, 450, x, y);
+        break;
+      case "shak50":
+        this.noiseBurst(0.18, 0.32, 900, 0.6, x, y);
+        this.tone(110, 0.32, "sawtooth", 0.36, 22, x, y);
+        break;
+      case "scout":
+        this.noiseBurst(0.08, 0.2, 2200, 1.1, x, y);
+        this.tone(520, 0.08, "sawtooth", 0.2, 200, x, y);
+        break;
+      // ===== 5. 炮击 / 重型火箭 / 榴弹 (真实炮声) =====
+      case "mortar":
+        this.noiseBurst(0.22, 0.38, 600, 0.4, x, y);
+        this.tone(130, 0.25, "sawtooth", 0.32, 25, x, y);
+        break;
+      case "rocket":
+      case "rpg":
+        this.noiseBurst(0.32, 0.4, 450, 0.35, x, y);
+        this.tone(100, 0.35, "sawtooth", 0.35, 20, x, y);
+        break;
+      case "mgl32":
+        this.noiseBurst(0.14, 0.28, 750, 0.5, x, y);
+        this.tone(160, 0.18, "sawtooth", 0.28, 30, x, y);
+        break;
+      case "turret_cannon":
+        this.noiseBurst(0.18, 0.36, 700, 0.4, x, y);
+        this.tone(120, 0.22, "sawtooth", 0.3, 28, x, y);
+        break;
+      // ===== 6. 电子性 / 能量 / 电磁粒子特效声音 =====
+      case "plasma_rifle":
+        this.emParticle(2600, 0.09, x, y);
+        this.tone(780, 0.07, "sawtooth", 0.18, 280, x, y);
+        this.noiseBurst(0.05, 0.08, 1800, 0.9, x, y);
         break;
       case "pulse":
-        this.tone(900, 0.04, "sawtooth", 0.05, 680);
+        this.emParticle(3200, 0.06, x, y);
+        this.tone(980, 0.04, "sawtooth", 0.12, 620, x, y);
+        break;
+      case "stun_gun":
+        this.electricZap(x, y);
+        break;
+      case "flamethrower":
+        this.noiseBurst(0.15, 0.22, 650, 0.4, x, y);
+        this.tone(160, 0.14, "sawtooth", 0.15, 110, x, y);
+        break;
+      case "recurve_bow":
+        this.tone(320, 0.08, "triangle", 0.22, 580, x, y);
+        this.noiseBurst(0.04, 0.12, 2200, 1.2, x, y);
+        break;
+      case "throwing_knife":
+        this.noiseBurst(0.08, 0.15, 3400, 1.5, x, y);
+        this.tone(960, 0.05, "sine", 0.08, 1450, x, y);
+        break;
+      case "flame_boomerang":
+        this.noiseBurst(0.2, 0.18, 750, 0.5, x, y);
+        this.tone(280, 0.14, "sawtooth", 0.14, 520, x, y);
+        break;
+      default:
+        this.noiseBurst(0.05, 0.15, 1600, 0.9, x, y);
+        this.tone(480, 0.07, "square", 0.16, 180, x, y);
         break;
     }
   }
-  hit() {
-    this.noiseBurst(0.05, 0.12, 2200, 1.2);
+  hit(x, y) {
+    this.noiseBurst(0.05, 0.12, 2200, 1.2, x, y);
   }
-  swing() {
-    this.noiseBurst(0.1, 0.12, 3200, 1.4);
-    this.tone(640, 0.07, "sine", 0.07, 1200);
+  /** Melee swing whooshes — enhanced aerodynamic slice sounds for all blade & impact weapons */
+  swing(gunId, x, y) {
+    switch (gunId) {
+      case "lightsaber":
+        this.emParticle(2800, 0.08, x, y);
+        this.noiseBurst(0.1, 0.16, 3400, 1.4, x, y);
+        this.tone(880, 0.09, "sine", 0.1, 1400, x, y);
+        break;
+      case "spear":
+        this.noiseBurst(0.08, 0.16, 2800, 1.3, x, y);
+        this.tone(680, 0.06, "sine", 0.08, 1100, x, y);
+        break;
+      case "dual_blades":
+        this.noiseBurst(0.05, 0.14, 3200, 1.5, x, y);
+        setTimeout(() => this.noiseBurst(0.05, 0.14, 3600, 1.5, x, y), 50);
+        break;
+      case "thrust_sword":
+        this.noiseBurst(0.09, 0.15, 3400, 1.6, x, y);
+        this.tone(740, 0.06, "sine", 0.08, 1350, x, y);
+        break;
+      case "lightning_whip":
+        this.electricZap(x, y);
+        this.noiseBurst(0.11, 0.18, 2400, 1.1, x, y);
+        this.tone(1300, 0.06, "sawtooth", 0.1, 380, x, y);
+        break;
+      default:
+        this.noiseBurst(0.1, 0.15, 3e3, 1.3, x, y);
+        this.tone(580, 0.07, "sine", 0.09, 1150, x, y);
+        break;
+    }
   }
-  slam() {
-    this.noiseBurst(0.42, 0.45, 480, 0.4);
-    this.tone(70, 0.42, "sine", 0.35, 34);
+  /** Crisp hit indicator sound. Consecutive hits within 0.85s increase pitch progressively! */
+  hitConfirm(isCrit = false) {
+    if (!this.enabled || !this.ctx || !this.master) return;
+    const now = performance.now() / 1e3;
+    if (now - this.lastHitTime < 0.85) {
+      this.hitStreak = Math.min(18, this.hitStreak + 1);
+    } else {
+      this.hitStreak = 1;
+    }
+    this.lastHitTime = now;
+    const pitchMult = 1 + (this.hitStreak - 1) * 0.05 + (isCrit ? 0.2 : 0);
+    const f1 = 1320 * pitchMult;
+    const f2 = 1980 * pitchMult;
+    const f3 = 2640 * pitchMult;
+    this.tone(f1, 0.05, "triangle", 0.2, f2);
+    this.tone(f2, 0.04, "sine", 0.12, f3);
   }
-  explosion() {
-    this.noiseBurst(0.4, 0.4, 700, 0.4);
-    this.tone(90, 0.4, "sine", 0.3, 40);
+  slam(x, y) {
+    this.noiseBurst(0.42, 0.45, 480, 0.4, x, y);
+    this.tone(70, 0.42, "sine", 0.35, 34, x, y);
   }
-  hurt() {
-    this.tone(200, 0.18, "sawtooth", 0.22, 80);
+  explosion(x, y) {
+    this.noiseBurst(0.4, 0.4, 700, 0.4, x, y);
+    this.tone(90, 0.4, "sine", 0.3, 40, x, y);
+  }
+  hurt(x, y) {
+    this.tone(200, 0.18, "sawtooth", 0.22, 80, x, y);
   }
   /** Short error / denied buzz (e.g. gadget overheated). */
   error() {
     this.tone(140, 0.12, "square", 0.2, 90);
     this.noiseBurst(0.08, 0.1, 600, 0.6);
   }
-  skill() {
-    this.tone(300, 0.18, "triangle", 0.22, 720);
-    this.tone(600, 0.18, "sine", 0.12, 1100);
+  skill(x, y) {
+    this.tone(300, 0.18, "triangle", 0.22, 720, x, y);
+    this.tone(600, 0.18, "sine", 0.12, 1100, x, y);
   }
   pickup() {
     this.tone(520, 0.08, "triangle", 0.16, 780);
@@ -2981,18 +3431,18 @@ var SoundManager = class _SoundManager {
     setTimeout(() => this.tone(440, 0.18, "triangle", 0.16, 550), 120);
   }
   /** Reload start: magazine eject + insert clack. */
-  reload() {
-    this.noiseBurst(0.05, 0.22, 1400, 1);
-    this.tone(150, 0.05, "square", 0.1, 90);
+  reload(x, y) {
+    this.noiseBurst(0.05, 0.22, 1400, 1, x, y);
+    this.tone(150, 0.05, "square", 0.1, 90, x, y);
     setTimeout(() => {
-      this.noiseBurst(0.05, 0.22, 1800, 1);
-      this.tone(220, 0.05, "square", 0.1, 130);
+      this.noiseBurst(0.05, 0.22, 1800, 1, x, y);
+      this.tone(220, 0.05, "square", 0.1, 130, x, y);
     }, 130);
   }
   /** Reload done: sharp chambering click when the magazine is seated. */
-  reloadDone() {
-    this.noiseBurst(0.04, 0.18, 2200, 1.4);
-    this.tone(300, 0.05, "sine", 0.1, 380);
+  reloadDone(x, y) {
+    this.noiseBurst(0.04, 0.18, 2200, 1.4, x, y);
+    this.tone(300, 0.05, "sine", 0.1, 380, x, y);
   }
 };
 var sound = new SoundManager();
@@ -3031,6 +3481,7 @@ var RUNTIME_DEFAULTS = {
 var RUNTIME = { ...RUNTIME_DEFAULTS };
 
 // src/game/engine.ts
+import AiWorker from "./ai.worker.ts?worker&inline";
 var COIN_STYLE = {
   whip: ["#7dd3fc", "#e0f2fe", "#a5f3fc", "#fbbf24"],
   saber: ["#a5b4fc", "#c7d2fe", "#fde68a", "#ffffff"],
@@ -3091,6 +3542,7 @@ var GameEngine = class {
   ctx;
   loadout;
   onHud;
+  quality = "high";
   W = 800;
   H = 600;
   /** world dimensions (larger than viewport) */
@@ -3099,6 +3551,15 @@ var GameEngine = class {
   camX = 0;
   camY = 0;
   raf = 0;
+  /** Cached radial gradients for glows, keyed by radius+color. Canvas gradients
+   *  are bound to the user-space at paint time, so we create them centred at the
+   *  origin (0,0,r) and let callers translate before filling — this lets bullets,
+   *  enemy bullets, etc. reuse one gradient object instead of rebuilding it every
+   *  frame (the single biggest render cost on the integrated GPU). */
+  glowCache = /* @__PURE__ */ new Map();
+  /** Offscreen cache for the static background (linear gradient + vignette). */
+  bgCache;
+  bgCacheKey = "";
   sceneTheme = SCENES[0];
   /** index into SCENES[] chosen by the host (authoritative); synced to the guest */
   sceneIndex = 0;
@@ -3140,6 +3601,10 @@ var GameEngine = class {
   enemies = [];
   particles = [];
   effects = [];
+  meleeTrails = [];
+  raindrops = [];
+  weather = "clear";
+  timeOfDay = "morning";
   /** floating score / heal number popups (declared since the gadget heal
    *  system pushes into it — previously missing, causing a runtime crash). */
   scorePopups = [];
@@ -3246,6 +3711,14 @@ var GameEngine = class {
   nextScoreFeedEventId = 0;
   /** fractional score accumulator for the local (non-combatant) player */
   localScoreAcc = 0;
+  /** per-attacker fractional damage-score accumulators for remote,
+   *  non-combatant attackers (host / authoritative server only) */
+  pidScoreAcc = /* @__PURE__ */ new Map();
+  // --- score/kill feed events mirrored to clients over snapshots ---
+  feedSeq = 1;
+  feedBuf = [];
+  /** watermark of snapshot feed events already consumed; -1 = uninitialised */
+  lastFeedId = -1;
   addScoreFeed(text, score, victimName, subScore, totalKills) {
     if (this.gameMode === "biohazard" && text === "\u4F24\u5BB3\u51FB\u4E2D") return;
     if (!this.activeScoreFeed || this.activeScoreFeed.timer <= 0) {
@@ -3280,39 +3753,87 @@ var GameEngine = class {
    */
   awardDamageScore(attackerId, dealt) {
     if (this.gameMode === "biohazard") return;
-    if (dealt <= 0 || attackerId === void 0 || attackerId < 0) return;
-    const killerC = this.combatants.find((c) => c.id === attackerId);
+    if (dealt <= 0) return;
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = attackerId !== void 0 && attackerId >= 0 ? attackerId : localId;
+    const isLocal = finalAttackerId === localId;
+    const killerC = this.combatants.find((c) => c.id === finalAttackerId);
     let acc;
     if (killerC) {
       killerC.scoreAcc = (killerC.scoreAcc ?? 0) + dealt;
       acc = killerC.scoreAcc;
-    } else {
+    } else if (isLocal) {
       this.localScoreAcc += dealt;
       acc = this.localScoreAcc;
+    } else {
+      acc = (this.pidScoreAcc.get(finalAttackerId) ?? 0) + dealt;
+      this.pidScoreAcc.set(finalAttackerId, acc);
     }
     if (acc >= 1) {
       const whole = Math.floor(acc);
       if (killerC) {
         killerC.score += whole;
         killerC.scoreAcc = acc - whole;
-      } else {
+        if (isLocal) {
+          this.score += whole;
+        }
+      } else if (isLocal) {
         this.score += whole;
         this.localScoreAcc = acc - whole;
+      } else {
+        this.pidScoreAcc.set(finalAttackerId, acc - whole);
       }
-      const isLocal = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
       if (isLocal) this.addScoreFeed("\u4F24\u5BB3\u51FB\u4E2D", whole);
+      this.pushFeedEvent({ kind: "damage", pid: finalAttackerId, amount: whole });
+    }
+  }
+  /** Record a score/kill event for clients (host & authoritative server only).
+   *  Clients consume unseen ids from Snapshot.feed in consumeFeedEvent(). */
+  pushFeedEvent(ev) {
+    if (this.mode !== "host" && this.mode !== "server") return;
+    this.feedBuf.push({ id: this.feedSeq++, ...ev });
+    if (this.feedBuf.length > 24) this.feedBuf.shift();
+  }
+  /** Apply one host/server feed event on a client: mirrors per-combatant
+   *  score/kills and shows the HUD feeds from THIS client's perspective. */
+  consumeFeedEvent(ev) {
+    const isMe = ev.pid === this.selfPid;
+    const c = this.combatants.find((cb) => cb.id === ev.pid);
+    if (c) {
+      c.score += ev.amount;
+      if (ev.kind === "kill" && ev.kills !== void 0 && ev.kills > c.kills) c.kills = ev.kills;
+    }
+    const nameFor = (pid, fallback) => pid === this.selfPid ? "\u4F60" : pid === this.peerPid ? this.peerName || fallback || "\u5BF9\u624B" : fallback || "\u654C\u4EBA";
+    if (ev.kind === "damage") {
+      if (isMe) {
+        this.score += ev.amount;
+        this.addScoreFeed("\u4F24\u5BB3\u51FB\u4E2D", ev.amount);
+      }
+      return;
+    }
+    const kName = nameFor(ev.pid, ev.killerName);
+    const vName = ev.victimPid === -1 ? ev.victimName || "\u654C\u4EBA" : nameFor(ev.victimPid, ev.victimName);
+    this.addKillFeed(kName, vName, ev.weaponId, c);
+    if (isMe) {
+      this.kills += 1;
+      this.score += ev.amount;
+      this.addScoreFeed("\u6DD8\u6C70", ev.amount, vName, ev.amount, ev.kills ?? this.kills);
+      this.banner = { text: `\u51FB\u6740 ${vName}\uFF01`, t: 1.6 };
+      sound.playKillConfirm();
+    } else if (ev.victimPid !== void 0 && ev.victimPid === this.selfPid) {
+      this.banner = { text: `\u4F60\u88AB ${kName} \u51FB\u8D25\uFF01`, t: 1.6 };
     }
   }
   addKillFeed(killerName, victimName, weaponId, killerC) {
     if (this.gameMode === "biohazard") return;
     let iconShape = "pistol";
-    let glow = "#ef4444";
+    let glow2 = "#ef4444";
     const wId = weaponId || (killerC ? killerC.guns[killerC.gunIndex]?.id : void 0);
     if (wId) {
       const g = GUNS.find((gn) => gn.id === wId);
       if (g) {
         iconShape = g.iconShape;
-        glow = g.color;
+        glow2 = g.color;
       }
     }
     this.killFeed.push({
@@ -3321,7 +3842,7 @@ var GameEngine = class {
       killerName,
       victimName,
       weaponIconShape: iconShape,
-      weaponGlow: glow,
+      weaponGlow: glow2,
       weaponId: wId,
       timer: 4
     });
@@ -3388,25 +3909,28 @@ var GameEngine = class {
   /** Record or merge damage logs from the same weapon/attacker */
   recordDamageLog(amount, weapon, targetName, sourceName, isDealtByMe) {
     if (amount <= 0) return;
-    const rounded = Math.round(amount);
-    if (rounded <= 0) return;
     const existing = this.damageLogs.find(
       (l) => l.isDealtByMe === isDealtByMe && l.weapon === weapon && l.targetName === targetName && l.sourceName === sourceName
     );
     if (existing) {
-      existing.amount += rounded;
+      existing.amount += amount;
       existing.timestamp = this.time;
     } else {
       this.damageLogs.push({
         id: this.nextDamageLogId++,
         timestamp: this.time,
-        amount: rounded,
+        amount,
         weapon,
         targetName,
         sourceName,
         isDealtByMe
       });
     }
+  }
+  /** Get the weapon ID of a combatant's currently equipped gun */
+  getAttackerWeaponId(c) {
+    if (!c) return void 0;
+    return c.guns?.[c.gunIndex]?.id;
   }
   /** bot AI decision frequency (Hz), decoupled from the render frame rate.
    *  Sourced from settings; higher = smarter but more CPU. */
@@ -3437,6 +3961,8 @@ var GameEngine = class {
   pointerLocked = false;
   firing = false;
   secondaryFiring = false;
+  /** when true, fireGun spawns the charged (85 dmg) knife pair instead of the 65 pair */
+  knifeChargingActive = false;
   /** virtual movement vector from the on-screen joystick (-1..1 each axis) */
   virtualMove = { x: 0, y: 0 };
   /** touch device: enables the mobile on-screen controls + mobile-only aim assist */
@@ -3452,6 +3978,8 @@ var GameEngine = class {
   boundResize;
   boundContext;
   boundLockChange;
+  aiWorker = null;
+  pathReqId = 0;
   constructor(canvas, loadout, onHud, opts = {}) {
     this.canvas = canvas;
     this.ctx = canvas ? canvas.getContext("2d") : null;
@@ -3486,6 +4014,53 @@ var GameEngine = class {
     this.boundResize = () => this.onResize();
     this.boundContext = (e) => e.preventDefault();
     this.boundLockChange = () => this.onPointerLockChange();
+    if (typeof window !== "undefined" && typeof Worker !== "undefined") {
+      try {
+        this.aiWorker = new AiWorker();
+        this.aiWorker.onmessage = (e) => this.onWorkerMessage(e);
+      } catch (e) {
+        console.warn("Failed to initialize aiWorker", e);
+      }
+    }
+  }
+  syncWorker() {
+    if (this.aiWorker) {
+      this.aiWorker.postMessage({
+        type: "init",
+        walls: this.walls,
+        worldW: this.worldW,
+        worldH: this.worldH
+      });
+    }
+  }
+  onWorkerMessage(e) {
+    const msg = e.data;
+    if (msg.type === "pathRes") {
+      const c = this.combatants.find((cb) => cb.id === msg.botId);
+      if (c && c.pathfindingReqId === msg.reqId) {
+        c.pathDir = { x: msg.dx, y: msg.dy };
+        c.pathfindingReqId = void 0;
+      }
+    }
+  }
+  getAsyncPath(c, targetX, targetY) {
+    if (!this.aiWorker) {
+      return this.findBotPath(c.player.x, c.player.y, targetX, targetY, c.player.size);
+    }
+    if (c.pathfindingReqId === void 0) {
+      c.pathfindingReqId = ++this.pathReqId;
+      this.aiWorker.postMessage({
+        type: "path",
+        reqId: c.pathfindingReqId,
+        botId: c.id,
+        startX: c.player.x,
+        startY: c.player.y,
+        targetX,
+        targetY,
+        pSize: c.player.size
+      });
+    }
+    return c.pathDir ?? { x: 0, y: 0 };
   }
   // ---------------------------------------------------------------- lifecycle
   start() {
@@ -3630,8 +4205,24 @@ var GameEngine = class {
     this.last = performance.now();
     this.emit(true);
   }
+  pickWeather() {
+    const weathers = ["clear", "fog", "overcast", "rain"];
+    const times = ["morning", "afternoon", "night"];
+    this.weather = weathers[Math.floor(Math.random() * weathers.length)];
+    this.timeOfDay = times[Math.floor(Math.random() * times.length)];
+    if (this.weather === "fog") {
+      this.timeOfDay = Math.random() > 0.5 ? "afternoon" : "night";
+    } else if (this.weather === "overcast") {
+      this.timeOfDay = "afternoon";
+    } else if (this.weather === "rain") {
+      this.timeOfDay = Math.random() > 0.5 ? "afternoon" : "night";
+    } else if (this.weather === "clear") {
+      this.timeOfDay = Math.random() > 0.5 ? "morning" : "night";
+    }
+  }
   resetState() {
     this.resize();
+    this.pickWeather();
     this.sceneIndex = Math.floor(Math.random() * SCENES.length);
     this.sceneTheme = SCENES[this.sceneIndex];
     if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
@@ -3654,10 +4245,13 @@ var GameEngine = class {
     this.enemies = [];
     this.particles = [];
     this.effects = [];
+    this.meleeTrails = [];
+    this.raindrops = [];
     this.pickups = [];
     this.grenades = [];
     this.deployables = [];
     this.walls = this.buildWalls();
+    this.syncWorker();
     this.base = {
       x: this.worldW / 2,
       y: this.worldH - 120,
@@ -3695,6 +4289,13 @@ var GameEngine = class {
     this.wallsDirty = true;
     this.score = 0;
     this.kills = 0;
+    this.localScoreAcc = 0;
+    this.pidScoreAcc.clear();
+    this.feedBuf = [];
+    this.feedSeq = 1;
+    this.lastFeedId = -1;
+    this.killFeed = [];
+    this.activeScoreFeed = null;
     this.gold = 0;
     this.wave = 0;
     this.waveTimer = 0;
@@ -3762,21 +4363,14 @@ var GameEngine = class {
     }
     this.player.shieldHp = this.gun.shieldMaxHp ?? 0;
     this.applyRuntime();
-    if (this.gameMode === "cashout") {
+    if (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
+      const is5v5 = this.gameMode === "cashout_5v5";
       this.isDM = true;
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
       this.enemyBase.maxHp = Infinity;
-      this.dmSpawns = [];
-      for (let i = 0; i < 12; i++) {
-        const angle = i / 12 * Math.PI * 2;
-        const dist = 350 + Math.random() * 180;
-        this.dmSpawns.push({
-          x: this.worldW * 0.5 + Math.cos(angle) * dist,
-          y: this.worldH * 0.5 + Math.sin(angle) * dist
-        });
-      }
+      this.dmSpawns = this.generateDistributedSpawns();
       this.player.x = this.dmSpawns[0].x;
       this.player.y = this.dmSpawns[0].y;
       const human = {
@@ -3810,13 +4404,14 @@ var GameEngine = class {
       };
       this.combatants = [human];
       this.player.cid = 0;
-      const teamColors = ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"];
-      const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
-      const picks = this.rollBotLoadouts(11);
-      for (let i = 1; i < 12; i++) {
-        const teamId = Math.floor(i / 3);
-        const memberIndex = i % 3;
-        const name = teamId === 0 ? `\u961F\u53CB${memberIndex}` : `${teamNames[teamId]}\xB7\u6210\u5458${memberIndex + 1}`;
+      const totalBots = is5v5 ? 9 : 11;
+      const teamColors = is5v5 ? ["#38bdf8", "#ef4444"] : ["#38bdf8", "#ef4444", "#f59e0b", "#ec4899"];
+      const teamNames = is5v5 ? ["\u84DD\u8272\u5C0F\u961F", "\u8D64\u7EA2\u5C0F\u961F"] : ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+      const picks = this.rollBotLoadouts(totalBots);
+      for (let i = 1; i <= totalBots; i++) {
+        const teamId = is5v5 ? i <= 4 ? 0 : 1 : Math.floor(i / 3);
+        const memberIndex = is5v5 ? i <= 4 ? i : i - 4 : i % 3;
+        const name = teamId === 0 ? `\u961F\u53CB${memberIndex}` : `${teamNames[teamId]}\xB7\u6210\u5458${memberIndex}`;
         const color = teamColors[teamId];
         const sp = this.dmSpawns[i];
         const bot = this.makeBot(i, picks[i - 1], name, color, sp.x, sp.y);
@@ -3829,7 +4424,7 @@ var GameEngine = class {
       this.vaults = [];
       this.cashBoxes = [];
       this.cashoutStations = [];
-      this.teamCash = [0, 0, 0, 0];
+      this.teamCash = is5v5 ? [0, 0] : [0, 0, 0, 0];
       this.cashBoxCount = 0;
       this.cashoutTimeLeft = 480;
       this.isOvertime = false;
@@ -3837,7 +4432,7 @@ var GameEngine = class {
       this.spawnVault();
       this.spawnCashoutStation();
       this.spawnCashoutStation();
-      this.banner = { text: "\u6392\u4F4D\u63D0\u73B0 \xB7 \u593A\u53D6\u73B0\u91D1\u76D2\u8FDB\u884C\u63D0\u73B0\uFF01", t: 2.8 };
+      this.banner = { text: is5v5 ? "5v5 \u63D0\u73B0\u4E89\u593A \xB7 \u62A2\u593A\u73B0\u91D1\u76D2\u51FB\u8D25\u654C\u65B9\uFF01" : "\u6392\u4F4D\u63D0\u73B0 \xB7 \u593A\u53D6\u73B0\u91D1\u76D2\u8FDB\u884C\u63D0\u73B0\uFF01", t: 2.8 };
       this.activeId = 0;
     } else if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
       this.isDM = true;
@@ -3848,15 +4443,7 @@ var GameEngine = class {
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
       this.enemyBase.maxHp = Infinity;
-      this.dmSpawns = [];
-      for (let i = 0; i < 12; i++) {
-        const angle = i / 12 * Math.PI * 2;
-        const dist = 350 + Math.random() * 180;
-        this.dmSpawns.push({
-          x: this.worldW * 0.5 + Math.cos(angle) * dist,
-          y: this.worldH * 0.5 + Math.sin(angle) * dist
-        });
-      }
+      this.dmSpawns = this.generateDistributedSpawns();
       if (this.mode === "local") {
         const human = {
           id: 0,
@@ -4206,7 +4793,7 @@ var GameEngine = class {
       this.foe.speed = c.speed * (1 + o.speedBonus);
       this.foe.size = c.size;
     }
-    if (this.gameMode === "deathmatch" && this.combatants.length > 0) {
+    if ((this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch" || this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && this.combatants.length > 0) {
       const peerC = this.combatants.find((c) => c.id === this.peerPid);
       if (peerC) {
         peerC.name = this.peerName || "\u5BF9\u624B";
@@ -4313,19 +4900,19 @@ var GameEngine = class {
         this.layoutCyber(building, cover, pillar, cx, cy);
         break;
       case 5:
-        this.layoutRuin(building, cover, pillar, cx, cy);
+        this.layoutWildWest(building, cover, pillar, cx, cy);
         break;
       case 6:
-        this.layoutArctic(building, cover, pillar, cx, cy);
+        this.layoutJungle(building, cover, pillar, cx, cy);
         break;
       case 7:
-        this.layoutCyber(building, cover, pillar, cx, cy);
+        this.layoutArcticZone(building, cover, pillar, cx, cy);
         break;
       default:
         this.layoutNeon(building, cover, pillar, cx, cy);
         break;
     }
-    if (this.gameMode === "deathmatch" || this.gameMode === "cashout") {
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch" || (this.gameMode === "cashout" || this.gameMode === "cashout_5v5")) {
       const baseArea = 2400 * 1200;
       const currentArea = this.worldW * this.worldH;
       const extraRatio = currentArea / baseArea - 1;
@@ -4365,88 +4952,155 @@ var GameEngine = class {
   // World is 2400×1200; bases sit at (cx, baseY=worldH-120) and (cx, 120) with
   // radius 48, so mid-field anchors are kept a safe gap above/below them.
   // ---------------------------------------------------------------------------
-  /** 霓虹都市 — four large corner towers, four mid-field anchors, central pillar ring. */
-  layoutNeon(b, _c, p, cx, cy) {
-    b(430, 320, 230, 180);
-    b(1970, 320, 230, 180);
-    b(430, 880, 230, 180);
-    b(1970, 880, 230, 180);
-    b(cx, 270, 220, 90);
-    b(cx, 930, 220, 90);
-    b(170, cy, 120, 200);
-    b(2230, cy, 120, 200);
-    p(cx - 200, cy - 150);
-    p(cx + 200, cy - 150);
-    p(cx - 200, cy + 150);
-    p(cx + 200, cy + 150);
+  /** 霓虹都市 — four corner towers, mid-field anchors, central pillar ring with balanced cover walls. */
+  layoutNeon(b, c, p, cx, cy) {
+    b(430, 320, 210, 160);
+    b(1970, 320, 210, 160);
+    b(430, 880, 210, 160);
+    b(1970, 880, 210, 160);
+    b(cx, 270, 200, 80);
+    b(cx, 930, 200, 80);
+    b(170, cy, 110, 180);
+    b(2230, cy, 110, 180);
+    c(cx - 350, cy - 130, 140, 26);
+    c(cx + 350, cy + 130, 140, 26);
+    p(cx - 180, cy - 120);
+    p(cx + 180, cy - 120);
+    p(cx - 180, cy + 120);
+    p(cx + 180, cy + 120);
     p(cx, cy);
   }
-  /** 沙漠废墟 — adobe compounds in the corners, a central alley of cover, scattered ruins. */
+  /** 沙漠废墟 — adobe compounds in the corners, a central alley of cover, diagonal sandbag walls. */
   layoutDesert(b, c, p, cx, cy) {
-    b(400, 260, 180, 150);
-    b(2e3, 260, 180, 150);
-    b(400, 940, 180, 150);
-    b(2e3, 940, 180, 150);
-    b(150, cy, 120, 180);
-    b(2250, cy, 120, 180);
-    b(cx, 270, 200, 90);
-    b(cx, 930, 200, 90);
-    c(cx, cy - 170, 180, 28);
-    c(cx, cy + 170, 180, 28);
-    c(cx - 170, cy, 28, 180);
-    c(cx + 170, cy, 28, 180);
+    b(400, 270, 180, 140);
+    b(2e3, 270, 180, 140);
+    b(400, 930, 180, 140);
+    b(2e3, 930, 180, 140);
+    b(160, cy, 110, 160);
+    b(2240, cy, 110, 160);
+    b(cx, 270, 190, 80);
+    b(cx, 930, 190, 80);
+    c(cx - 300, cy - 140, 140, 28);
+    c(cx + 300, cy + 140, 140, 28);
+    c(cx, cy - 170, 160, 28);
+    c(cx, cy + 170, 160, 28);
+    c(cx - 170, cy, 28, 160);
+    c(cx + 170, cy, 28, 160);
+    p(cx - 200, cy);
+    p(cx + 200, cy);
     p(cx, cy);
   }
-  /** 冰原基地 — frozen bunkers in the corners + sides, a long central ice cross. */
+  /** 冰原基地 — frozen bunkers in the corners + sides, ice wall barriers. */
   layoutArctic(b, c, p, cx, cy) {
-    b(450, 300, 190, 150);
-    b(1950, 300, 190, 150);
-    b(450, 900, 190, 150);
-    b(1950, 900, 190, 150);
-    b(760, cy, 130, 190);
-    b(1640, cy, 130, 190);
-    b(cx, 270, 200, 90);
-    b(cx, 930, 200, 90);
-    c(cx, cy - 150, 230, 26);
-    c(cx, cy + 150, 230, 26);
-    c(cx - 150, cy, 26, 230);
-    c(cx + 150, cy, 26, 230);
+    b(450, 300, 180, 140);
+    b(1950, 300, 180, 140);
+    b(450, 900, 180, 140);
+    b(1950, 900, 180, 140);
+    b(740, cy, 120, 170);
+    b(1660, cy, 120, 170);
+    b(cx, 270, 190, 80);
+    b(cx, 930, 190, 80);
+    c(cx, cy - 160, 210, 26);
+    c(cx, cy + 160, 210, 26);
+    c(cx - 160, cy, 26, 210);
+    c(cx + 160, cy, 26, 210);
+    p(cx - 200, cy - 120);
+    p(cx + 200, cy + 120);
     p(cx, cy);
   }
-  /** 末日废墟 — broken city blocks clustered in the corners, scattered rubble pillars. */
-  layoutRuin(b, _c, p, cx, cy) {
-    b(380, 250, 170, 150);
-    b(640, 430, 150, 170);
-    b(2020, 250, 170, 150);
-    b(1760, 430, 150, 170);
-    b(380, 950, 170, 150);
-    b(640, 770, 150, 170);
-    b(2020, 950, 170, 150);
-    b(1760, 770, 150, 170);
-    b(cx, 260, 210, 80);
-    b(cx, 930, 210, 80);
-    b(150, cy, 120, 190);
-    b(2250, cy, 120, 190);
-    p(cx - 160, cy - 130);
-    p(cx + 160, cy - 130);
-    p(cx - 160, cy + 130);
-    p(cx + 160, cy + 130);
+  /** 末日废墟 — broken city blocks in the corners, scattered barrier walls & rubble pillars. */
+  layoutRuin(b, c, p, cx, cy) {
+    b(380, 260, 160, 140);
+    b(640, 420, 140, 150);
+    b(2020, 260, 160, 140);
+    b(1760, 420, 140, 150);
+    b(380, 940, 160, 140);
+    b(640, 780, 140, 150);
+    b(2020, 940, 160, 140);
+    b(1760, 780, 140, 150);
+    b(cx, 260, 190, 80);
+    b(cx, 930, 190, 80);
+    b(160, cy, 110, 170);
+    b(2240, cy, 110, 170);
+    c(cx - 280, cy - 140, 130, 26);
+    c(cx + 280, cy + 140, 130, 26);
+    p(cx - 160, cy - 120);
+    p(cx + 160, cy - 120);
+    p(cx - 160, cy + 120);
+    p(cx + 160, cy + 120);
     p(cx, cy);
   }
-  /** 赛博都市 — tall vertical strips in the corners + mid, neon arches at center. */
+  /** 赛博都市 — vertical towers, neon arches at center, balanced server nodes. */
   layoutCyber(b, c, p, cx, cy) {
-    b(420, 360, 160, 320);
-    b(1980, 360, 160, 320);
-    b(420, 840, 160, 320);
-    b(1980, 840, 160, 320);
-    b(760, cy, 120, 240);
-    b(1640, cy, 120, 240);
-    b(cx, 280, 200, 100);
-    b(cx, 920, 200, 100);
+    b(420, 340, 150, 260);
+    b(1980, 340, 150, 260);
+    b(420, 860, 150, 260);
+    b(1980, 860, 150, 260);
+    b(720, cy, 110, 200);
+    b(1680, cy, 110, 200);
+    b(cx, 270, 190, 90);
+    b(cx, 930, 190, 90);
     c(cx, cy - 160, 170, 26);
     c(cx, cy + 160, 170, 26);
     p(cx - 220, cy);
     p(cx + 220, cy);
+    p(cx, cy);
+  }
+  /** 西部牛仔 — Frontier town with saloon structures, central well, crate barriers. */
+  layoutWildWest(b, c, p, cx, cy) {
+    b(400, 270, 190, 140);
+    b(2e3, 270, 190, 140);
+    b(400, 930, 190, 140);
+    b(2e3, 930, 190, 140);
+    b(cx, 260, 180, 80);
+    b(cx, 940, 180, 80);
+    b(160, cy, 110, 170);
+    b(2240, cy, 110, 170);
+    c(cx - 280, cy - 130, 130, 28);
+    c(cx + 280, cy + 130, 130, 28);
+    c(cx - 150, cy, 28, 140);
+    c(cx + 150, cy, 28, 140);
+    p(cx, cy);
+    p(cx - 180, cy + 140);
+    p(cx + 180, cy - 140);
+  }
+  /** 幽静丛林 — Overgrown stone temple ruins with mossy walls & ancient obelisks. */
+  layoutJungle(b, c, p, cx, cy) {
+    b(420, 280, 180, 150);
+    b(1980, 280, 180, 150);
+    b(420, 920, 180, 150);
+    b(1980, 920, 180, 150);
+    b(180, cy, 120, 170);
+    b(2220, cy, 120, 170);
+    b(cx, 260, 190, 80);
+    b(cx, 940, 190, 80);
+    c(cx - 260, cy - 150, 140, 28);
+    c(cx + 260, cy + 150, 140, 28);
+    c(cx, cy - 160, 180, 26);
+    c(cx, cy + 160, 180, 26);
+    p(cx - 200, cy - 120);
+    p(cx + 200, cy - 120);
+    p(cx - 200, cy + 120);
+    p(cx + 200, cy + 120);
+    p(cx, cy);
+  }
+  /** 极寒地带 — Glacial canyon shelters, ice wall barriers & crystal pillars. */
+  layoutArcticZone(b, c, p, cx, cy) {
+    b(430, 280, 180, 140);
+    b(1970, 280, 180, 140);
+    b(430, 920, 180, 140);
+    b(1970, 920, 180, 140);
+    b(750, cy, 120, 170);
+    b(1650, cy, 120, 170);
+    b(cx, 260, 190, 80);
+    b(cx, 940, 190, 80);
+    c(cx - 300, cy - 140, 150, 26);
+    c(cx + 300, cy + 140, 150, 26);
+    c(cx, cy - 160, 200, 26);
+    c(cx, cy + 160, 200, 26);
+    p(cx - 180, cy);
+    p(cx + 180, cy);
+    p(cx, cy);
   }
   attach() {
     if (!this.canvas) return;
@@ -4481,7 +5135,8 @@ var GameEngine = class {
     const rect = this.canvas.getBoundingClientRect();
     this.W = Math.max(320, rect.width);
     this.H = Math.max(240, rect.height);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const maxDpr = this.quality === "low" ? 1 : this.quality === "medium" ? 1.5 : 2;
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     this.canvas.width = Math.floor(this.W * dpr);
     this.canvas.height = Math.floor(this.H * dpr);
     this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -4490,6 +5145,11 @@ var GameEngine = class {
    *  (every mode uses the expanded RUNTIME world), so there is nothing to
    *  re-sync here — the camera simply keeps following the player. */
   onResize() {
+    this.resize();
+  }
+  setQuality(q) {
+    if (this.quality === q) return;
+    this.quality = q;
     this.resize();
   }
   // ----------------------------------------------------------------- input
@@ -4634,7 +5294,7 @@ var GameEngine = class {
         p.bladeReflectRange = g.reflectRange ?? 96;
         p.bladeReflectSelf = g.reflectSelfDamage ?? 0.05;
         p.bladeReflectGlow = g.glow;
-        sound.swing();
+        sound.swing(g.id);
         e.preventDefault();
         return;
       }
@@ -4642,6 +5302,13 @@ var GameEngine = class {
         const p = this.player;
         p.thrustCharging = true;
         p.thrustCharge = 0;
+        e.preventDefault();
+        return;
+      }
+      if (this.gun.id === "throwing_knife" && !this.paused && !this.gameOver) {
+        const p = this.player;
+        p.knifeCharging = true;
+        p.knifeCharge = 0;
         e.preventDefault();
         return;
       }
@@ -4667,6 +5334,7 @@ var GameEngine = class {
     } else if (e.button === 2) {
       this.secondaryFiring = false;
       if (this.player.thrustCharging) this.thrustRelease();
+      if (this.player.knifeCharging) this.knifeRelease();
       this.player.bladeRaising = false;
     }
   }
@@ -4699,6 +5367,40 @@ var GameEngine = class {
     if (this.hudAccum > 0.06) {
       this.hudAccum = 0;
       this.emit(false);
+    }
+    for (let i = this.effects.length - 1; i >= 0; i--) {
+      this.effects[i].t += dt;
+      if (this.effects[i].t > this.effects[i].duration) {
+        this.effects.splice(i, 1);
+      }
+    }
+    for (let i = this.meleeTrails.length - 1; i >= 0; i--) {
+      this.meleeTrails[i].life -= dt;
+      if (this.meleeTrails[i].life <= 0) {
+        this.meleeTrails.splice(i, 1);
+      }
+    }
+    if (this.weather === "rain" && Math.random() < 0.6) {
+      for (let i = 0; i < (this.quality === "high" ? 4 : 2); i++) {
+        const rx = this.localPlayer ? this.localPlayer.x + (Math.random() - 0.5) * 1600 : Math.random() * this.W;
+        const ry = this.localPlayer ? this.localPlayer.y + (Math.random() - 0.5) * 1200 : Math.random() * this.H;
+        this.raindrops.push({
+          x: rx,
+          y: ry,
+          vx: -300 - Math.random() * 100,
+          vy: 800 + Math.random() * 200,
+          life: 0.6,
+          maxLife: 0.6
+        });
+      }
+    }
+    for (let i = this.raindrops.length - 1; i >= 0; i--) {
+      this.raindrops[i].x += this.raindrops[i].vx * dt;
+      this.raindrops[i].y += this.raindrops[i].vy * dt;
+      this.raindrops[i].life -= dt;
+      if (this.raindrops[i].life <= 0) {
+        this.raindrops.splice(i, 1);
+      }
     }
     this.raf = requestAnimationFrame(this.loop);
   };
@@ -4791,7 +5493,7 @@ var GameEngine = class {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
         const selfC = this.combatants.find((c) => c.id === 0);
-        if (this.gameMode === "cashout" && selfC && (selfC.coins ?? 0) > 0) {
+        if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && selfC && (selfC.coins ?? 0) > 0) {
           this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${Math.ceil(this.player.deadTimer)} \u79D2\u540E\u590D\u6D3B (\u590D\u6D3B\u5E01: ${selfC.coins})`, t: 0.4 };
         } else {
           this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${Math.ceil(this.player.deadTimer)} \u79D2\u540E\u590D\u6D3B`, t: 0.4 };
@@ -4892,7 +5594,7 @@ var GameEngine = class {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
         const selfC = this.combatants.find((c) => c.id === 0);
-        if (this.gameMode === "cashout" && selfC && (selfC.coins ?? 0) > 0) {
+        if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && selfC && (selfC.coins ?? 0) > 0) {
           this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${Math.ceil(this.player.deadTimer)} \u79D2\u540E\u590D\u6D3B (\u590D\u6D3B\u5E01: ${selfC.coins})`, t: 0.4 };
         } else {
           this.banner = { text: `\u4F60\u88AB\u51FB\u8D25\uFF01${Math.ceil(this.player.deadTimer)} \u79D2\u540E\u590D\u6D3B`, t: 0.4 };
@@ -4924,6 +5626,7 @@ var GameEngine = class {
       this.emit(false);
       return;
     }
+    sound.setListenerPos(this.player.x, this.player.y);
     if (this.isDM) {
       this.activeId = this.mode === "local" ? 0 : this.selfPid;
       this.updatePlayer(dt);
@@ -4998,6 +5701,7 @@ var GameEngine = class {
   updatePlayer(dt) {
     const p = this.player;
     const g = this.gun;
+    sound.setEnemyDampen(this.simulatingOther);
     p.t += dt;
     if (p.deadTimer && p.deadTimer > 0) {
       p.vx = 0;
@@ -5011,6 +5715,13 @@ var GameEngine = class {
     if (p.slamCd > 0) p.slamCd -= dt;
     if (p.swingTimer > 0) p.swingTimer -= dt;
     if (p.slowT && p.slowT > 0) p.slowT -= dt;
+    if (p.burnT && p.burnT > 0) {
+      p.burnT -= dt;
+      this.damagePlayerEntity(p, (p.burnDps ?? 30) * dt, void 0, 0, 0, p.burnOwnerId ?? -1, p.burnWeapon);
+      if (Math.random() < 0.3) {
+        this.spawnParticles(p.x, p.y, "#fb923c", 1, 50, 0.2);
+      }
+    }
     if (p.stunTime && p.stunTime > 0) p.stunTime -= dt;
     if (p.comboTimer > 0) {
       p.comboTimer -= dt;
@@ -5047,7 +5758,7 @@ var GameEngine = class {
           const q = it.ref;
           if (!q.deadTimer || q.deadTimer <= 0) {
             if (Math.hypot(q.x - p.x, q.y - p.y) < hitR + q.size) {
-              this.damagePlayerEntity(q, ramDmg, void 0, kx, ky, p.cid ?? this.activeId);
+              this.damagePlayerEntity(q, ramDmg, void 0, kx, ky, p.cid ?? this.activeId, "charge_slam");
             }
           }
         }
@@ -5110,6 +5821,19 @@ var GameEngine = class {
       p.thrustCharging = false;
     }
     if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
+    if (this.gun.id === "throwing_knife") {
+      if (this.secondaryFiring) {
+        if (!p.knifeCharging) {
+          p.knifeCharging = true;
+          p.knifeCharge = 0;
+        }
+      } else if (p.knifeCharging) {
+        this.knifeRelease();
+      }
+      if (p.knifeCharging) p.knifeCharge = (p.knifeCharge ?? 0) + dt;
+    } else {
+      p.knifeCharging = false;
+    }
     if (this.gun.id === "dual_blades") {
       if (this.secondaryFiring) {
         if (!p.bladeRaising) {
@@ -5162,8 +5886,8 @@ var GameEngine = class {
       const tgt = this.findAimTarget(p);
       if (tgt) p.angle = Math.atan2(tgt.y - p.y, tgt.x - p.x);
     }
-    const carriedBox = this.gameMode === "cashout" ? this.cashBoxes.find((b) => b.carriedByCid === this.activeId) : null;
-    const carriedStatue = this.gameMode === "cashout" ? this.statues.find((s) => s.carriedByCid === this.activeId) : null;
+    const carriedBox = this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.cashBoxes.find((b) => b.carriedByCid === this.activeId) : null;
+    const carriedStatue = this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.statues.find((s) => s.carriedByCid === this.activeId) : null;
     const carriedItem = carriedBox || carriedStatue;
     if (carriedItem) {
       if (this.firing) {
@@ -5314,7 +6038,75 @@ var GameEngine = class {
           });
           continue;
         }
-        const sp = g.bulletSpeed * (0.92 + Math.random() * 0.12);
+        if (g.kind === "boomerang") {
+          const liveBoom = this.bullets.reduce(
+            (n, b) => n + (b.kind === "boomerang" && b.ownerId === this.activeId && (b.life ?? 0) > 0 ? 1 : 0),
+            0
+          );
+          if (liveBoom >= 3) continue;
+          const bsp = g.bulletSpeed * 1.2 * (0.92 + Math.random() * 0.12);
+          const outDist = g.range ?? 240;
+          this.bullets.push({
+            x: bx,
+            y: by,
+            vx: Math.cos(base) * bsp,
+            vy: Math.sin(base) * bsp,
+            life: g.life,
+            damage: dmg,
+            size: g.bulletSize ?? 11,
+            color: g.color,
+            glow: g.glow,
+            pierce: 999,
+            knockback: g.knockback ?? 0,
+            explosive: false,
+            explosionRadius: 0,
+            kind: "boomerang",
+            hit: /* @__PURE__ */ new Set(),
+            owner: this.player === this.foe ? "foe" : "self",
+            ownerId: this.activeId,
+            trail: false,
+            ignoreWalls: true,
+            weapon: g.id,
+            boomerang: true,
+            outDist,
+            returning: false,
+            traveled: 0,
+            boomSpeed: bsp
+          });
+          continue;
+        }
+        if (g.kind === "knife") {
+          const kdmg = (this.knifeChargingActive ? Math.round(g.damage * 1.3) : g.damage) * this.character.damageMult * spinMult;
+          for (let k = 0; k < 2; k++) {
+            const ka = base + (k === 0 ? -0.035 : 0.035) + (Math.random() - 0.5) * g.spread;
+            const kx = p.x + Math.cos(ka) * (p.size + g.barrel);
+            const ky = p.y + Math.sin(ka) * (p.size + g.barrel);
+            const ksp = g.bulletSpeed * 1.2 * (0.92 + Math.random() * 0.12);
+            this.bullets.push({
+              x: kx,
+              y: ky,
+              vx: Math.cos(ka) * ksp,
+              vy: Math.sin(ka) * ksp,
+              life: g.life,
+              damage: kdmg,
+              size: g.bulletSize,
+              color: g.color,
+              glow: g.glow,
+              pierce: g.pierce,
+              knockback: g.knockback,
+              explosive: false,
+              explosionRadius: 0,
+              kind: "knife",
+              hit: /* @__PURE__ */ new Set(),
+              owner: this.player === this.foe ? "foe" : "self",
+              ownerId: this.activeId,
+              trail: true,
+              weapon: g.id
+            });
+          }
+          continue;
+        }
+        const sp = g.bulletSpeed * 1.2 * (0.92 + Math.random() * 0.12);
         this.bullets.push({
           x: bx,
           y: by,
@@ -5344,7 +6136,7 @@ var GameEngine = class {
       }
       if (g.magazine !== void 0) ws.ammo -= 1;
     }
-    sound.shoot(g.id);
+    sound.shoot(g.id, p.x, p.y);
     this.spawnParticles(
       p.x + Math.cos(base) * (p.size + g.barrel),
       p.y + Math.sin(base) * (p.size + g.barrel),
@@ -5406,6 +6198,32 @@ var GameEngine = class {
   }
   // ------------------------------------------------------------- melee
   /** The human opponent of whoever is currently `this.player` (the melee attacker). */
+  /** Geometrically test whether a circle (cx, cy, r) intersects a 2D sector area wedge
+   *  centered at (px, py) with radius R, direction angle `dirAngle`, and sweep arc `arc`. */
+  sectorIntersectsCircle(px, py, cx, cy, r, R, dirAngle, arc, pSize) {
+    const dx = cx - px;
+    const dy = cy - py;
+    const distSq = dx * dx + dy * dy;
+    const maxDist = R + r;
+    if (distSq > maxDist * maxDist) return false;
+    const dist = Math.sqrt(distSq);
+    if (dist <= r + pSize * 0.8) return true;
+    const centerAng = Math.atan2(dy, dx);
+    const diff = Math.abs(this.angleDiff(centerAng, dirAngle));
+    if (diff <= arc / 2) return true;
+    const halfArc = arc / 2;
+    const rayAngles = [dirAngle - halfArc, dirAngle + halfArc];
+    for (const a of rayAngles) {
+      const rx = Math.cos(a);
+      const ry = Math.sin(a);
+      const proj = dx * rx + dy * ry;
+      if (proj >= 0 && proj <= R) {
+        const perpDistSq = distSq - proj * proj;
+        if (perpDistSq <= r * r) return true;
+      }
+    }
+    return false;
+  }
   meleeOpponent() {
     if (this.isDM) {
       let best = null;
@@ -5437,7 +6255,7 @@ var GameEngine = class {
     const isWhip = !!g.whip;
     const isDual = g.id === "dual_blades";
     const slowOnHit = g.slowOnHit ?? 0;
-    sound.swing();
+    sound.swing(g.id);
     p.swingTimer = p.swingDur;
     let swingAngle = p.angle;
     if (isWhip) {
@@ -5469,6 +6287,8 @@ var GameEngine = class {
       }
     }
     const dmgMult = isSpear ? 1 + p.comboStep * 0.35 : 1;
+    const hitRange = (range + p.size) * (isDual && p.comboStep === 5 ? 1.35 : 1);
+    const hitArc = Math.max(arc, 2.3);
     this.effects.push({
       type: isWhip ? "whip" : isSaber ? "saberswing" : isDual ? "dual_slash" : "slash",
       x: p.x,
@@ -5477,52 +6297,56 @@ var GameEngine = class {
       arc: isWhip ? this.whipToggle ? 0.6 : -0.6 : arc,
       range: range * (isDual && p.comboStep === 5 ? 1.3 : 1),
       t: 0,
-      duration: isDual ? p.comboStep === 5 ? 0.36 : 0.18 : isWhip ? 0.18 : isSaber ? 0.32 : 0.22,
-      radius: range * (isDual && p.comboStep === 5 ? 1.3 : 1),
-      color: g.glow,
-      style: isDual ? String(p.comboStep) : void 0,
-      dirX: isDual ? this.whipToggle ? 1 : -1 : void 0
+      duration: isWhip ? 0.08 : 0.12,
+      color: g.glow || g.color,
+      radius: range * (isDual && p.comboStep === 5 ? 1.3 : 1)
     });
-    if (isDual && p.comboStep === 5 && !this.simulatingOther) {
-      this.shake = Math.min(20, this.shake + 14);
+    if (isSaber || g.id === "thrust_sword") {
+      this.meleeTrails.push({
+        x: p.x,
+        y: p.y,
+        angle: swingAngle,
+        weapon: g.id,
+        life: 0.25,
+        maxLife: 0.25,
+        arc: isWhip ? this.whipToggle ? 0.6 : -0.6 : arc,
+        range: range * (isDual && p.comboStep === 5 ? 1.3 : 1)
+      });
     }
     for (const e of this.enemies) {
-      const dx = e.x - p.x;
-      const dy = e.y - p.y;
-      const d = Math.hypot(dx, dy);
-      if (d <= range + e.size) {
+      if (this.sectorIntersectsCircle(p.x, p.y, e.x, e.y, e.size, hitRange, swingAngle, hitArc, p.size)) {
+        const dx = e.x - p.x;
+        const dy = e.y - p.y;
         const ang = Math.atan2(dy, dx);
-        if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          this.damageEnemy(e, dmg * dmgMult, 0, 0, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
-          if (isSaber) {
-            e.electrifiedTime = 0.7;
-            e.electrifiedGlow = g.glow;
-          }
-          if (isWhip && slowOnHit > 0) {
-            e.slowT = Math.max(e.slowT, slowOnHit);
-          }
+        this.damageEnemy(e, dmg * dmgMult, 0, 0, false, { weapon: g.id, dx: Math.cos(ang), dy: Math.sin(ang) });
+        if (isSaber) {
+          e.electrifiedTime = 0.7;
+          e.electrifiedGlow = g.glow;
+        }
+        if (isWhip && slowOnHit > 0) {
+          e.slowT = Math.max(e.slowT, slowOnHit);
         }
       }
     }
     const opp = this.meleeOpponent();
     if (opp && !(opp.deadTimer && opp.deadTimer > 0)) {
-      const dx = opp.x - p.x;
-      const dy = opp.y - p.y;
-      const d = Math.hypot(dx, dy);
-      if (d <= range + opp.size) {
-        const ang = Math.atan2(dy, dx);
-        if (Math.abs(this.angleDiff(ang, swingAngle)) <= arc / 2) {
-          const kx = 0;
-          const ky = 0;
-          this.damagePlayerEntity(opp, dmg * dmgMult, void 0, kx, ky, this.activeId);
-          if (isSaber) {
-            opp.electrifiedTime = 0.7;
-            opp.electrifiedGlow = g.glow;
-          }
-          if (isWhip && slowOnHit > 0) {
-            opp.slowT = Math.max(opp.slowT ?? 0, slowOnHit);
-          }
+      if (this.sectorIntersectsCircle(p.x, p.y, opp.x, opp.y, opp.size, hitRange, swingAngle, hitArc, p.size)) {
+        this.damagePlayerEntity(opp, dmg * dmgMult, void 0, 0, 0, this.activeId, g.id);
+        if (isSaber) {
+          opp.electrifiedTime = 0.7;
+          opp.electrifiedGlow = g.glow;
         }
+        if (isWhip && slowOnHit > 0) {
+          opp.slowT = Math.max(opp.slowT ?? 0, slowOnHit);
+        }
+      }
+    }
+    const candDeployables = this.queryGrid(p.x, p.y, hitRange + this.gridMaxR + 4).filter((it) => it.kind === "deployable");
+    for (const it of candDeployables) {
+      const d = it.ref;
+      if (this.isTeammate(this.activeId, d.ownerId)) continue;
+      if (this.sectorIntersectsCircle(p.x, p.y, d.x, d.y, d.size, hitRange, swingAngle, hitArc, p.size)) {
+        this.damageDeployable(d, dmg * dmgMult, this.activeId);
       }
     }
     for (const w of this.walls) {
@@ -5531,9 +6355,9 @@ var GameEngine = class {
       const cx = Math.max(w.x, Math.min(p.x, w.x + w.w));
       const cy = Math.max(w.y, Math.min(p.y, w.y + w.h));
       const d = Math.hypot(cx - p.x, cy - p.y);
-      if (d <= range) {
+      if (d <= hitRange) {
         const ang = Math.atan2(cy - p.y, cx - p.x);
-        if (Math.abs(this.angleDiff(ang, p.angle)) <= arc / 2) {
+        if (Math.abs(this.angleDiff(ang, p.angle)) <= hitArc / 2) {
           this.damageWall(w, g.id === "hammer" ? 40 : 16);
         }
       }
@@ -5570,7 +6394,17 @@ var GameEngine = class {
       const d = Math.hypot(opp.x - p.x, opp.y - p.y);
       if (d <= radius + opp.size) {
         const fall = 1 - d / (radius + opp.size);
-        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, 0, 0, this.activeId);
+        this.damagePlayerEntity(opp, dmg * (0.55 + fall * 0.5), void 0, 0, 0, this.activeId, g.id);
+      }
+    }
+    const candDeployables = this.queryGrid(p.x, p.y, radius + this.gridMaxR + 4).filter((it) => it.kind === "deployable");
+    for (const it of candDeployables) {
+      const d = it.ref;
+      if (this.isTeammate(this.activeId, d.ownerId)) continue;
+      const dist = Math.hypot(d.x - p.x, d.y - p.y);
+      if (dist <= radius + d.size) {
+        const fall = 1 - dist / (radius + d.size);
+        this.damageDeployable(d, dmg * (0.55 + fall * 0.5), this.activeId);
       }
     }
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -5602,7 +6436,7 @@ var GameEngine = class {
     p.thrustDashDmg = dmg;
     p.thrustHitIds = /* @__PURE__ */ new Set();
     p.iframes = Math.max(p.iframes, 0.18);
-    sound.swing();
+    sound.swing(g.id);
     this.spawnParticles(p.x, p.y, g.glow, 14, 280, 0.4);
     this.effects.push({
       type: "slash",
@@ -5611,11 +6445,46 @@ var GameEngine = class {
       angle: ang,
       arc: 0.5,
       range: g.chargeDashRange ?? 34,
-      t: 0,
       duration: 0.18,
       radius: g.chargeDashRange ?? 34,
       color: g.glow
     });
+    this.effects.push({
+      type: "dash",
+      x: p.x,
+      y: p.y,
+      angle: ang,
+      arc: 0,
+      range: dist,
+      t: 0,
+      duration: 0.15,
+      radius: g.chargeDashRange ?? 34
+    });
+    this.meleeTrails.push({
+      x: p.x,
+      y: p.y,
+      angle: ang,
+      weapon: g.id,
+      life: 0.35,
+      maxLife: 0.35,
+      length: dist
+    });
+  }
+  /** Release the charged throw for the throwing knife (called on right-click up). */
+  knifeRelease() {
+    const p = this.player;
+    const g = this.gun;
+    if (g.kind !== "knife") return;
+    if (!p.knifeCharging) return;
+    const charge = p.knifeCharge ?? 0;
+    p.knifeCharging = false;
+    p.knifeCharge = 0;
+    if (charge < (g.chargeMin ?? 0.15)) return;
+    const ws = this.weaponStates.get(g.id);
+    if (!ws) return;
+    this.knifeChargingActive = true;
+    this.fireGun(ws);
+    this.knifeChargingActive = false;
   }
   /** Advance the thrust-sword dash each frame, hitting enemies along the path. */
   stepThrustDash(dt) {
@@ -5649,7 +6518,21 @@ var GameEngine = class {
       const fwd = rx * ca + ry * sa;
       if (d <= range + opp.size && fwd > -range) {
         p.thrustHitIds?.add(opp.cid);
-        this.damagePlayerEntity(opp, dmg, void 0, ca * 240, sa * 240, this.activeId);
+        this.damagePlayerEntity(opp, dmg, void 0, ca * 240, sa * 240, this.activeId, g.id);
+      }
+    }
+    const candDeployables = this.queryGrid(p.x, p.y, range + this.gridMaxR + 4).filter((it) => it.kind === "deployable");
+    for (const it of candDeployables) {
+      const d = it.ref;
+      const dKey = -d.id - 1e3;
+      if (p.thrustHitIds?.has(dKey) || this.isTeammate(this.activeId, d.ownerId)) continue;
+      const rx = d.x - p.x;
+      const ry = d.y - p.y;
+      const dist = Math.hypot(rx, ry);
+      const fwd = rx * ca + ry * sa;
+      if (dist <= range + d.size && fwd > -range) {
+        p.thrustHitIds?.add(dKey);
+        this.damageDeployable(d, dmg, this.activeId);
       }
     }
     this.spawnParticles(p.x, p.y, g.glow, 2, 140, 0.2);
@@ -5683,7 +6566,7 @@ var GameEngine = class {
         if (Math.random() < 0.5)
           this.spawnParticles(hit.point.x, hit.point.y, g.glow, 1, 90, 0.2);
       } else if (hit.combatant) {
-        this.damagePlayerEntity(hit.combatant, g.damage * this.character.damageMult * dt, void 0, 0, 0, this.activeId);
+        this.damagePlayerEntity(hit.combatant, g.damage * this.character.damageMult * dt, void 0, 0, 0, this.activeId, g.id);
         if (Math.random() < 0.7)
           this.spawnParticles(hit.combatant.x, hit.combatant.y, g.glow, 2, 120, 0.22);
       } else if (hit.deployable) {
@@ -5789,8 +6672,8 @@ var GameEngine = class {
           if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone || d <= e.size + this.player.size) {
             const fall = 1 - d / (range + e.size);
             this.damageEnemy(e, dps * dt * (0.4 + fall * 0.6), 0, 0, false, { weapon: g.id, dx: Math.cos(this.player.angle), dy: Math.sin(this.player.angle) });
-            e.burnT = Math.max(e.burnT, 1.2);
-            e.burnDps = Math.max(e.burnDps, dps * 0.25);
+            e.burnT = Math.max(e.burnT, 1.5);
+            e.burnDps = Math.max(e.burnDps, dps * 0.45);
           }
         }
       }
@@ -5806,7 +6689,11 @@ var GameEngine = class {
             const ang = Math.atan2(ddy, ddx);
             if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
               const fall = 1 - d / (range + q.size);
-              this.damagePlayerEntity(q, dps * dt * (0.4 + fall * 0.6), void 0, 0, 0, this.activeId);
+              this.damagePlayerEntity(q, dps * dt * (0.4 + fall * 0.6), void 0, 0, 0, this.activeId, g.id);
+              q.burnT = Math.max(q.burnT ?? 0, 1.5);
+              q.burnDps = Math.max(q.burnDps ?? 0, dps * 0.45);
+              q.burnOwnerId = this.activeId;
+              q.burnWeapon = g.id;
             }
           }
         }
@@ -5828,9 +6715,23 @@ var GameEngine = class {
           size: 4 + Math.random() * 5,
           shrink: true
         });
+        if (this.quality === "high" && Math.random() > 0.5) {
+          const sa = this.player.angle + (Math.random() - 0.5) * cone * 4;
+          const ssp = range * (0.8 + Math.random() * 1);
+          this.particles.push({
+            x: ox,
+            y: oy,
+            vx: Math.cos(sa) * ssp,
+            vy: Math.sin(sa) * ssp,
+            life: 0.6 + Math.random() * 0.4,
+            maxLife: 1,
+            color: "rgba(80, 80, 80, 0.4)",
+            size: 10 + Math.random() * 10
+          });
+        }
       }
       if (this.flameSndCd <= 0) {
-        sound.shoot("rocket");
+        sound.shoot("flamethrower");
         this.flameSndCd = 0.12;
       }
       this.effects.push({
@@ -5928,7 +6829,7 @@ var GameEngine = class {
           knockback: 0,
           hit: /* @__PURE__ */ new Set()
         });
-        sound.shoot();
+        sound.shoot("rpg", p.x, p.y);
         p.fireTimer = 1;
         this.gadgetCd.set(g.id, g.cooldown);
         this.clearGadgetSelection();
@@ -5961,7 +6862,7 @@ var GameEngine = class {
           stunDuration: g.ccDuration ?? 3
           // special property we'll check on hit
         });
-        sound.shoot();
+        sound.shoot("stun_gun", p.x, p.y);
         p.fireTimer = 0.5;
         this.gadgetCd.set(g.id, g.cooldown);
         this.clearGadgetSelection();
@@ -5987,7 +6888,9 @@ var GameEngine = class {
         radius: range * 0.7,
         color: g.glow,
         dps,
-        slow: 0.5
+        slow: 0.5,
+        ownerId: this.activeId,
+        weapon: g.id
       });
       for (const e of this.enemies) {
         const dx = e.x - this.player.x;
@@ -6011,7 +6914,7 @@ var GameEngine = class {
           if (d <= range + q.size) {
             const ang = Math.atan2(ddy, ddx);
             if (Math.abs(this.angleDiff(ang, this.player.angle)) <= cone) {
-              this.damagePlayerEntity(q, dps * dt * 0.5, void 0, 0, 0, this.activeId);
+              this.damagePlayerEntity(q, dps * dt * 0.5, void 0, 0, 0, this.activeId, g.id);
             }
           }
         }
@@ -6034,7 +6937,7 @@ var GameEngine = class {
         });
       }
       if (this.flameSndCd <= 0) {
-        sound.shoot("rocket");
+        sound.shoot("flamethrower");
         this.flameSndCd = 0.14;
       }
     }
@@ -6064,7 +6967,7 @@ var GameEngine = class {
     const dmgMult = minMult + (maxMult - minMult) * chargePct;
     const speedMult = 1 + chargePct * ((g.maxChargeSpeedMult ?? 2) - 1);
     const dmg = g.damage * dmgMult * this.character.damageMult;
-    const sp = g.bulletSpeed * speedMult;
+    const sp = g.bulletSpeed * speedMult * 1.2;
     const a = p.angle + (Math.random() - 0.5) * g.spread;
     const bx = p.x + Math.cos(a) * (p.size + g.barrel);
     const by = p.y + Math.sin(a) * (p.size + g.barrel);
@@ -6088,7 +6991,7 @@ var GameEngine = class {
       weapon: g.id
     });
     this.swatPointBlank(dmg, g.knockback * dmgMult);
-    sound.shoot("sniper");
+    sound.shoot(g.id);
     this.spawnParticles(bx, by, g.glow, 4, 120, 0.25);
     if (chargePct >= 0.85) {
     }
@@ -6260,7 +7163,7 @@ var GameEngine = class {
       b.x += (b.driftX ?? 0) * dt;
       b.y += (b.driftY ?? 0) * dt;
       b.life -= dt;
-      if (b.trail && Math.random() < 0.7) {
+      if (this.quality !== "low" && b.trail && Math.random() < 0.7) {
         this.particles.push({
           x: b.x,
           y: b.y,
@@ -6274,8 +7177,37 @@ var GameEngine = class {
         });
       }
       let dead = b.life <= 0;
-      if (b.x < -40 || b.x > this.worldW + 40 || b.y < -40 || b.y > this.worldH + 40)
+      if (!b.boomerang && (b.x < -40 || b.x > this.worldW + 40 || b.y < -40 || b.y > this.worldH + 40))
         dead = true;
+      if (b.boomerang) {
+        const bs = b.boomSpeed ?? 500;
+        if (!b.returning) {
+          b.traveled = (b.traveled ?? 0) + bs * dt;
+          if ((b.traveled ?? 0) >= (b.outDist ?? 240)) {
+            b.returning = true;
+            b.hit.clear();
+          }
+        } else {
+          const o = this.ownerPos(b);
+          const ang = Math.atan2(o.y - b.y, o.x - b.x);
+          b.vx = Math.cos(ang) * bs;
+          b.vy = Math.sin(ang) * bs;
+          if (Math.hypot(o.x - b.x, o.y - b.y) < b.size + 22) dead = true;
+        }
+        if (Math.random() < 0.85) {
+          this.particles.push({
+            x: b.x,
+            y: b.y,
+            vx: 0,
+            vy: 0,
+            life: 0.22,
+            maxLife: 0.22,
+            color: b.glow,
+            size: b.size * 1.3,
+            shrink: true
+          });
+        }
+      }
       if (!dead && !b.ignoreWalls) {
         const w = this.pointInWall(b.x, b.y, b.size);
         if (w) {
@@ -6351,6 +7283,11 @@ var GameEngine = class {
               { weapon: b.weapon ?? "bullet", dx: Math.cos(Math.atan2(b.vy, b.vx)), dy: Math.sin(Math.atan2(b.vy, b.vx)) },
               b.ownerId
             );
+            if (b.weapon === "dragon_breath" || b.weapon === "flamethrower") {
+              e.burnT = Math.max(e.burnT, 1.5);
+              e.burnDps = Math.max(e.burnDps, b.damage * 2.5 * 0.45);
+              e.burnOwnerId = b.ownerId;
+            }
             if (b.pierce <= 0) {
               dead = true;
               break;
@@ -6368,7 +7305,7 @@ var GameEngine = class {
           if (rdx * rdx + rdy * rdy <= rr * rr) {
             const selfDmg = b.damage * (q.bladeReflectSelf ?? 0.05);
             if (selfDmg > 0)
-              this.damagePlayerEntity(q, selfDmg, void 0, 0, 0, b.ownerId ?? 2);
+              this.damagePlayerEntity(q, selfDmg, void 0, 0, 0, b.ownerId ?? 2, b.weapon);
             b.vx = -b.vx;
             b.vy = -b.vy;
             b.owner = "player";
@@ -6376,7 +7313,7 @@ var GameEngine = class {
             b.reflected = true;
             b.hit.clear();
             this.spawnParticles(b.x, b.y, q.bladeReflectGlow ?? "#22d3ee", 6, 160, 0.25);
-            sound.swing();
+            sound.swing(this.gun.id);
             break;
           }
         }
@@ -6386,7 +7323,7 @@ var GameEngine = class {
           const oid = b.ownerId ?? (b.owner === "foe" ? 2 : 1);
           const players = this.queryGrid(b.x, b.y, b.size + this.gridMaxR + 2).filter((it) => it.kind === "player").sort((a, b2) => a.idx - b2.idx);
           for (const it of players) {
-            if (it.ownerId === oid) continue;
+            if (it.ownerId === oid || this.isTeammate(oid, it.ownerId)) continue;
             const q = it.ref;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if (this.hitsPlayer(b, q)) {
@@ -6479,7 +7416,8 @@ var GameEngine = class {
             color: "#fb923c",
             dps: 90,
             tickT: 0,
-            ownerId: gr.ownerId
+            ownerId: gr.ownerId,
+            weapon: "fire_grenade"
           });
           this.spawnParticles(gr.x, gr.y, "#fb923c", 20, 200, 0.5);
         } else if (gr.kind === "poison") {
@@ -6494,9 +7432,33 @@ var GameEngine = class {
             dps: 60,
             slow: 0.5,
             tickT: 0,
-            ownerId: gr.ownerId
+            ownerId: gr.ownerId,
+            weapon: "poison_grenade"
           });
           this.spawnParticles(gr.x, gr.y, "#84cc16", 20, 200, 0.5);
+        } else if (gr.kind === "cluster") {
+          this.explode(gr.x, gr.y, 40, 0, "#f97316", void 0, gr.ownerId);
+          for (let i = 0; i < 4; i++) {
+            const a = i * Math.PI / 2 + Math.random() * 0.5;
+            this.deployables.push({
+              kind: "mine_explosive",
+              x: gr.x + Math.cos(a) * 45,
+              y: gr.y + Math.sin(a) * 45,
+              angle: 0,
+              hp: 20,
+              maxHp: 20,
+              life: 25,
+              timer: 0,
+              armed: 0.6,
+              radius: 48,
+              size: 12,
+              color: "#f87171",
+              targets: [],
+              owner: "self",
+              // Fallback, not strictly critical
+              ownerId: gr.ownerId
+            });
+          }
         } else {
           this.explode(gr.x, gr.y, 120, 180, "#fb923c", void 0, gr.ownerId);
         }
@@ -6509,7 +7471,7 @@ var GameEngine = class {
   gadgetRange(def) {
     if (def.range) return def.range;
     const k = def.kind;
-    if (k === "glue_grenade" || k === "fire_grenade" || k === "poison_grenade")
+    if (k === "glue_grenade" || k === "fire_grenade" || k === "poison_grenade" || k === "cluster_grenade")
       return GADGET_THROW_DIST;
     return GADGET_DEPLOY_DIST;
   }
@@ -6598,6 +7560,15 @@ var GameEngine = class {
           timer: 1.2,
           size: 18
         });
+      case "turret_sniper":
+        this.deployables.push({
+          ...base,
+          hp: def.hp ?? 120,
+          maxHp: def.hp ?? 120,
+          life: Infinity,
+          radius: 400,
+          timer: 2.5
+        });
         break;
       case "mine_explosive":
         this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 56, armed: 0.8 });
@@ -6607,6 +7578,9 @@ var GameEngine = class {
         break;
       case "mine_fire":
         this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 70, armed: 0.8 });
+        break;
+      case "mine_stun":
+        this.deployables.push({ ...base, hp: 30, maxHp: 30, life: 60, radius: 65, armed: 0.8 });
         break;
       case "glue_grenade": {
         const sim = this.simulateThrow(p.x, p.y, px, py);
@@ -6646,6 +7620,20 @@ var GameEngine = class {
           life: sim.fuse,
           fuse: sim.fuse,
           kind: "poison",
+          ownerId: this.activeId
+        });
+        break;
+      }
+      case "cluster_grenade": {
+        const sim = this.simulateThrow(p.x, p.y, px, py);
+        this.grenades.push({
+          x: p.x,
+          y: p.y,
+          vx: sim.vx,
+          vy: sim.vy,
+          life: sim.fuse,
+          fuse: sim.fuse,
+          kind: "cluster",
           ownerId: this.activeId
         });
         break;
@@ -6695,7 +7683,7 @@ var GameEngine = class {
     for (const d of this.deployables) {
       d.life -= dt;
       d.armed -= dt;
-      if (d.kind === "turret_mg" || d.kind === "turret_cannon") {
+      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
         d.timer -= dt;
         let target = null;
         let bestD = d.radius;
@@ -6757,6 +7745,30 @@ var GameEngine = class {
                 weapon: "turret_mg"
               });
               this.spawnParticles(d.x + Math.cos(d.angle) * 14, d.y + Math.sin(d.angle) * 14, d.color, 2, 80, 0.15);
+            } else if (d.kind === "turret_sniper") {
+              d.timer = 2.5;
+              const sp = 2e3;
+              this.bullets.push({
+                x: d.x + Math.cos(d.angle) * 16,
+                y: d.y + Math.sin(d.angle) * 16,
+                vx: Math.cos(d.angle) * sp,
+                vy: Math.sin(d.angle) * sp,
+                life: 1,
+                damage: 180,
+                size: 7,
+                color: "#fecdd3",
+                glow: d.color,
+                pierce: 99,
+                knockback: 100,
+                explosive: false,
+                explosionRadius: 0,
+                kind: "tracer",
+                hit: /* @__PURE__ */ new Set(),
+                owner: d.owner,
+                ownerId: d.ownerId,
+                weapon: "turret_sniper"
+              });
+              this.spawnParticles(d.x + Math.cos(d.angle) * 16, d.y + Math.sin(d.angle) * 16, d.color, 4, 150, 0.2);
             } else {
               d.timer = 1.1;
               const sp = 360;
@@ -6807,7 +7819,7 @@ var GameEngine = class {
         }
         continue;
       }
-      if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
+      if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire" || d.kind === "mine_stun") {
         let triggered = d.hp <= 0;
         if (d.armed <= 0) {
           const tryTrigger = (cx, cy, cs) => Math.hypot(cx - d.x, cy - d.y) < cs + 24;
@@ -6846,8 +7858,26 @@ var GameEngine = class {
               color: d.color,
               dps: 60,
               slow: 0.5,
-              tickT: 0
+              tickT: 0,
+              ownerId: d.ownerId,
+              weapon: "mine_poison"
             });
+          } else if (d.kind === "mine_stun") {
+            this.spawnParticles(d.x, d.y, "#fde047", 30, 250, 0.5);
+            const r = d.radius;
+            for (const e of this.enemies) {
+              if (Math.hypot(e.x - d.x, e.y - d.y) < r + e.size) e.ccTimer = 3.5;
+            }
+            if (this.isDM) {
+              for (const c of this.combatants) {
+                if (c.id === (d.ownerId ?? -1)) continue;
+                const q = c.player;
+                if (Math.hypot(q.x - d.x, q.y - d.y) < r + q.size) q.ccTimer = 3.5;
+              }
+            } else if (this.mode !== "local" && d.owner) {
+              const foe = d.owner === "foe" ? this.player : this.foe;
+              if (foe && Math.hypot(foe.x - d.x, foe.y - d.y) < r + foe.size) foe.ccTimer = 3.5;
+            }
           } else {
             this.effects.push({
               type: "firefield",
@@ -6858,7 +7888,9 @@ var GameEngine = class {
               radius: d.radius,
               color: d.color,
               dps: 90,
-              tickT: 0
+              tickT: 0,
+              ownerId: d.ownerId,
+              weapon: "mine_fire"
             });
           }
           d.life = 0;
@@ -7129,8 +8161,8 @@ var GameEngine = class {
               e.slowT = Math.max(e.slowT, 0.3);
             } else {
               this.damageEnemy(e, (fx.dps ?? 20) * 0.25, 0, 0, true, void 0, fx.ownerId);
-              e.burnT = Math.max(e.burnT, 1);
-              e.burnDps = Math.max(e.burnDps, 20);
+              e.burnT = Math.max(e.burnT, 1.5);
+              e.burnDps = Math.max(e.burnDps, (fx.dps ?? 20) * 0.45);
               e.burnOwnerId = fx.ownerId;
             }
           }
@@ -7141,7 +8173,13 @@ var GameEngine = class {
             const q = it.ref;
             if (q.deadTimer && q.deadTimer > 0) continue;
             if ((q.x - fx.x) ** 2 + (q.y - fx.y) ** 2 < (fx.radius + q.size) ** 2) {
-              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, void 0, 0, 0, fx.ownerId ?? -1);
+              this.damagePlayerEntity(q, (fx.dps ?? 20) * 0.25, void 0, 0, 0, fx.ownerId ?? -1, fx.weapon);
+              if (fx.type === "firefield") {
+                q.burnT = Math.max(q.burnT ?? 0, 1.5);
+                q.burnDps = Math.max(q.burnDps ?? 0, (fx.dps ?? 80) * 0.45);
+                q.burnOwnerId = fx.ownerId;
+                q.burnWeapon = fx.weapon;
+              }
             }
           }
         }
@@ -7154,10 +8192,11 @@ var GameEngine = class {
     const before = e.hp;
     e.hp -= dmg;
     const dealt = before - Math.max(e.hp, 0);
-    const finalAttackerId = attackerId !== void 0 ? attackerId : this.activeId ?? 0;
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = attackerId !== void 0 && attackerId >= 0 ? attackerId : this.activeId ?? localId;
+    const isLocalAttacker = finalAttackerId === localId;
     if (dealt > 0) {
       this.awardDamageScore(finalAttackerId, dealt);
-      const isLocalAttacker = this.mode === "local" && finalAttackerId === 0 || this.mode !== "local" && finalAttackerId === this.selfPid;
       if (isLocalAttacker) {
         this.playerDamageDealt += dealt;
         this.recordDamageLog(
@@ -7171,7 +8210,8 @@ var GameEngine = class {
     }
     if (!silent) e.hitFlash = 1;
     if (!silent && this.hitSndCd <= 0) {
-      sound.hit();
+      if (isLocalAttacker) sound.hitConfirm();
+      else sound.hit();
       this.hitSndCd = 0.04;
     }
     const kbScale = 0.045 / (e.type === "boss" ? 6 : 1);
@@ -7264,31 +8304,40 @@ var GameEngine = class {
     }
   }
   killEnemy(e, attackerId) {
-    this.score += e.score;
-    this.kills += 1;
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = attackerId !== void 0 && attackerId >= 0 ? attackerId : localId;
+    const isLocal = finalAttackerId === localId;
+    const killerC = this.combatants.find((c) => c.id === finalAttackerId);
+    if (killerC) {
+      killerC.kills += 1;
+      killerC.score += e.score;
+    }
+    if (isLocal) {
+      this.score += e.score;
+      this.kills += 1;
+    }
     let killerName = "\u672A\u77E5";
-    let isLocal = false;
-    let killerC;
-    if (attackerId !== void 0) {
-      isLocal = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
-      if (isLocal) {
-        killerName = "\u4F60";
-      } else if (attackerId === this.peerPid) {
-        killerName = this.peerName || "\u961F\u53CB";
-      } else {
-        killerC = this.combatants.find((c) => c.id === attackerId);
-        if (killerC) {
-          killerC.kills += 1;
-          killerName = killerC.name;
-        }
-      }
+    if (isLocal) {
+      killerName = "\u4F60";
+    } else if (finalAttackerId === this.peerPid) {
+      killerName = this.peerName || "\u961F\u53CB";
+    } else if (killerC) {
+      killerName = killerC.name;
     } else {
-      const active = this.activeId ?? 0;
-      isLocal = this.mode === "local" && active === 0 || this.mode !== "local" && active === this.selfPid;
-      killerName = isLocal ? "\u4F60" : this.peerName || "\u961F\u53CB";
+      killerName = "\u961F\u53CB";
     }
     const victimName = e.name || (e.type === "monster" ? "\u602A\u7269" : "\u654C\u4EBA");
     this.addKillFeed(killerName, victimName, e.lastSrc?.weapon, killerC);
+    this.pushFeedEvent({
+      kind: "kill",
+      pid: finalAttackerId,
+      victimPid: -1,
+      killerName: killerC?.name,
+      victimName,
+      weaponId: e.lastSrc?.weapon,
+      amount: e.score,
+      kills: killerC?.kills
+    });
     if (isLocal) {
       this.addScoreFeed("\u6DD8\u6C70", e.score, victimName, e.score, this.kills);
       this.banner = { text: `\u51FB\u6740 ${victimName}\uFF01`, t: 1.6 };
@@ -7458,15 +8507,27 @@ var GameEngine = class {
     const rr = p.size + b.size;
     return (p.x - b.x) ** 2 + (p.y - b.y) ** 2 <= rr * rr;
   }
+  /** Helper to check if two combatant IDs are on the same team (no friendly fire in team modes) */
+  isTeammate(cid1, cid2) {
+    if (cid1 === void 0 || cid2 === void 0 || cid1 < 0 || cid2 < 0) return false;
+    if (cid1 === cid2) return true;
+    if (this.gameMode !== "team_deathmatch" && this.gameMode !== "cashout" && this.gameMode !== "cashout_5v5") return false;
+    const c1 = this.combatants.find((c) => c.id === cid1);
+    const c2 = this.combatants.find((c) => c.id === cid2);
+    if (c1 && c2 && c1.teamId !== void 0 && c2.teamId !== void 0) {
+      return c1.teamId === c2.teamId;
+    }
+    return false;
+  }
   /** Damage an arbitrary player (local or foe); death starts a 4s respawn timer. */
-  damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0, attackerId) {
+  damagePlayerEntity(p, dmg, _b, knockX = 0, knockY = 0, attackerId, weaponHint) {
     if (p.deadTimer && p.deadTimer > 0) return;
-    if (this.gameMode === "team_deathmatch" && attackerId !== void 0) {
-      const victim = this.combatants.find((c) => c.id === (p.cid ?? -1));
-      const atk = this.combatants.find((c) => c.id === attackerId);
-      if (victim && atk && victim.teamId !== void 0 && atk.teamId !== void 0 && victim.teamId === atk.teamId) {
-        return;
-      }
+    const localId = this.mode === "local" ? 0 : this.selfPid;
+    const finalAttackerId = attackerId !== void 0 && attackerId >= 0 ? attackerId : this.activeId ?? localId;
+    const victimC = this.combatants.find((c) => c.player === p || p.cid !== void 0 && c.id === p.cid);
+    const victimCid = victimC ? victimC.id : p.cid ?? -1;
+    if (this.isTeammate(finalAttackerId, victimCid) && finalAttackerId !== victimCid) {
+      return;
     }
     if (p.isChargingSlam) dmg *= 0.65;
     if (p.isCloaked) p.isCloaked = false;
@@ -7483,12 +8544,12 @@ var GameEngine = class {
         p.shieldHp = 0;
         p.shieldBlockTime = 0;
         p.shieldCd = this.gun.shieldRechargeTime ?? 8;
-        const isLocalVictimShield = p === this.localPlayer || p.cid !== void 0 && (this.mode === "local" && p.cid === 0 || this.mode !== "local" && p.cid === this.selfPid);
+        const isLocalVictimShield = p === this.localPlayer || p.cid !== void 0 && p.cid === localId;
         if (isLocalVictimShield) this.shake = 12;
         sound.explosion();
       }
       const shieldDiff = prevShield - p.shieldHp;
-      this.awardDamageScore(attackerId, shieldDiff);
+      this.awardDamageScore(finalAttackerId, shieldDiff);
       return;
     }
     p.hp -= dmg;
@@ -7500,7 +8561,7 @@ var GameEngine = class {
     if (!this.isDM) p.iframes = 0.45;
     p.lastHitTime = this.time;
     sound.hurt();
-    const isLocalVictim = p === this.localPlayer || p.cid !== void 0 && (this.mode === "local" && p.cid === 0 || this.mode !== "local" && p.cid === this.selfPid);
+    const isLocalVictim = p === this.localPlayer || p.cid !== void 0 && p.cid === localId;
     if (isLocalVictim) {
       this.shake = Math.min(16, this.shake + dmg * 0.4);
     }
@@ -7510,18 +8571,17 @@ var GameEngine = class {
       p.y = Math.max(p.size, Math.min(this.worldH - p.size, p.y + knockY));
     }
     const hpDiff = prevHp - p.hp;
-    this.awardDamageScore(attackerId, hpDiff);
-    const victimC = this.combatants.find((c) => c.player === p || c.id === p.cid);
-    const attackerC = this.combatants.find((c) => c.id === attackerId);
+    this.awardDamageScore(finalAttackerId, hpDiff);
+    const attackerC = this.combatants.find((c) => c.id === finalAttackerId);
     if (victimC) victimC.damageTaken = (victimC.damageTaken ?? 0) + hpDiff;
     if (attackerC) attackerC.damageDealt = (attackerC.damageDealt ?? 0) + hpDiff;
-    const isLocalAttacker = this.mode === "local" && attackerId === 0 || this.mode !== "local" && attackerId === this.selfPid;
+    const isLocalAttacker = finalAttackerId === localId;
     if (hpDiff > 0) {
       if (isLocalAttacker && !isLocalVictim) {
         this.playerDamageDealt += hpDiff;
         this.recordDamageLog(
           hpDiff,
-          this.gun.id,
+          _b?.weapon || weaponHint || this.gun.id,
           victimC ? victimC.name : "\u5BF9\u624B",
           "\u4F60",
           true
@@ -7530,7 +8590,7 @@ var GameEngine = class {
         this.playerDamageTaken += hpDiff;
         this.recordDamageLog(
           hpDiff,
-          "combatant_attack",
+          _b?.weapon || weaponHint || this.getAttackerWeaponId(attackerC) || "combatant_attack",
           "\u4F60",
           attackerC ? attackerC.name : "\u5BF9\u624B",
           false
@@ -7543,13 +8603,12 @@ var GameEngine = class {
       p.bowDrawing = false;
       if (victimC) victimC.deaths = (victimC.deaths ?? 0) + 1;
       this.spawnParticles(p.x, p.y, "#f472b6", 30, 200, 0.6);
-      const isLocal = this.mode === "local" && p.cid === 0 || this.mode !== "local" && p.cid === this.selfPid;
-      if (isLocal) {
+      if (isLocalVictim) {
         this.playerDeaths++;
         this.eliminatedBy = attackerC ? attackerC.name : "\u5BF9\u624B";
         sound.playDeath();
       }
-      if (this.gameMode === "cashout") {
+      if (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
         const c = this.combatants.find((comb) => comb.id === p.cid);
         if (c) {
           c.player.deadTimer = 20;
@@ -7570,7 +8629,7 @@ var GameEngine = class {
         }
       }
       if (this.gameMode !== "biohazard") {
-        const killer = attackerId !== void 0 && attackerId >= 0 ? this.combatants.find((c) => c.id === attackerId)?.player ?? null : null;
+        const killer = attackerC ? attackerC.player : null;
         const kdx = killer ? p.x - killer.x : 0;
         const kdy = killer ? p.y - killer.y : 0;
         this.spawnCoinBurstFX(p.x, p.y, p.size, false, true, "", kdx, kdy);
@@ -7581,34 +8640,44 @@ var GameEngine = class {
         this.flameActive = false;
       }
       if (this.isDM) {
-        const victim = this.combatants.find((c) => c.id === (p.cid ?? 0)) ?? null;
-        const killer = attackerId !== void 0 && attackerId >= 0 ? this.combatants.find((c) => c.id === attackerId) ?? void 0 : void 0;
+        const victim = victimC ?? (this.combatants.find((c) => c.id === (p.cid ?? 0)) ?? null);
+        const killer = attackerC ?? (this.combatants.find((c) => c.id === finalAttackerId) ?? void 0);
         if (killer && victim && killer.id !== victim.id) {
           killer.kills += 1;
           killer.score += 250;
-          if (this.gameMode === "cashout") {
+          if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && killer.teamId !== void 0) {
             this.teamCash[killer.teamId] += 500;
           }
-          const kName = killer.id === this.selfPid ? "\u4F60" : killer.name;
-          const vName = victim.id === this.selfPid ? "\u4F60" : victim.name;
-          this.addKillFeed(kName, vName, _b?.weapon, killer);
-          if (killer.id === this.selfPid || this.mode === "local" && killer.id === 0) {
+          const kName = killer.id === localId ? "\u4F60" : killer.name;
+          const vName = victim.id === localId ? "\u4F60" : victim.name;
+          this.addKillFeed(kName, vName, _b?.weapon || weaponHint, killer);
+          this.pushFeedEvent({
+            kind: "kill",
+            pid: killer.id,
+            victimPid: victim.id,
+            killerName: killer.name,
+            victimName: victim.name,
+            weaponId: _b?.weapon || weaponHint,
+            amount: 250,
+            kills: killer.kills
+          });
+          if (killer.id === localId) {
+            this.kills += 1;
+            this.score += 250;
             this.addScoreFeed("\u6DD8\u6C70", 250, vName, 250, killer.kills);
-            if (this.gameMode === "cashout") {
+            if (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
               this.addScoreFeed("\u6DD8\u6C70\u8D4F\u91D1", 500);
             }
             sound.playKillConfirm();
-          }
-          if (killer.id === this.selfPid || this.mode === "local" && killer.id === 0) {
             this.banner = { text: `\u51FB\u6740 ${vName}\uFF01`, t: 1.6 };
-          } else if (victim.id === this.selfPid || this.mode === "local" && victim.id === 0) {
+          } else if (victim.id === localId) {
             this.banner = { text: `\u4F60\u88AB ${kName} \u51FB\u8D25\uFF01`, t: 1.6 };
           }
           let teamKills = killer.kills;
           if (this.gameMode === "team_deathmatch" && killer.teamId !== void 0) {
             teamKills = this.combatants.filter((c) => c.teamId === killer.teamId).reduce((sum, c) => sum + c.kills, 0);
           }
-          if (teamKills >= this.dmKillLimit && !this.gameOver) {
+          if (teamKills >= this.dmKillLimit && !this.gameOver && this.gameMode !== "cashout" && this.gameMode !== "cashout_5v5") {
             if (this.gameMode === "team_deathmatch") {
               const isMyTeam = killer.teamId === 0;
               this.endGame(isMyTeam ? "\u80DC\u5229\uFF01\u4F60\u7684\u961F\u4F0D\u8D62\u5F97\u4E86\u6BD4\u8D5B\uFF01" : "\u5931\u8D25\uFF01\u5176\u4ED6\u961F\u4F0D\u7387\u5148\u8FBE\u5230\u4E86\u76EE\u6807\uFF01");
@@ -7622,8 +8691,17 @@ var GameEngine = class {
       } else if (p === this.foe) {
         this.kills += 1;
         this.score += 250;
-        this.addKillFeed("\u4F60", this.peerName || "\u5BF9\u624B", _b?.weapon);
+        this.addKillFeed("\u4F60", this.peerName || "\u5BF9\u624B", _b?.weapon || weaponHint);
         this.addScoreFeed("\u6DD8\u6C70", 250, this.peerName || "\u5BF9\u624B", 250, this.kills);
+        this.pushFeedEvent({
+          kind: "kill",
+          pid: this.selfPid,
+          victimPid: this.peerPid,
+          victimName: this.peerName || "\u5BF9\u624B",
+          weaponId: _b?.weapon || weaponHint,
+          amount: 250,
+          kills: this.kills
+        });
         this.banner = { text: `\u51FB\u6740 ${this.peerName || "\u5BF9\u624B"}\uFF01`, t: 1.6 };
         sound.playKillConfirm();
       } else {
@@ -7631,7 +8709,78 @@ var GameEngine = class {
       }
     }
   }
-  /** Count down downed avatars and revive them after RESPAWN_TIME. */
+  /** Generate well-distributed spawn points across the entire map, avoiding building walls. */
+  generateDistributedSpawns() {
+    const spawns = [];
+    const marginX = Math.min(240, this.worldW * 0.1);
+    const marginY = Math.min(160, this.worldH * 0.14);
+    const useW = this.worldW - marginX * 2;
+    const useH = this.worldH - marginY * 2;
+    const cols = 5;
+    const rows = 4;
+    const stepX = useW / (cols - 1);
+    const stepY = useH / (rows - 1);
+    const isInsideBuilding = (x, y) => {
+      for (const w of this.walls) {
+        if (w.invisible) continue;
+        if (x >= w.x - 30 && x <= w.x + w.w + 30 && y >= w.y - 30 && y <= w.y + w.h + 30) {
+          return true;
+        }
+      }
+      return false;
+    };
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let x = marginX + c * stepX + Math.sin(r * 2.5 + c * 3.7) * 35;
+        let y = marginY + r * stepY + Math.cos(r * 4.1 + c * 1.9) * 25;
+        x = Math.max(100, Math.min(this.worldW - 100, x));
+        y = Math.max(80, Math.min(this.worldH - 80, y));
+        if (isInsideBuilding(x, y)) {
+          x += 50;
+          y += 50;
+        }
+        spawns.push({ x: Math.round(x), y: Math.round(y) });
+      }
+    }
+    return spawns;
+  }
+  /** Pick the safest spawn point from dmSpawns that is furthest from active enemies. */
+  getSafestSpawnPoint(teamId, selfCid) {
+    if (!this.dmSpawns || this.dmSpawns.length === 0) {
+      this.dmSpawns = this.generateDistributedSpawns();
+    }
+    const pool = this.dmSpawns;
+    const enemyPositions = [];
+    if (this.isDM) {
+      for (const c of this.combatants) {
+        if (c.id === selfCid) continue;
+        if (teamId !== void 0 && c.teamId === teamId) continue;
+        const q = c.player;
+        if (q && (!q.deadTimer || q.deadTimer <= 0)) {
+          enemyPositions.push({ x: q.x, y: q.y });
+        }
+      }
+    } else if (this.foe && (!this.foe.deadTimer || this.foe.deadTimer <= 0)) {
+      enemyPositions.push({ x: this.foe.x, y: this.foe.y });
+    }
+    if (enemyPositions.length === 0) {
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+    let bestSpawn = pool[0];
+    let maxMinDistSq = -1;
+    for (const sp of pool) {
+      let minDistSq = Infinity;
+      for (const ep of enemyPositions) {
+        const d2 = (sp.x - ep.x) ** 2 + (sp.y - ep.y) ** 2;
+        if (d2 < minDistSq) minDistSq = d2;
+      }
+      if (minDistSq > maxMinDistSq) {
+        maxMinDistSq = minDistSq;
+        bestSpawn = sp;
+      }
+    }
+    return bestSpawn;
+  }
   /** Pick a random respawn point for the PvE foe that is well away from the
    *  player, so it doesn't keep coming back at the same center-top spot and
    *  face-hug the player. Uses squared distance for the min-distance check. */
@@ -7663,8 +8812,7 @@ var GameEngine = class {
           this.reviveIfReady(p, p.x, p.y, dt, c.guns, c.weaponStates);
           continue;
         }
-        const pool = this.dmSpawns;
-        const sp = pool.length ? pool[Math.floor(Math.random() * pool.length)] : { x: this.worldW / 2, y: this.worldH / 2 };
+        const sp = this.getSafestSpawnPoint(c.teamId, c.id);
         this.reviveIfReady(p, sp.x, sp.y, dt, c.guns, c.weaponStates);
       }
       return;
@@ -7688,7 +8836,7 @@ var GameEngine = class {
     if (p.deadTimer <= 0) {
       p.deadTimer = 0;
       p.hp = p.maxHp;
-      if (this.gameMode === "cashout" && p.cid !== void 0) {
+      if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && p.cid !== void 0) {
         this.statues = this.statues.filter((s) => s.deadCid !== p.cid);
       }
       p.x = spawnX;
@@ -7844,6 +8992,7 @@ var GameEngine = class {
       this.firing = false;
       const intent = this.botThink(c, dt);
       c.aiTimer = this.aiStep;
+      this.botAimFire(c, dt);
       c.aiMvx = this.virtualMove.x;
       c.aiMvy = this.virtualMove.y;
       this.updatePlayer(dt);
@@ -7907,8 +9056,133 @@ var GameEngine = class {
     if (g.weaponClass === "flamethrower") return g.flameRange ?? 260;
     if (g.weaponClass === "poison_mist") return 320;
     if (g.weaponClass === "melee" || g.weaponClass === "shield")
-      return (g.meleeRange ?? 64) + 12;
-    return (g.bulletSpeed ?? 700) * (g.life ?? 1);
+      return (g.meleeRange ?? 64) + 24;
+    return Math.max(1e3, (g.bulletSpeed ?? 700) * (g.life ?? 1.5));
+  }
+  /** Simple & fast A* pathfinding for bot navigation around obstacles */
+  findBotPath(startX, startY, targetX, targetY, pSize = 24) {
+    if (this.botLOS(startX, startY, targetX, targetY)) {
+      const ang2 = Math.atan2(targetY - startY, targetX - startX);
+      return { x: Math.cos(ang2), y: Math.sin(ang2) };
+    }
+    const CELL = 60;
+    const cols = Math.ceil(this.worldW / CELL);
+    const rows = Math.ceil(this.worldH / CELL);
+    const startCol = Math.max(0, Math.min(cols - 1, Math.floor(startX / CELL)));
+    const startRow = Math.max(0, Math.min(rows - 1, Math.floor(startY / CELL)));
+    const targetCol = Math.max(0, Math.min(cols - 1, Math.floor(targetX / CELL)));
+    const targetRow = Math.max(0, Math.min(rows - 1, Math.floor(targetY / CELL)));
+    if (startCol === targetCol && startRow === targetRow) {
+      const ang2 = Math.atan2(targetY - startY, targetX - startX);
+      return { x: Math.cos(ang2), y: Math.sin(ang2) };
+    }
+    const isCellBlocked = (c, r) => {
+      if (c < 0 || c >= cols || r < 0 || r >= rows) return true;
+      const cx = (c + 0.5) * CELL;
+      const cy = (r + 0.5) * CELL;
+      return this.pointInWall(cx, cy, pSize + 10);
+    };
+    const totalCells = cols * rows;
+    const openSet = [];
+    const gScore = new Float32Array(totalCells).fill(Infinity);
+    const fScore = new Float32Array(totalCells).fill(Infinity);
+    const cameFrom = new Int32Array(totalCells).fill(-1);
+    const inOpen = new Uint8Array(totalCells);
+    const startIdx = startRow * cols + startCol;
+    const targetIdx = targetRow * cols + targetCol;
+    gScore[startIdx] = 0;
+    fScore[startIdx] = Math.hypot(startCol - targetCol, startRow - targetRow);
+    openSet.push(startIdx);
+    inOpen[startIdx] = 1;
+    let steps = 0;
+    const maxSteps = 250;
+    while (openSet.length > 0 && steps++ < maxSteps) {
+      let bestIdx = 0;
+      let minF = fScore[openSet[0]];
+      for (let i = 1; i < openSet.length; i++) {
+        if (fScore[openSet[i]] < minF) {
+          minF = fScore[openSet[i]];
+          bestIdx = i;
+        }
+      }
+      const current = openSet[bestIdx];
+      if (current === targetIdx) break;
+      openSet[bestIdx] = openSet[openSet.length - 1];
+      openSet.pop();
+      inOpen[current] = 0;
+      const curR = Math.floor(current / cols);
+      const curC = current % cols;
+      const neighbors = [
+        [curC + 1, curR, 1],
+        [curC - 1, curR, 1],
+        [curC, curR + 1, 1],
+        [curC, curR - 1, 1],
+        [curC + 1, curR + 1, 1.414],
+        [curC - 1, curR + 1, 1.414],
+        [curC + 1, curR - 1, 1.414],
+        [curC - 1, curR - 1, 1.414]
+      ];
+      for (const [nc, nr, dist] of neighbors) {
+        if (isCellBlocked(nc, nr)) continue;
+        const nIdx = nr * cols + nc;
+        const tentativeG = gScore[current] + dist;
+        if (tentativeG < gScore[nIdx]) {
+          cameFrom[nIdx] = current;
+          gScore[nIdx] = tentativeG;
+          fScore[nIdx] = tentativeG + Math.hypot(nc - targetCol, nr - targetRow);
+          if (!inOpen[nIdx]) {
+            openSet.push(nIdx);
+            inOpen[nIdx] = 1;
+          }
+        }
+      }
+    }
+    let curr = targetIdx;
+    if (cameFrom[curr] === -1 && curr !== startIdx) {
+      let closestIdx = startIdx;
+      let minH = Infinity;
+      for (let i = 0; i < totalCells; i++) {
+        if (gScore[i] < Infinity && fScore[i] < minH) {
+          minH = fScore[i];
+          closestIdx = i;
+        }
+      }
+      curr = closestIdx;
+    }
+    if (curr === startIdx) {
+      const ang2 = Math.atan2(targetY - startY, targetX - startX);
+      return { x: Math.cos(ang2), y: Math.sin(ang2) };
+    }
+    while (cameFrom[curr] !== -1 && cameFrom[curr] !== startIdx) {
+      curr = cameFrom[curr];
+    }
+    const wayR = Math.floor(curr / cols);
+    const wayC = curr % cols;
+    const wayX = (wayC + 0.5) * CELL;
+    const wayY = (wayR + 0.5) * CELL;
+    const ang = Math.atan2(wayY - startY, wayX - startX);
+    return { x: Math.cos(ang), y: Math.sin(ang) };
+  }
+  /** Wall avoidance helper to steer bot velocity vector away from obstacle collisions */
+  botAvoidWalls(p, vx, vy) {
+    if (vx === 0 && vy === 0) return { x: 0, y: 0 };
+    const speed = Math.hypot(vx, vy);
+    const ang = Math.atan2(vy, vx);
+    const checkDist = p.size + 36;
+    const tx = p.x + Math.cos(ang) * checkDist;
+    const ty = p.y + Math.sin(ang) * checkDist;
+    if (!this.pointInWall(tx, ty, p.size)) {
+      return { x: vx, y: vy };
+    }
+    const angles = [ang + Math.PI / 4, ang - Math.PI / 4, ang + Math.PI / 2, ang - Math.PI / 2];
+    for (const a of angles) {
+      const cx = p.x + Math.cos(a) * checkDist;
+      const cy = p.y + Math.sin(a) * checkDist;
+      if (!this.pointInWall(cx, cy, p.size)) {
+        return { x: Math.cos(a) * speed, y: Math.sin(a) * speed };
+      }
+    }
+    return { x: vx, y: vy };
   }
   /** Bot decision-making: pick a target, lead-aim, pick the best weapon for the
    *  distance, strafe/approach/retreat, fire aggressively on line-of-sight, and
@@ -7919,8 +9193,7 @@ var GameEngine = class {
     let target = null;
     let bestD = Infinity;
     for (const o of this.combatants) {
-      if (o.id === c.id) continue;
-      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
+      if (o.id === c.id || this.isTeammate(c.id, o.id)) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
       if (q.isCloaked) continue;
@@ -7930,10 +9203,58 @@ var GameEngine = class {
         target = q;
       }
     }
+    if (!target || this.gameMode === "biohazard") {
+      for (const e of this.enemies) {
+        if (e.hp <= 0) continue;
+        const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          target = { x: e.x, y: e.y, vx: e.vx ?? 0, vy: e.vy ?? 0, hp: e.hp, maxHp: e.maxHp, deadTimer: 0 };
+        }
+      }
+    }
     let objX = null;
     let objY = null;
     let isInsertingBox = false;
-    if (this.gameMode === "cashout") {
+    let isRevivingTeammate = false;
+    if (!target || bestD > 400 * 400) {
+      const downedStatue = this.statues.find((s) => this.isTeammate(c.id, s.deadCid));
+      if (downedStatue) {
+        objX = downedStatue.x;
+        objY = downedStatue.y;
+        isRevivingTeammate = true;
+      } else {
+        const downedAlly = this.combatants.find((o) => o.id !== c.id && this.isTeammate(c.id, o.id) && o.player.deadTimer && o.player.deadTimer > 0);
+        if (downedAlly) {
+          objX = downedAlly.player.x;
+          objY = downedAlly.player.y;
+          isRevivingTeammate = true;
+        }
+      }
+    }
+    if (!isRevivingTeammate) {
+      const injuredAlly = this.combatants.find((o) => this.isTeammate(c.id, o.id) && o.player.hp < o.player.maxHp * 0.75 && (!o.player.deadTimer || o.player.deadTimer <= 0));
+      if (injuredAlly && c.gadgets.length && (c.gadgetTimer ?? 0) <= 0) {
+        const healGadgetIdx = c.gadgets.findIndex((g2) => g2.kind === "healing_station" && (c.gadgetCd.get(g2.id) ?? 0) <= 0);
+        if (healGadgetIdx >= 0) {
+          intent.gadget = healGadgetIdx;
+          intent.gadgetX = injuredAlly.player.x;
+          intent.gadgetY = injuredAlly.player.y;
+          c.gadgetTimer = 3;
+        }
+      }
+    }
+    if (!target && objX === null && objY === null) {
+      const ally = this.combatants.find((o) => o.id !== c.id && this.isTeammate(c.id, o.id) && (!o.player.deadTimer || o.player.deadTimer <= 0));
+      if (ally) {
+        const ad = Math.hypot(ally.player.x - p.x, ally.player.y - p.y);
+        if (ad > 180) {
+          objX = ally.player.x;
+          objY = ally.player.y;
+        }
+      }
+    }
+    if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && !isRevivingTeammate) {
       const carriedBox = this.cashBoxes.find((b) => b.carriedByCid === c.id);
       if (carriedBox) {
         let bestStDist = Infinity;
@@ -7948,7 +9269,7 @@ var GameEngine = class {
         if (bestStDist < 120) {
           isInsertingBox = true;
         }
-      } else {
+      } else if (objX === null) {
         let bestBoxDist = Infinity;
         for (const box of this.cashBoxes) {
           if (box.carriedByCid === null && box.throwTimer <= 0) {
@@ -8029,42 +9350,70 @@ var GameEngine = class {
       const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
       this.mouse.x = target.x + target.vx * lead;
       this.mouse.y = target.y + target.vy * lead;
+      p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
     } else if (objX !== null && objY !== null) {
       this.mouse.x = objX;
       this.mouse.y = objY;
+      p.angle = Math.atan2(objY - p.y, objX - p.x);
     }
-    if (objX !== null && objY !== null && (!target || dist > 250)) {
-      const objAng = Math.atan2(objY - p.y, objX - p.x);
-      this.virtualMove.x = Math.cos(objAng);
-      this.virtualMove.y = Math.sin(objAng);
-    } else if (target) {
-      c.strafeTimer = (c.strafeTimer ?? 0) - dt;
-      if (c.strafeTimer <= 0) {
-        c.strafeTimer = 0.6 + Math.random() * 1;
-        const r = Math.random();
-        if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1;
-        else if (r < 0.82) c.strafeDir = 0;
-        else c.strafeDir = 2;
-      }
-      let mvx = 0, mvy = 0;
-      if (c.strafeDir === 0) {
-        mvx = Math.cos(ang);
-        mvy = Math.sin(ang);
-        if (dist < 150) {
-          mvx = 0;
-          mvy = 0;
-        }
-      } else if (c.strafeDir === 2) {
-        mvx = -Math.cos(ang);
-        mvy = -Math.sin(ang);
+    let rawMvx = 0, rawMvy = 0;
+    if (isRevivingTeammate && objX !== null && objY !== null) {
+      const dToTeammate = Math.hypot(objX - p.x, objY - p.y);
+      if (dToTeammate < 45) {
+        rawMvx = 0;
+        rawMvy = 0;
       } else {
-        const sa = ang + (c.strafeDir ?? 1) * Math.PI / 2;
-        mvx = Math.cos(sa);
-        mvy = Math.sin(sa);
+        const pathDir = this.getAsyncPath(c, objX, objY);
+        rawMvx = pathDir.x;
+        rawMvy = pathDir.y;
       }
-      this.virtualMove.x = mvx;
-      this.virtualMove.y = mvy;
+    } else if (objX !== null && objY !== null && (!target || dist > 250)) {
+      const pathDir = this.getAsyncPath(c, objX, objY);
+      rawMvx = pathDir.x;
+      rawMvy = pathDir.y;
+    } else if (target) {
+      if (!this.botLOS(p.x, p.y, target.x, target.y)) {
+        const pathDir = this.getAsyncPath(c, target.x, target.y);
+        rawMvx = pathDir.x;
+        rawMvy = pathDir.y;
+      } else {
+        c.pathfindingReqId = void 0;
+        c.strafeTimer = (c.strafeTimer ?? 0) - dt;
+        if (c.strafeTimer <= 0) {
+          c.strafeTimer = 0.8 + Math.random() * 1.2;
+          const r = Math.random();
+          if (r < 0.5) c.strafeDir = c.strafeDir === 1 ? -1 : 1;
+          else if (r < 0.8) c.strafeDir = 0;
+          else c.strafeDir = 2;
+        }
+        let effectiveStrafe = c.strafeDir;
+        if (dist < 45) {
+          const isMelee = g.weaponClass === "melee" || g.weaponClass === "shield";
+          effectiveStrafe = isMelee ? 0 : 2;
+        }
+        if (effectiveStrafe === 0) {
+          rawMvx = Math.cos(ang);
+          rawMvy = Math.sin(ang);
+          const stopDist = g.weaponClass === "melee" || g.weaponClass === "shield" ? (g.meleeRange ?? 64) * 0.5 : 140;
+          if (dist < stopDist) {
+            rawMvx = 0;
+            rawMvy = 0;
+          }
+        } else if (effectiveStrafe === 2) {
+          rawMvx = -Math.cos(ang);
+          rawMvy = -Math.sin(ang);
+        } else {
+          const sa = ang + (effectiveStrafe ?? 1) * Math.PI / 2;
+          rawMvx = Math.cos(sa);
+          rawMvy = Math.sin(sa);
+        }
+      }
     }
+    const steer = this.botAvoidWalls(p, rawMvx, rawMvy);
+    c.aiMvx = (c.aiMvx ?? 0) * 0.65 + steer.x * 0.35;
+    c.aiMvy = (c.aiMvy ?? 0) * 0.65 + steer.y * 0.35;
+    this.virtualMove.x = c.aiMvx;
+    this.virtualMove.y = c.aiMvy;
     if (isInsertingBox) {
       this.firing = true;
     }
@@ -8072,10 +9421,9 @@ var GameEngine = class {
     let inRange = false;
     if (target) {
       los = this.botLOS(p.x, p.y, target.x, target.y);
-      inRange = dist < this.gunEffRange(g) + 40;
-      const facing = Math.abs(this.angleDiff(ang, p.angle));
-      const close = dist < 120 || p.isChargingSlam === true;
-      this.firing = (los || close) && inRange && (close || facing < 1.2);
+      inRange = dist < this.gunEffRange(g) + 60;
+      const close = dist < 140 || p.isChargingSlam === true;
+      this.firing = (los || close) && inRange;
     } else if (!isInsertingBox) {
       this.firing = false;
     }
@@ -8088,7 +9436,7 @@ var GameEngine = class {
       }
     }
     c.gadgetTimer = (c.gadgetTimer ?? 0) - dt;
-    if (c.gadgets.length && (c.gadgetTimer ?? 0) <= 0) {
+    if (c.gadgets.length && (c.gadgetTimer ?? 0) <= 0 && intent.gadget < 0) {
       for (const gd of c.gadgets) {
         if ((c.gadgetCd.get(gd.id) ?? 0) > 0) continue;
         let deploy = false;
@@ -8101,6 +9449,7 @@ var GameEngine = class {
             break;
           case "turret_mg":
           case "turret_cannon":
+          case "turret_sniper":
             deploy = target ? dist > 180 && los : false;
             tx = p.x + Math.cos(ang) * 130;
             ty = p.y + Math.sin(ang) * 130;
@@ -8108,6 +9457,7 @@ var GameEngine = class {
           case "mine_explosive":
           case "mine_poison":
           case "mine_fire":
+          case "mine_stun":
             deploy = target ? dist < 220 : false;
             tx = p.x + Math.cos(ang) * 90;
             ty = p.y + Math.sin(ang) * 90;
@@ -8115,6 +9465,7 @@ var GameEngine = class {
           case "glue_grenade":
           case "fire_grenade":
           case "poison_grenade":
+          case "cluster_grenade":
             deploy = target ? dist < 360 && los : false;
             tx = target ? target.x : p.x;
             ty = target ? target.y : p.y;
@@ -8134,7 +9485,7 @@ var GameEngine = class {
       }
     }
     const ws = this.weaponStates.get(g.id);
-    if (g.magazine !== void 0 && ws.ammo <= 0 && ws.reload <= 0) {
+    if (g.magazine !== void 0 && ws && ws.ammo <= 0 && ws.reload <= 0) {
       if (c.guns.length > 1) {
         const alt = c.guns.findIndex(
           (gg, i) => i !== this.gunIndex && ((this.weaponStates.get(gg.id)?.ammo ?? 0) > 0 || gg.magazine === void 0)
@@ -8145,19 +9496,13 @@ var GameEngine = class {
     }
     return intent;
   }
-  /** Cheap, per-frame aim + fire control for a bot. The heavy movement/weapon/
-   *  gadget brain (`botThink`) is throttled, but AIM + FIRE must stay responsive
-   *  or bots look braindead (the original throttle cached firing and bots would
-   *  stand there not shooting when an enemy entered view between decisions).
-   *  Only does a nearest-target scan (O(combatants)) + a single LOS ray, then
-   *  mirrors `botThink`'s fire gate (LOS && inRange && facing). */
+  /** Cheap, per-frame aim + fire control for a bot. */
   botAimFire(c, dt) {
     const p = c.player;
     let target = null;
     let bestD = Infinity;
     for (const o of this.combatants) {
-      if (o.id === c.id) continue;
-      if ((this.gameMode === "cashout" || this.gameMode === "team_deathmatch") && o.teamId === c.teamId) continue;
+      if (o.id === c.id || this.isTeammate(c.id, o.id)) continue;
       const q = o.player;
       if (q.deadTimer && q.deadTimer > 0) continue;
       if (q.isCloaked) continue;
@@ -8167,9 +9512,19 @@ var GameEngine = class {
         target = q;
       }
     }
+    if (!target || this.gameMode === "biohazard") {
+      for (const e of this.enemies) {
+        if (e.hp <= 0) continue;
+        const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          target = { x: e.x, y: e.y, vx: e.vx ?? 0, vy: e.vy ?? 0, hp: e.hp, maxHp: e.maxHp, deadTimer: 0 };
+        }
+      }
+    }
     if (!target) {
       this.firing = false;
-      if (this.gameMode === "cashout") {
+      if (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
         const carried = this.cashBoxes.find((b) => b.carriedByCid === c.id);
         if (carried) {
           let bestSt = Infinity, sx = p.x, sy = p.y;
@@ -8192,13 +9547,15 @@ var GameEngine = class {
     }
     const g = this.gun;
     const dist = Math.sqrt(bestD);
-    const ang = Math.atan2(target.y - p.y, target.x - p.x);
     const lead = g.bulletSpeed ? Math.min(dist / g.bulletSpeed, 0.4) : 0;
     this.mouse.x = target.x + target.vx * lead;
     this.mouse.y = target.y + target.vy * lead;
+    if (dist > 5) {
+      p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+    }
     let los;
     if ((c.losTtl ?? 0) > 0 && c.losTarget === target) {
-      los = c.losResult ?? false;
+      los = c.losResult ?? true;
     } else {
       los = this.botLOS(p.x, p.y, target.x, target.y);
       c.losTarget = target;
@@ -8206,10 +9563,14 @@ var GameEngine = class {
       c.losTtl = 0.1;
     }
     c.losTtl = Math.max(0, (c.losTtl ?? 0) - dt);
-    const inRange = dist < this.gunEffRange(g) + 40;
-    const facing = Math.abs(this.angleDiff(ang, p.angle));
-    const close = dist < 120 || p.isChargingSlam === true;
-    this.firing = (los || close) && inRange && (close || facing < 1.2);
+    const inRange = dist < this.gunEffRange(g) + 60;
+    const close = dist < 140 || p.isChargingSlam === true;
+    const wState = c.weaponStates[this.gunIndex];
+    if (g.semiAuto && wState && wState.cd > 0) {
+      this.firing = false;
+    } else {
+      this.firing = (los || close) && inRange;
+    }
   }
   /** Line-of-sight test: true if the segment (x0,y0)->(x1,y1) is not blocked by a wall. */
   botLOS(x0, y0, x1, y1) {
@@ -8363,7 +9724,10 @@ var GameEngine = class {
       gameOver: this.gameOver,
       gameOverReason: this.gameOverReason,
       dmKills: this.isDM ? this.gameMode === "team_deathmatch" ? [0, 1, 2, 3].map((t) => this.combatants.filter((c) => c.teamId === t).reduce((sum, c) => sum + c.kills, 0)).filter((_, i, arr) => i === 0 || arr[i] > 0 || this.combatants.some((c) => c.teamId === i)) : [this.combatants.find((c) => c.id === 1)?.kills ?? 0, this.combatants.find((c) => c.id === 2)?.kills ?? 0] : void 0,
-      dmTarget: this.isDM ? this.dmKillLimit : void 0
+      dmTarget: this.isDM ? this.dmKillLimit : void 0,
+      // always present (even when empty) so clients can initialise their
+      // feed watermark on the FIRST snapshot and never swallow the first kill
+      feed: this.feedBuf.slice()
     };
   }
   /** Host relay path: send the snapshot to the guest over the existing Net. */
@@ -8478,6 +9842,7 @@ var GameEngine = class {
   }
   /** Advance the shared world state (entities, bullets, waves, respawns). */
   simulateWorld(dt) {
+    sound.setEnemyDampen(false);
     this.time += dt;
     this.base.t += dt;
     if (this.base.flash > 0) this.base.flash -= dt * 3;
@@ -8493,7 +9858,7 @@ var GameEngine = class {
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.tickRespawns(dt);
-    if (this.gameMode === "cashout") {
+    if (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
       this.updateCashoutMode(dt);
     }
     if (this.matchLive && this.gameMode !== "cashout") this.updateWaves(dt);
@@ -8548,17 +9913,14 @@ var GameEngine = class {
     this.peerInput.clear();
     this.peerLatch.clear();
     this.foe = this.makeFoe();
-    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch") {
-      const isTeam = this.gameMode === "team_deathmatch";
+    this.peerLoadout = loadoutB;
+    this.applyPeerLoadout();
+    if (this.gameMode === "deathmatch" || this.gameMode === "team_deathmatch" || this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
+      const isTeam = this.gameMode === "team_deathmatch" || this.gameMode === "cashout" || this.gameMode === "cashout_5v5";
       const pCount = this.loadout.dmPlayerCount || 4;
       this.player.cid = this.selfPid;
       this.foe.cid = this.peerPid;
-      this.dmSpawns = [
-        { x: this.worldW * 0.5, y: this.worldH - 200 },
-        { x: this.worldW * 0.15, y: this.worldH * 0.2 },
-        { x: this.worldW * 0.85, y: this.worldH * 0.2 },
-        { x: this.worldW * 0.5, y: this.worldH * 0.16 }
-      ];
+      this.dmSpawns = this.generateDistributedSpawns();
       const hostSpawn = this.dmSpawns[0];
       const guestSpawn = this.dmSpawns[1];
       this.player.x = hostSpawn.x;
@@ -8594,7 +9956,7 @@ var GameEngine = class {
       const c2 = {
         id: 2,
         isBot: false,
-        name: "\u73A9\u5BB62",
+        name: this.peerName || "\u73A9\u5BB62",
         color: isTeam ? "#8b5cf6" : "#f472b6",
         player: this.foe,
         character: this.foeChar,
@@ -8602,7 +9964,7 @@ var GameEngine = class {
         skill: getSkill(loadoutB.skillId ?? "dash"),
         guns: this.foeGuns,
         gunIndex: 0,
-        weaponStates: /* @__PURE__ */ new Map(),
+        weaponStates: this.foeWeaponStates,
         gadgets: this.foeGadgets,
         selectedGadget: -1,
         skillCd: 0,
@@ -8615,10 +9977,10 @@ var GameEngine = class {
         wander: 0,
         strafeDir: 1,
         strafeTimer: 0,
-        teamId: isTeam ? 0 : void 0
+        teamId: isTeam ? this.gameMode === "team_deathmatch" ? 0 : 1 : void 0
       };
       this.combatants = [c1, c2];
-      if (isTeam) {
+      if (this.gameMode === "team_deathmatch") {
         const botColors = ["#8b5cf6", "#f472b6", "#a3e635", "#fbbf24"];
         const botNames = ["\u963F\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C", "\u5FB7\u5854", "\u827E\u666E", "\u6CFD\u5854", "\u4F0A\u5854", "\u897F\u5854"];
         const numTeams = pCount / 2;
@@ -8634,7 +9996,7 @@ var GameEngine = class {
             botIdx++;
           }
         }
-      } else {
+      } else if (this.gameMode === "deathmatch") {
         const botColors = ["#f472b6", "#a3e635", "#fbbf24", "#e879f9", "#34d399", "#60a5fa", "#f87171", "#c084fc"];
         const botNames = ["\u963F\u5C14\u6CD5", "\u8D1D\u5854", "\u4F3D\u9A6C", "\u5FB7\u5C14\u5854", "\u827E\u666E\u897F\u9F99", "\u6CFD\u5854", "\u4F0A\u5854", "\u897F\u5854"];
         const botCount = pCount - 2;
@@ -8645,8 +10007,6 @@ var GameEngine = class {
         }
       }
     }
-    this.peerLoadout = loadoutB;
-    this.applyPeerLoadout();
     this.foe.gunIndex = 0;
     this.foe.skillCd = 0;
     this.foe.dashCharges = MAX_DASH_CHARGES;
@@ -8730,16 +10090,29 @@ var GameEngine = class {
     this.wave = s.wave;
     this.enemiesLeft = s.enemiesLeft;
     this.snapEnemies = s.enemies.map((e) => ({ x: e.x, y: e.y }));
-    this.score = s.score;
-    this.kills = s.kills;
     this.gold = s.gold;
-    if (this.mode === "guest" && this.score > oldScore) {
-      const diff = this.score - oldScore;
-      if (this.kills > oldKills) {
-        this.addScoreFeed("\u6DD8\u6C70", diff, this.peerName || "\u5BF9\u624B", diff, this.kills);
-        sound.playKillConfirm();
+    if (s.feed) {
+      if (this.lastFeedId < 0) {
+        this.lastFeedId = 0;
+        for (const ev of s.feed) if (ev.id > this.lastFeedId) this.lastFeedId = ev.id;
       } else {
-        this.addScoreFeed(diff >= 200 ? "\u91D1\u5E01\u6536\u96C6" : "\u4F24\u5BB3\u51FB\u4E2D", diff);
+        for (const ev of s.feed) {
+          if (ev.id <= this.lastFeedId) continue;
+          this.lastFeedId = ev.id;
+          this.consumeFeedEvent(ev);
+        }
+      }
+    } else {
+      this.score = s.score;
+      this.kills = s.kills;
+      if (this.mode === "guest" && this.score > oldScore) {
+        const diff = this.score - oldScore;
+        if (this.kills > oldKills) {
+          this.addScoreFeed("\u6DD8\u6C70", diff, this.peerName || "\u5BF9\u624B", diff, this.kills);
+          sound.playKillConfirm();
+        } else {
+          this.addScoreFeed(diff >= 200 ? "\u91D1\u5E01\u6536\u96C6" : "\u4F24\u5BB3\u51FB\u4E2D", diff);
+        }
       }
     }
     this.peerReady = true;
@@ -8819,21 +10192,22 @@ var GameEngine = class {
         const newGuestKills = s.dmKills[1];
         if (hostC) hostC.kills = newHostKills;
         if (guestC) guestC.kills = newGuestKills;
-        if (this.mode === "guest") {
+        if (this.mode === "guest" && !s.feed) {
           if (newHostKills > oldHostKills) {
             const isMe = this.selfPid === 1;
             const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
             const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
             const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
-            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+            this.killFeed.push({ id: this.nextKillFeedId++, type: "kill", killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, weaponId: gun.id, timer: 4.2 });
           }
           if (newGuestKills > oldGuestKills) {
             const isMe = this.selfPid === 2;
             const kName = isMe ? "\u4F60" : this.peerName || "\u5BF9\u624B";
             const vName = isMe ? this.peerName || "\u5BF9\u624B" : "\u4F60";
             const gun = isMe ? this.gun : this.foeGuns[this.foe?.gunIndex ?? 0] ?? GUNS[0];
-            this.killFeed.push({ id: this.fxSeq++, killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, timer: 4.2 });
+            this.killFeed.push({ id: this.nextKillFeedId++, type: "kill", killerName: kName, victimName: vName, weaponIconShape: gun.iconShape, weaponGlow: gun.glow, weaponId: gun.id, timer: 4.2 });
           }
+          if (this.killFeed.length > 5) this.killFeed.splice(0, this.killFeed.length - 5);
         }
       }
     }
@@ -8878,7 +10252,7 @@ var GameEngine = class {
   /** Draw a networked player (me or foe) with the full character silhouette —
    *  including the held weapon, skin/outfit + hat — instead of the crude circle.
    *  Resolves the gun def from the player's own weapon list via `gunList`. */
-  drawNetCharacter(ctx, x, y, angle, charId, outfitId, gunIndex, gunList, name, hpPct, t, size) {
+  drawNetCharacter(ctx, x, y, angle, charId, outfitId, gunIndex, gunList, name, hpPct, t, size, gadget) {
     const char = getCharacter(charId);
     const outfit = getOutfit(outfitId);
     const gun = gunList[gunIndex] ?? gunList[0];
@@ -8890,7 +10264,8 @@ var GameEngine = class {
       outfit,
       size,
       t,
-      gun
+      gun,
+      gadget
     });
     const w = 32;
     ctx.fillStyle = "rgba(0,0,0,0.5)";
@@ -8909,6 +10284,7 @@ var GameEngine = class {
     ctx.save();
     if (this.shake > 0.2) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
     ctx.translate(-this.camX, -this.camY);
+    this.drawDecorations(ctx);
     {
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
       const dtfx = this.netFxPrev ? Math.min(0.05, (now - this.netFxPrev) / 1e3) : 0;
@@ -8982,7 +10358,8 @@ var GameEngine = class {
         isMe ? this.character.name : this.peerName || "\u5BF9\u624B",
         p.hp / p.maxHp,
         this.time,
-        size
+        size,
+        p.selectedGadget !== void 0 && p.selectedGadget >= 0 ? isMe ? this.gadgets[p.selectedGadget] : GADGETS[p.selectedGadget] : void 0
       );
       if (p.electrified > 0) {
         this.drawElectricArcs(ctx, r.x, r.y, size, p.electrifiedGlow, this.time);
@@ -9001,17 +10378,20 @@ var GameEngine = class {
       ctx.moveTo(b.x, b.y);
       ctx.lineTo(tx, ty);
       ctx.stroke();
-      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3.4);
-      rg.addColorStop(0, rgba(b.glow, 0.85));
-      rg.addColorStop(1, rgba(b.glow, 0));
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size * 3.4, 0, Math.PI * 2);
-      ctx.fill();
+      this.fillGlow(ctx, b.x, b.y, b.size * 3.4, `bn|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.85)], [1, rgba(b.glow, 0)]]);
       ctx.fillStyle = b.color;
+      const bLen = Math.max(b.size * 2.5, b.size);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+      if (ctx.ellipse) {
+        ctx.ellipse(0, 0, bLen, Math.max(1, b.size * 0.5), 0, 0, Math.PI * 2);
+      } else {
+        ctx.arc(0, 0, b.size, 0, Math.PI * 2);
+      }
       ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
     this.drawParticles(ctx);
@@ -9181,7 +10561,7 @@ var GameEngine = class {
       radius: r,
       color
     });
-    sound.explosion();
+    sound.explosion(x, y);
     this.spawnParticles(x, y, color, 26, 260, 0.55);
     this.spawnParticles(x, y, "#fde68a", 14, 200, 0.4);
     if (damage > 0) {
@@ -9208,7 +10588,7 @@ var GameEngine = class {
       if (this.isDM) {
         for (const it of cand) {
           if (it.kind !== "player") continue;
-          if (it.ownerId === (ownerId ?? -1)) continue;
+          if (it.ownerId === (ownerId ?? -1) || this.isTeammate(ownerId, it.ownerId)) continue;
           const q = it.ref;
           if (q.deadTimer && q.deadTimer > 0) continue;
           const d = Math.hypot(q.x - x, q.y - y);
@@ -9221,7 +10601,8 @@ var GameEngine = class {
               void 0,
               0,
               0,
-              ownerId
+              ownerId,
+              srcWpn
             );
           }
         }
@@ -9236,7 +10617,8 @@ var GameEngine = class {
             void 0,
             0,
             0,
-            ownerId
+            ownerId,
+            srcWpn
           );
         }
       }
@@ -9265,6 +10647,8 @@ var GameEngine = class {
     }
   }
   spawnParticles(x, y, color, count, speed, life = 0.5, ox, oy) {
+    if (this.quality === "low") return;
+    if (this.quality === "medium") count = Math.ceil(count / 2);
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= MAX_PARTICLES) break;
       const p = this.particlePool.pop() ?? {};
@@ -9779,10 +11163,10 @@ var GameEngine = class {
       baseMaxHp: this.base ? this.mode === "guest" ? this.enemyBase.maxHp : this.base.maxHp : 0,
       enemyBaseHp: this.base ? Math.max(0, Math.round(this.mode === "guest" ? this.base.hp : this.enemyBase.hp)) : 0,
       enemyBaseMaxHp: this.base ? this.mode === "guest" ? this.base.maxHp : this.enemyBase.maxHp : 0,
-      teamCash: this.gameMode === "cashout" ? this.teamCash : void 0,
-      cashoutTimeLeft: this.gameMode === "cashout" ? this.cashoutTimeLeft : void 0,
-      isOvertime: this.gameMode === "cashout" ? this.isOvertime : void 0,
-      combatantsData: this.gameMode === "cashout" ? this.combatants.map((c) => ({
+      teamCash: this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.teamCash : void 0,
+      cashoutTimeLeft: this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.cashoutTimeLeft : void 0,
+      isOvertime: this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.isOvertime : void 0,
+      combatantsData: this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.combatants.map((c) => ({
         id: c.id,
         name: c.name,
         hp: c.player.hp,
@@ -9825,7 +11209,7 @@ var GameEngine = class {
       dmTarget: this.isDM ? this.dmKillLimit : void 0,
       deadTimer: p.deadTimer ?? 0,
       eliminatedBy: this.eliminatedBy,
-      damageLogs: this.damageLogs,
+      damageLogs: this.damageLogs.map((l) => ({ ...l, amount: Math.round(l.amount) })),
       postGameStats: this.gameOver ? this.combatants && this.combatants.length > 0 ? (() => {
         let maxScore = -1;
         this.combatants.forEach((c) => {
@@ -9880,9 +11264,10 @@ var GameEngine = class {
       );
     }
     ctx.translate(-this.camX, -this.camY);
+    this.drawDecorations(ctx);
     this.drawWalls(ctx);
     this.drawDeployables(ctx);
-    if (this.gameMode === "cashout") {
+    if (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") {
       this.drawCashoutElements(ctx);
     }
     if (this.gameMode !== "biohazard" && this.gameMode !== "cashout" && !this.isDM) {
@@ -9902,8 +11287,8 @@ var GameEngine = class {
       for (const c of this.combatants) {
         const q = c.player;
         if (q.deadTimer && q.deadTimer > 0) continue;
-        const hasBox = this.gameMode === "cashout" ? this.cashBoxes.find((b) => b.carriedByCid === c.id) : null;
-        const hasStatue = this.gameMode === "cashout" ? this.statues.find((s) => s.carriedByCid === c.id) : null;
+        const hasBox = this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.cashBoxes.find((b) => b.carriedByCid === c.id) : null;
+        const hasStatue = this.gameMode === "cashout" || this.gameMode === "cashout_5v5" ? this.statues.find((s) => s.carriedByCid === c.id) : null;
         if (hasBox || hasStatue) {
           ctx.save();
           ctx.translate(q.x, q.y - q.size - 10);
@@ -9956,7 +11341,8 @@ var GameEngine = class {
           c.name,
           q.hp / q.maxHp,
           this.time,
-          q.size
+          q.size,
+          c.selectedGadget >= 0 ? c.gadgets[c.selectedGadget] : void 0
         );
         if (q.electrifiedTime && q.electrifiedTime > 0) {
           this.drawElectricArcs(ctx, q.x, q.y, q.size, q.electrifiedGlow ?? "#38bdf8", this.time);
@@ -9987,7 +11373,8 @@ var GameEngine = class {
           this.peerName || "\u5BF9\u624B",
           this.foe.hp / this.foe.maxHp,
           this.time,
-          this.foe.size
+          this.foe.size,
+          this.foe.selectedGadget !== void 0 && this.foe.selectedGadget >= 0 ? this.foeGadgets?.[this.foe.selectedGadget] ?? GADGETS[this.foe.selectedGadget] : void 0
         );
         if (this.foe.electrifiedTime && this.foe.electrifiedTime > 0) {
           this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
@@ -9997,7 +11384,9 @@ var GameEngine = class {
     this.drawAimPreview(ctx);
     if (this.gun.aimIndicator) this.drawLauncherIndicator(ctx);
     this.drawBullets(ctx);
+    this.drawMeleeTrails(ctx);
     this.drawEffects(ctx);
+    this.drawWeather(ctx);
     ctx.restore();
     this.drawCrosshair(ctx);
     this.drawOverlays(ctx);
@@ -10006,11 +11395,16 @@ var GameEngine = class {
   cityBgKey = "";
   drawBackground(ctx) {
     const theme = this.sceneTheme;
-    const g = ctx.createLinearGradient(0, 0, 0, this.H);
-    g.addColorStop(0, theme.bgTop);
-    g.addColorStop(1, theme.bgBottom);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.W, this.H);
+    const bgc = this.getBgCache();
+    if (bgc) {
+      ctx.drawImage(bgc, 0, 0);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, this.H);
+      g.addColorStop(0, theme.bgTop);
+      g.addColorStop(1, theme.bgBottom);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
     if (!this.isDM && this.gameMode !== "biohazard") {
       const myBase = this.mode === "guest" ? this.enemyBase : this.base;
       const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
@@ -10019,11 +11413,12 @@ var GameEngine = class {
         [myBase.x - this.camX, myBase.y - this.camY, "#1d4ed8"]
       ];
       for (const [bx, by, col] of blobs) {
-        const rg = ctx.createRadialGradient(bx, by, 0, bx, by, this.W * 0.4);
-        rg.addColorStop(0, rgba(col, 0.18));
-        rg.addColorStop(1, rgba(col, 0));
+        const rg = this.radialGlow(ctx, this.W * 0.4, `blob|${col}|${this.W}`, [[0, rgba(col, 0.18)], [1, rgba(col, 0)]]);
+        ctx.save();
+        ctx.translate(bx, by);
         ctx.fillStyle = rg;
-        ctx.fillRect(0, 0, this.W, this.H);
+        ctx.fillRect(-bx, -by, this.W, this.H);
+        ctx.restore();
       }
     }
     if (theme.style === "city") {
@@ -10061,18 +11456,20 @@ var GameEngine = class {
       }
       ctx.stroke();
     }
-    const vg = ctx.createRadialGradient(
-      this.W / 2,
-      this.H / 2,
-      this.H * 0.35,
-      this.W / 2,
-      this.H / 2,
-      this.H * 0.85
-    );
-    vg.addColorStop(0, "rgba(0,0,0,0)");
-    vg.addColorStop(1, "rgba(0,0,0,0.45)");
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, this.W, this.H);
+    if (!bgc) {
+      const vg = ctx.createRadialGradient(
+        this.W / 2,
+        this.H / 2,
+        this.H * 0.35,
+        this.W / 2,
+        this.H / 2,
+        this.H * 0.85
+      );
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.45)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
   }
   /**
    * Top-down cyber-city floor: neon "road" grid + glowing building rooftops
@@ -10363,42 +11760,6 @@ var GameEngine = class {
   /** Render a solid building. The slab colour follows the map palette
    *  (sceneTheme.wallColor → wallDark); the *structure* drawn on top depends on
    *  the map (this.sceneIndex) so every map has its own building style. */
-  bldWildWest(ctx, w) {
-    ctx.fillStyle = "#8B4513";
-    ctx.fillRect(w.x, w.y, w.w, w.h);
-    ctx.strokeStyle = "#A0522D";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(w.x, w.y, w.w, w.h);
-    ctx.beginPath();
-    for (let y = w.y + 10; y < w.y + w.h; y += 20) {
-      ctx.moveTo(w.x, y);
-      ctx.lineTo(w.x + w.w, y);
-    }
-    ctx.stroke();
-  }
-  bldJungle(ctx, w) {
-    ctx.fillStyle = "#2E8B57";
-    ctx.fillRect(w.x, w.y, w.w, w.h);
-    ctx.fillStyle = "#228B22";
-    for (let i = 0; i < 5; i++) {
-      ctx.beginPath();
-      ctx.arc(w.x + w.w * Math.random(), w.y + w.h * Math.random(), 10 + Math.random() * 15, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  bldArcticZone(ctx, w) {
-    ctx.fillStyle = "#F0F8FF";
-    ctx.fillRect(w.x, w.y, w.w, w.h);
-    ctx.strokeStyle = "#B0E0E6";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(w.x, w.y, w.w, w.h);
-    ctx.beginPath();
-    ctx.moveTo(w.x + 5, w.y + 5);
-    ctx.lineTo(w.x + w.w - 5, w.y + w.h - 5);
-    ctx.moveTo(w.x + w.w - 5, w.y + 5);
-    ctx.lineTo(w.x + 5, w.y + w.h - 5);
-    ctx.stroke();
-  }
   drawBuilding(ctx, w) {
     ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.beginPath();
@@ -10582,9 +11943,500 @@ var GameEngine = class {
     roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 9);
     ctx.stroke();
   }
+  /** 西部牛仔 — wooden saloon: horizontal timber planks, warm golden windows, saloon door arch. */
+  bldWildWest(ctx, w) {
+    const accent = this.sceneTheme.accent || "#fcd34d";
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, "#b45309");
+    g.addColorStop(1, "#78350f");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 6);
+    ctx.fill();
+    ctx.strokeStyle = "#451a03";
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 6);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1.5;
+    const plankStep = 20;
+    for (let py = w.y + plankStep; py < w.y + w.h; py += plankStep) {
+      ctx.beginPath();
+      ctx.moveTo(w.x + 2, py);
+      ctx.lineTo(w.x + w.w - 2, py);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(252,211,77,0.25)";
+    roundRect(ctx, w.x + 4, w.y + 4, w.w - 8, Math.max(10, w.h * 0.12), 4);
+    ctx.fill();
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 24, 0.5, 0.6);
+    ctx.fillStyle = "rgba(40,15,5,0.7)";
+    roundRect(ctx, w.x + w.w / 2 - 14, w.y + w.h - 22, 28, 22, 5);
+    ctx.fill();
+  }
+  /** 幽静丛林 — ancient mossy stone temple: carved stone blocks, vine trim, glowing green runes. */
+  bldJungle(ctx, w) {
+    const accent = this.sceneTheme.accent || "#86efac";
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, "#15803d");
+    g.addColorStop(1, "#064e3b");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 8);
+    ctx.fill();
+    ctx.strokeStyle = "#022c22";
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 8);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(134,239,172,0.3)";
+    for (let i = 0; i < 5; i++) {
+      const vx = w.x + 12 + i * ((w.w - 24) / 4);
+      ctx.beginPath();
+      ctx.arc(vx, w.y + 4, 6 + i % 3 * 2, 0, Math.PI);
+      ctx.fill();
+    }
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 26, 0.4, 0.55);
+    const hw = Math.min(w.w, w.h) * 0.28;
+    ctx.fillStyle = "rgba(6,78,59,0.5)";
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.fill();
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, w.x + w.w / 2 - hw / 2, w.y + w.h / 2 - hw / 2, hw, hw, 4);
+    ctx.stroke();
+  }
+  /** 极寒地带 — glacial ice shelter: frosty ice sheen, snow cap, icy blue glowing vents. */
+  bldArcticZone(ctx, w) {
+    const accent = this.sceneTheme.accent || "#38bdf8";
+    const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h);
+    g.addColorStop(0, "#93c5fd");
+    g.addColorStop(1, "#3b82f6");
+    ctx.fillStyle = g;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.fill();
+    ctx.strokeStyle = "#1e3a8a";
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x, w.y, w.w, w.h, 10);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(240,249,255,0.95)";
+    roundRect(ctx, w.x + 2, w.y + 2, w.w - 4, Math.max(10, w.h * 0.18), 8);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(w.x + 8, w.y + w.h * 0.3);
+    ctx.lineTo(w.x + w.w * 0.4, w.y + 10);
+    ctx.moveTo(w.x + w.w * 0.5, w.y + w.h - 10);
+    ctx.lineTo(w.x + w.w - 10, w.y + w.h * 0.4);
+    ctx.stroke();
+    this.bldWindows(ctx, w, w.seed ?? 1, accent, 22, 0.45, 0.6);
+    ctx.strokeStyle = rgba(accent, 0.5);
+    ctx.lineWidth = 2;
+    roundRect(ctx, w.x + 3, w.y + 3, w.w - 6, w.h - 6, 8);
+    ctx.stroke();
+  }
+  // ---------------------------------------------------------------------------
+  // Map Decorations System (Pure cosmetic non-colliding visual objects)
+  // ---------------------------------------------------------------------------
+  mapDecorations = [];
+  mapDecorationsKey = "";
+  getMapDecorations() {
+    const key = `${this.sceneIndex}_${Math.ceil(this.worldW)}_${Math.ceil(this.worldH)}`;
+    if (this.mapDecorationsKey === key && this.mapDecorations.length > 0) {
+      return this.mapDecorations;
+    }
+    const decs = [];
+    let seed = (this.sceneIndex + 1) * 12345;
+    const rnd = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+    const count = 45;
+    const margin = 150;
+    const isInsideWall = (x, y) => {
+      for (const w of this.walls) {
+        if (x >= w.x - 20 && x <= w.x + w.w + 20 && y >= w.y - 20 && y <= w.y + w.h + 20) {
+          return true;
+        }
+      }
+      return false;
+    };
+    let kinds = [];
+    switch (this.sceneIndex) {
+      case 1:
+        kinds = ["skull", "rock", "crack", "cactus"];
+        break;
+      case 2:
+        kinds = ["snow_drift", "ice_crystal", "crack"];
+        break;
+      case 3:
+        kinds = ["crack", "rock", "neon_arrow"];
+        break;
+      case 4:
+        kinds = ["cable", "neon_arrow"];
+        break;
+      case 5:
+        kinds = ["fence", "barrel", "wagon_wheel", "cactus", "crack"];
+        break;
+      case 6:
+        kinds = ["tree", "glowing_mushroom", "stone_tile", "rock"];
+        break;
+      case 7:
+        kinds = ["ice_crystal", "snow_drift", "crack"];
+        break;
+      default:
+        kinds = ["neon_arrow", "cable"];
+        break;
+    }
+    for (let i = 0; i < count; i++) {
+      const rx = margin + rnd() * (this.worldW - margin * 2);
+      const ry = margin + rnd() * (this.worldH - margin * 2);
+      if (isInsideWall(rx, ry)) continue;
+      const kind = kinds[Math.floor(rnd() * kinds.length)];
+      const scale = 0.8 + rnd() * 0.5;
+      const angle = (rnd() - 0.5) * Math.PI;
+      decs.push({ x: rx, y: ry, kind, scale, angle });
+    }
+    this.mapDecorations = decs;
+    this.mapDecorationsKey = key;
+    return decs;
+  }
+  drawDecorations(ctx) {
+    const decs = this.getMapDecorations();
+    for (const d of decs) {
+      if (!this.inView(d.x, d.y, 60)) continue;
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.angle);
+      ctx.scale(d.scale, d.scale);
+      switch (d.kind) {
+        case "tree": {
+          ctx.fillStyle = "rgba(0,0,0,0.22)";
+          ctx.beginPath();
+          ctx.ellipse(5, 12, 28, 16, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(0, 0, 9, 0, Math.PI * 2);
+          ctx.fill();
+          const r1 = 28;
+          ctx.fillStyle = "rgba(22,101,52,0.85)";
+          ctx.beginPath();
+          ctx.arc(0, 0, r1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(21,128,61,0.85)";
+          ctx.beginPath();
+          ctx.arc(-8, -8, r1 * 0.65, 0, Math.PI * 2);
+          ctx.arc(10, -6, r1 * 0.6, 0, Math.PI * 2);
+          ctx.arc(6, 10, r1 * 0.65, 0, Math.PI * 2);
+          ctx.arc(-10, 6, r1 * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(134,239,172,0.5)";
+          ctx.beginPath();
+          ctx.arc(-5, -10, 6, 0, Math.PI * 2);
+          ctx.arc(8, -8, 5, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "fence": {
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.fillRect(-22, 2, 44, 6);
+          ctx.fillStyle = "#78350f";
+          ctx.strokeStyle = "#451a03";
+          ctx.lineWidth = 1.5;
+          ctx.fillRect(-20, -14, 6, 20);
+          ctx.strokeRect(-20, -14, 6, 20);
+          ctx.fillRect(14, -14, 6, 20);
+          ctx.strokeRect(14, -14, 6, 20);
+          ctx.fillStyle = "#b45309";
+          ctx.fillRect(-22, -10, 44, 4);
+          ctx.strokeRect(-22, -10, 44, 4);
+          ctx.fillRect(-22, -2, 44, 4);
+          ctx.strokeRect(-22, -2, 44, 4);
+          break;
+        }
+        case "barrel": {
+          ctx.fillStyle = "rgba(0,0,0,0.3)";
+          ctx.beginPath();
+          ctx.arc(2, 4, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#78350f";
+          ctx.strokeStyle = "#451a03";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, 11, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.strokeStyle = "#94a3b8";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(0, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "wagon_wheel": {
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.beginPath();
+          ctx.ellipse(3, 4, 14, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#78350f";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(0, 0, 12, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#b45309";
+          ctx.lineWidth = 1;
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * 12, Math.sin(a) * 12);
+            ctx.stroke();
+          }
+          break;
+        }
+        case "cactus": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(2, 4, 12, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#15803d";
+          ctx.strokeStyle = "#14532d";
+          ctx.lineWidth = 1.5;
+          roundRect(ctx, -5, -12, 10, 24, 4);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, -12, -4, 8, 6, 2);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, -12, -10, 6, 8, 2);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, 4, 0, 8, 6, 2);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, 6, -6, 6, 8, 2);
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "skull": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(2, 3, 9, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#fef3c7";
+          ctx.strokeStyle = "#d97706";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(0, -2, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillRect(-3, 2, 6, 6);
+          ctx.strokeRect(-3, 2, 6, 6);
+          ctx.fillStyle = "#451a03";
+          ctx.beginPath();
+          ctx.arc(-2.5, -2, 1.5, 0, Math.PI * 2);
+          ctx.arc(2.5, -2, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "rock": {
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.beginPath();
+          ctx.ellipse(2, 3, 14, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#78716c";
+          ctx.strokeStyle = "#44403c";
+          ctx.lineWidth = 1;
+          roundRect(ctx, -10, -6, 12, 10, 3);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, 0, -4, 10, 8, 3);
+          ctx.fill();
+          ctx.stroke();
+          roundRect(ctx, -4, 0, 9, 7, 2);
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "ice_crystal": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(0, 4, 12, 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(56,189,248,0.7)";
+          ctx.strokeStyle = "#e0f2fe";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, -16);
+          ctx.lineTo(6, -2);
+          ctx.lineTo(0, 4);
+          ctx.lineTo(-6, -2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "rgba(147,197,253,0.8)";
+          ctx.beginPath();
+          ctx.moveTo(-8, -10);
+          ctx.lineTo(-2, 0);
+          ctx.lineTo(-8, 6);
+          ctx.lineTo(-12, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "snow_drift": {
+          ctx.fillStyle = "rgba(224,242,254,0.35)";
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 26, 12, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.45)";
+          ctx.beginPath();
+          ctx.ellipse(-6, -2, 14, 7, 0.1, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "glowing_mushroom": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.beginPath();
+          ctx.ellipse(0, 3, 10, 5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          const mg = ctx.createRadialGradient(0, 0, 0, 0, 0, 16);
+          mg.addColorStop(0, "rgba(134,239,172,0.4)");
+          mg.addColorStop(1, "rgba(134,239,172,0)");
+          ctx.fillStyle = mg;
+          ctx.fillRect(-16, -16, 32, 32);
+          ctx.fillStyle = "#86efac";
+          ctx.strokeStyle = "#15803d";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(-4, -2, 4, Math.PI, 0);
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(4, 0, 3, Math.PI, 0);
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "stone_tile": {
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.fillRect(-16, -12, 32, 24);
+          ctx.fillStyle = "rgba(100,116,139,0.3)";
+          ctx.strokeStyle = "rgba(148,163,184,0.4)";
+          ctx.lineWidth = 1;
+          ctx.fillRect(-15, -11, 30, 22);
+          ctx.strokeRect(-15, -11, 30, 22);
+          ctx.fillStyle = "rgba(21,128,61,0.5)";
+          ctx.beginPath();
+          ctx.arc(-10, -6, 5, 0, Math.PI * 2);
+          ctx.arc(10, 4, 6, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "cable": {
+          ctx.strokeStyle = "rgba(34,211,238,0.4)";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-20, -10);
+          ctx.bezierCurveTo(-5, 10, 5, -10, 20, 10);
+          ctx.stroke();
+          ctx.fillStyle = "#22d3ee";
+          ctx.beginPath();
+          ctx.arc(0, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case "neon_arrow": {
+          ctx.strokeStyle = "rgba(217,70,239,0.35)";
+          ctx.fillStyle = "rgba(217,70,239,0.2)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(-10, -12);
+          ctx.lineTo(10, 0);
+          ctx.lineTo(-10, 12);
+          ctx.lineTo(-4, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case "crack": {
+          ctx.strokeStyle = "rgba(0,0,0,0.45)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(-14, -8);
+          ctx.lineTo(-4, 0);
+          ctx.lineTo(2, -6);
+          ctx.lineTo(12, 8);
+          ctx.stroke();
+          break;
+        }
+      }
+      ctx.restore();
+    }
+  }
   /** Is (x,y) within the camera viewport (plus margin)? Used to skip drawing\n   *  entities that are fully off-screen (cheap perf win when the world is large\n   *  but the viewport is small). */
   inView(x, y, margin = 0) {
     return x >= this.camX - margin && x <= this.camX + this.W + margin && y >= this.camY - margin && y <= this.camY + this.H + margin;
+  }
+  /** Returns a radial gradient centred at the origin with radius `r`, cached by
+   *  `key`. Because gradient coordinates are resolved in the user space at paint
+   *  time, callers should `ctx.translate(x, y)` before using it to position the
+   *  glow anywhere — so the cached object is reusable across every instance. */
+  radialGlow(ctx, r, key, stops) {
+    const cached = this.glowCache.get(key);
+    if (cached) return cached;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    for (const [o, c] of stops) g.addColorStop(o, c);
+    this.glowCache.set(key, g);
+    return g;
+  }
+  /** Draw a cached radial glow as a filled disc at world (x, y). `alpha` fades
+   *  time-varying glows without rebuilding the gradient. */
+  fillGlow(ctx, x, y, r, key, stops, alpha = 1) {
+    const g = this.radialGlow(ctx, r, key, stops);
+    ctx.save();
+    if (alpha !== 1) ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  /** Build (and cache) the static background layer (scene gradient + vignette)
+   *  into an offscreen canvas. Avoids two fullscreen gradient fills every frame. */
+  getBgCache() {
+    const t = this.sceneTheme;
+    const key = `${this.W}x${this.H}|${t.bgTop}|${t.bgBottom}`;
+    if (this.bgCache && this.bgCacheKey === key) return this.bgCache;
+    if (typeof document === "undefined") return null;
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, this.W);
+    c.height = Math.max(1, this.H);
+    const b = c.getContext("2d");
+    if (!b) return null;
+    const bg = b.createLinearGradient(0, 0, 0, this.H);
+    bg.addColorStop(0, t.bgTop);
+    bg.addColorStop(1, t.bgBottom);
+    b.fillStyle = bg;
+    b.fillRect(0, 0, this.W, this.H);
+    const vg = b.createRadialGradient(this.W / 2, this.H / 2, this.H * 0.35, this.W / 2, this.H / 2, this.H * 0.85);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,0,0.45)");
+    b.fillStyle = vg;
+    b.fillRect(0, 0, this.W, this.H);
+    this.bgCache = c;
+    this.bgCacheKey = key;
+    return c;
   }
   drawDeployables(ctx) {
     for (const d of this.deployables) {
@@ -10595,7 +12447,7 @@ var GameEngine = class {
       ctx.beginPath();
       ctx.ellipse(0, d.size * 0.7, d.size * 0.8, d.size * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
-      if (d.kind === "turret_mg" || d.kind === "turret_cannon") {
+      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
         ctx.strokeStyle = rgba(d.color, 0.12);
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 8]);
@@ -10604,16 +12456,15 @@ var GameEngine = class {
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      if (d.kind === "turret_mg") {
+      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
         ctx.rotate(d.angle + Math.PI / 2);
-        drawGadgetIcon(ctx, { iconShape: "turret_mg", color: d.color }, 0, 0, d.size * 2);
-      } else if (d.kind === "turret_cannon") {
-        ctx.rotate(d.angle + Math.PI / 2);
-        drawGadgetIcon(ctx, { iconShape: "turret_cannon", color: d.color }, 0, 0, d.size * 2);
-      } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire") {
+        ctx.scale(1.5, 1.5);
+        drawGadgetModel(ctx, d.kind, d.color, this.time);
+      } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire" || d.kind === "mine_stun") {
         const blink = d.armed <= 0 ? Math.floor(this.time * 4) % 2 === 0 ? 1 : 0.4 : 0.5;
         const colorWithBlink = rgba(d.color, blink);
-        drawGadgetIcon(ctx, { iconShape: d.kind, color: colorWithBlink }, 0, 0, d.size * 2.2);
+        ctx.scale(1.2, 1.2);
+        drawGadgetModel(ctx, d.kind, colorWithBlink, this.time);
         if (d.armed <= 0) {
           ctx.strokeStyle = rgba(d.color, 0.3);
           ctx.lineWidth = 1.5;
@@ -10630,17 +12481,12 @@ var GameEngine = class {
         ctx.stroke();
         ctx.setLineDash([]);
         const pulse = 0.5 + Math.sin(this.time * 3) * 0.2;
-        const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, d.size * 2);
-        rg.addColorStop(0, rgba(d.color, pulse * 0.5));
-        rg.addColorStop(1, rgba(d.color, 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(0, 0, d.size * 2, 0, Math.PI * 2);
-        ctx.fill();
-        drawGadgetIcon(ctx, { iconShape: "healing_station", color: d.color }, 0, 0, d.size * 2);
+        this.fillGlow(ctx, 0, 0, d.size * 2, `hs|${d.color}`, [[0, rgba(d.color, 0.5)], [1, rgba(d.color, 0)]], pulse);
+        ctx.scale(1.2, 1.2);
+        drawGadgetModel(ctx, d.kind, d.color, this.time);
       }
       ctx.restore();
-      if ((d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "healing_station") && d.hp < d.maxHp) {
+      if ((d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper" || d.kind === "healing_station") && d.hp < d.maxHp) {
         ctx.fillStyle = "rgba(0,0,0,0.55)";
         ctx.fillRect(d.x - 14, d.y - d.size - 10, 28, 4);
         ctx.fillStyle = rgba(d.color, 0.9);
@@ -10655,13 +12501,7 @@ var GameEngine = class {
         const k = 1 - e.t / e.duration;
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius);
-        rg.addColorStop(0, rgba(e.color, 0.35 * k));
-        rg.addColorStop(1, rgba(e.color, 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, e.x, e.y, e.radius, `pc|${e.color}`, [[0, rgba(e.color, 0.35)], [1, rgba(e.color, 0)]], k);
         for (let i = 0; i < 6; i++) {
           const a = i / 6 * Math.PI * 2 + this.time;
           ctx.fillStyle = rgba(e.color, 0.4 * k);
@@ -10680,14 +12520,7 @@ var GameEngine = class {
         const k = 1 - e.t / e.duration;
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius);
-        rg.addColorStop(0, rgba("#fde68a", 0.4 * k));
-        rg.addColorStop(0.5, rgba(e.color, 0.35 * k));
-        rg.addColorStop(1, rgba(e.color, 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, e.x, e.y, e.radius, `ff|${e.color}`, [[0, rgba("#fde68a", 0.4)], [0.5, rgba(e.color, 0.35)], [1, rgba(e.color, 0)]], k);
         ctx.restore();
       }
     }
@@ -10719,13 +12552,7 @@ var GameEngine = class {
     ctx.beginPath();
     ctx.arc(0, 0, b.radius + 12, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
     ctx.stroke();
-    const halo = ctx.createRadialGradient(0, 0, b.radius * 0.3, 0, 0, b.radius * 2);
-    halo.addColorStop(0, rgba(col, 0.35));
-    halo.addColorStop(1, rgba(col, 0));
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(0, 0, b.radius * 2, 0, Math.PI * 2);
-    ctx.fill();
+    this.fillGlow(ctx, 0, 0, b.radius * 2, `baseh|${col}`, [[0, rgba(col, 0.35)], [1, rgba(col, 0)]]);
     ctx.rotate(b.t * 0.4);
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
@@ -10736,11 +12563,7 @@ var GameEngine = class {
       else ctx.lineTo(px, py);
     }
     ctx.closePath();
-    const cg = ctx.createRadialGradient(0, 0, 2, 0, 0, b.radius);
-    cg.addColorStop(0, b.flash > 0 ? "#ffffff" : "#dbeafe");
-    cg.addColorStop(0.6, col);
-    cg.addColorStop(1, shade(col, -0.3));
-    ctx.fillStyle = cg;
+    ctx.fillStyle = this.radialGlow(ctx, b.radius, `basec|${col}|${b.flash > 0 ? "w" : "c"}`, [[0, b.flash > 0 ? "#ffffff" : "#dbeafe"], [0.6, col], [1, shade(col, -0.3)]]);
     ctx.fill();
     ctx.strokeStyle = "rgba(8,10,25,0.6)";
     ctx.lineWidth = 2;
@@ -10835,7 +12658,7 @@ var GameEngine = class {
       ctx.translate(gr.x, gr.y);
       const color = gr.kind === "fire" ? "#f97316" : gr.kind === "glue" ? "#06b6d4" : gr.kind === "poison" ? "#22c55e" : "#fbbf24";
       ctx.rotate(this.time * 6);
-      drawGadgetIcon(ctx, { iconShape: gr.kind + "_grenade", color }, 0, 0, 15);
+      drawGadgetModel(ctx, gr.kind + "_grenade", color, this.time);
       ctx.restore();
     }
   }
@@ -10852,13 +12675,7 @@ var GameEngine = class {
       if (e.type === "elite") {
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        const rg = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.size * 2.5);
-        rg.addColorStop(0, rgba("#fb7185", 0.25));
-        rg.addColorStop(1, rgba("#fb7185", 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.size * 2.5, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, e.x, e.y, e.size * 2.5, `elite`, [[0, rgba("#fb7185", 0.25)], [1, rgba("#fb7185", 0)]]);
         ctx.restore();
       }
       if (e.behavior) {
@@ -10959,13 +12776,7 @@ var GameEngine = class {
     ctx.globalCompositeOperation = "lighter";
     for (const b of this.enemyBullets) {
       if (!this.inView(b.x, b.y, b.size * 3 + 6)) continue;
-      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3);
-      rg.addColorStop(0, rgba(b.color, 0.9));
-      rg.addColorStop(1, rgba(b.color, 0));
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size * 3, 0, Math.PI * 2);
-      ctx.fill();
+      this.fillGlow(ctx, b.x, b.y, b.size * 3, `eb|${b.color}|${b.size}`, [[0, rgba(b.color, 0.9)], [1, rgba(b.color, 0)]]);
       ctx.fillStyle = "#fff";
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.size * 0.7, 0, Math.PI * 2);
@@ -11016,11 +12827,7 @@ var GameEngine = class {
     const oy = p.y + Math.sin(p.angle) * (p.size + g.barrel);
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const rg = ctx.createRadialGradient(ox, oy, 0, ox, oy, range);
-    rg.addColorStop(0, rgba("#fde68a", 0.5));
-    rg.addColorStop(0.4, rgba(g.glow, 0.35));
-    rg.addColorStop(1, rgba(g.glow, 0));
-    ctx.fillStyle = rg;
+    ctx.fillStyle = this.radialGlow(ctx, range, `flame|${g.glow}`, [[0, rgba("#fde68a", 0.5)], [0.4, rgba(g.glow, 0.35)], [1, rgba(g.glow, 0)]]);
     ctx.beginPath();
     ctx.moveTo(ox, oy);
     ctx.arc(ox, oy, range, p.angle - cone, p.angle + cone);
@@ -11106,7 +12913,7 @@ var GameEngine = class {
       ctx.restore();
     }
     this.drawThrustSwordChargeIndicator(ctx, p);
-    const glow = p.overdriveTime > 0 ? "#fbbf24" : p.dashTime > 0 ? "#22d3ee" : void 0;
+    const glow2 = p.overdriveTime > 0 ? "#fbbf24" : p.dashTime > 0 ? "#22d3ee" : void 0;
     const swing = p.swingTimer > 0 ? 1 - p.swingTimer / p.swingDur : 0;
     drawCharacter(ctx, {
       x: p.x,
@@ -11117,10 +12924,13 @@ var GameEngine = class {
       size: p.size,
       t: p.t,
       flash: p.flash > 0 ? Math.min(1, p.flash) : 0,
-      glow,
+      glow: glow2,
       gun: this.gun,
+      gadget: this.selectedGadget >= 0 ? this.gadgets[this.selectedGadget] : void 0,
       meleeSwing: swing,
-      lunge: p.lunge
+      lunge: p.lunge,
+      thrustCharging: p.thrustCharging,
+      thrustCharge: p.thrustCharge
     });
     if (p.electrifiedTime && p.electrifiedTime > 0) {
       this.drawElectricArcs(ctx, p.x, p.y, p.size, p.electrifiedGlow ?? "#38bdf8", this.time);
@@ -11246,6 +13056,15 @@ var GameEngine = class {
     ctx.lineTo(bx + len * 0.22, by + (lateral >= 0 ? 1 : -1) * (14 + Math.random() * 10));
     ctx.stroke();
   }
+  /** Resolve the current world position of a projectile's owner (for returning boomerangs). */
+  ownerPos(b) {
+    if (this.combatants.length > 0) {
+      const c = this.combatants.find((c2) => c2.cid === b.ownerId);
+      if (c && c.player) return { x: c.player.x, y: c.player.y };
+    }
+    if (b.owner === "foe" && this.foe) return { x: this.foe.x, y: this.foe.y };
+    return { x: this.player.x, y: this.player.y };
+  }
   drawBullets(ctx) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -11258,30 +13077,73 @@ var GameEngine = class {
         ctx.ellipse(b.x, b.y, b.size * 1.5, b.size * 0.8, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalCompositeOperation = "lighter";
-        const rg0 = ctx.createRadialGradient(b.x, b.y - b.z, 0, b.x, b.y - b.z, b.size * 3);
-        rg0.addColorStop(0, rgba(b.glow, 0.9));
-        rg0.addColorStop(1, rgba(b.glow, 0));
-        ctx.fillStyle = rg0;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y - b.z, b.size * 3, 0, Math.PI * 2);
-        ctx.fill();
+        this.fillGlow(ctx, b.x, b.y - b.z, b.size * 3, `bz|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.9)], [1, rgba(b.glow, 0)]]);
         ctx.fillStyle = b.color;
         ctx.beginPath();
         ctx.arc(b.x, b.y - b.z, b.size, 0, Math.PI * 2);
         ctx.fill();
         continue;
       }
-      const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.size * 3.4);
-      rg.addColorStop(0, rgba(b.glow, 0.85));
-      rg.addColorStop(1, rgba(b.glow, 0));
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size * 3.4, 0, Math.PI * 2);
-      ctx.fill();
+      if (b.kind === "boomerang") {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(this.time * 11);
+        ctx.fillStyle = this.radialGlow(ctx, b.size * 2.8, `bb|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.85)], [1, rgba(b.glow, 0)]]);
+        ctx.beginPath();
+        ctx.arc(0, 0, b.size * 2.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = b.size * 0.5;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(-b.size, b.size * 0.7);
+        ctx.quadraticCurveTo(0, -b.size * 1.2, b.size, b.size * 0.7);
+        ctx.stroke();
+        ctx.strokeStyle = "#fff4d6";
+        ctx.lineWidth = b.size * 0.18;
+        ctx.beginPath();
+        ctx.moveTo(-b.size, b.size * 0.7);
+        ctx.quadraticCurveTo(0, -b.size * 1.2, b.size, b.size * 0.7);
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      if (b.kind === "knife") {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(Math.atan2(b.vy, b.vx) + this.time * 9);
+        ctx.fillStyle = this.radialGlow(ctx, b.size * 2, `bk|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.7)], [1, rgba(b.glow, 0)]]);
+        ctx.beginPath();
+        ctx.arc(0, 0, b.size * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.moveTo(b.size * 1.5, 0);
+        ctx.lineTo(-b.size * 0.5, -b.size * 0.55);
+        ctx.lineTo(-b.size * 1.2, 0);
+        ctx.lineTo(-b.size * 0.5, b.size * 0.55);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      this.fillGlow(ctx, b.x, b.y, b.size * 3.4, `bn|${b.glow}|${b.size}`, [[0, rgba(b.glow, 0.85)], [1, rgba(b.glow, 0)]]);
       ctx.fillStyle = b.color;
+      const bLen = Math.max(b.size * 2.5, b.size);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.vy, b.vx));
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+      if (ctx.ellipse) {
+        ctx.ellipse(0, 0, bLen, Math.max(1, b.size * 0.5), 0, 0, Math.PI * 2);
+      } else {
+        ctx.arc(0, 0, b.size, 0, Math.PI * 2);
+      }
       ctx.fill();
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -11318,10 +13180,77 @@ var GameEngine = class {
     ctx.stroke();
     ctx.restore();
   }
+  drawWeather(ctx) {
+    ctx.save();
+    if (this.weather === "rain" && this.raindrops.length > 0) {
+      ctx.strokeStyle = "rgba(180, 200, 220, 0.4)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const r of this.raindrops) {
+        ctx.moveTo(r.x, r.y);
+        ctx.lineTo(r.x - r.vx * 0.05, r.y - r.vy * 0.05);
+      }
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    if (this.timeOfDay === "morning") {
+      ctx.fillStyle = "rgba(255, 240, 200, 0.08)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.timeOfDay === "afternoon") {
+      ctx.fillStyle = "rgba(255, 180, 100, 0.04)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.timeOfDay === "night") {
+      ctx.fillStyle = "rgba(10, 15, 35, 0.35)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
+    if (this.weather === "fog") {
+      ctx.fillStyle = "rgba(200, 210, 220, 0.25)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.weather === "overcast") {
+      ctx.fillStyle = "rgba(120, 130, 140, 0.15)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    } else if (this.weather === "rain") {
+      ctx.fillStyle = "rgba(90, 100, 110, 0.2)";
+      ctx.fillRect(0, 0, this.W, this.H);
+    }
+    ctx.restore();
+  }
+  drawMeleeTrails(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const trail of this.meleeTrails) {
+      const alpha = Math.max(0, trail.life / trail.maxLife);
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.beginPath();
+      if (trail.weapon === "thrust_sword" && trail.length) {
+        ctx.strokeStyle = "#f472b6";
+        ctx.lineWidth = 14 * alpha;
+        ctx.lineCap = "round";
+        ctx.moveTo(trail.x, trail.y);
+        ctx.lineTo(trail.x + Math.cos(trail.angle) * trail.length, trail.y + Math.sin(trail.angle) * trail.length);
+        ctx.stroke();
+      } else if (trail.arc && trail.range) {
+        ctx.translate(trail.x, trail.y);
+        ctx.rotate(trail.angle);
+        const grad = ctx.createRadialGradient(0, 0, trail.range * 0.2, 0, 0, trail.range);
+        grad.addColorStop(0, trail.weapon === "lightsaber" ? "rgba(56,189,248,0)" : "rgba(255,255,255,0)");
+        grad.addColorStop(0.8, trail.weapon === "lightsaber" ? "rgba(56,189,248,0.5)" : "rgba(255,255,255,0.4)");
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = grad;
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, trail.range, -trail.arc, trail.arc);
+        ctx.fill();
+        ctx.rotate(-trail.angle);
+        ctx.translate(-trail.x, -trail.y);
+      }
+    }
+    ctx.restore();
+  }
   drawEffects(ctx, list = this.effects) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     for (const e of list) {
+      if (!this.inView(e.x, e.y, (e.radius ?? 40) + 40)) continue;
       const k = e.t / e.duration;
       if (e.type === "explosion") {
         const r = e.radius * (0.3 + k * 0.9);
@@ -11808,7 +13737,7 @@ var GameEngine = class {
       ctx.fillStyle = rgba("#a855f7", 0.1);
       ctx.fillRect(0, 0, this.W, this.H);
     }
-    if (this.gameMode === "cashout" && this.humanInteractProgress > 0) {
+    if ((this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && this.humanInteractProgress > 0) {
       const cx = this.W / 2;
       const cy = this.H / 2 + 55;
       ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
@@ -11920,9 +13849,10 @@ var GameEngine = class {
     this.gameOver = true;
     this.running = false;
     this.exitMouseLock();
-    const rank = [0, 1, 2, 3].sort((a, b) => this.teamCash[b] - this.teamCash[a]);
-    const isWin = rank[0] === 0 || rank[1] === 0;
-    const teamNames = ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
+    const teamIndices = Array.from({ length: this.teamCash.length }, (_, i) => i);
+    const rank = teamIndices.sort((a, b) => this.teamCash[b] - this.teamCash[a]);
+    const isWin = (this.gameMode === "cashout" || this.gameMode === "cashout_5v5") && this.gameMode === "cashout_5v5" ? rank[0] === 0 : rank[0] === 0 || rank[1] === 0;
+    const teamNames = this.gameMode === "cashout_5v5" ? ["\u84DD\u8272\u5C0F\u961F", "\u8D64\u7EA2\u5C0F\u961F"] : ["\u73A9\u5BB6\u5C0F\u961F", "\u592A\u9633\u5C0F\u961F", "\u95EA\u7535\u5C0F\u961F", "\u6697\u5F71\u5C0F\u961F"];
     const results = rank.map((tid, idx) => `${idx + 1}. ${teamNames[tid]} ($${this.teamCash[tid]})`).join("\n");
     const endMsg = isWin ? `\u606D\u559C\u83B7\u80DC\u664B\u7EA7\uFF01
 
@@ -12152,8 +14082,8 @@ ${results}`;
             if (c.player.hp > 0) {
               const d = Math.hypot(c.player.x - st.x, c.player.y - st.y);
               if (d < c.player.size + st.size + 10 && this.isInteracting(c, st.x, st.y, c.player.size + st.size + 20)) {
-                const isHoldingV = c.id === 0 ? this.keys.has("KeyV") : false;
-                if (!isHoldingV) {
+                const isHoldingT = c.id === 0 ? this.keys.has("KeyT") : false;
+                if (!isHoldingT) {
                   st.carriedByCid = c.id;
                   st.vx = 0;
                   st.vy = 0;
@@ -12167,18 +14097,24 @@ ${results}`;
           }
         }
         let isBeingRevived = false;
+        let reviverCid = null;
         for (const c of this.combatants) {
           if (c.player.hp > 0 && c.teamId === st.teamId && c.id !== st.deadCid) {
             const d = Math.hypot(c.player.x - st.x, c.player.y - st.y);
-            const isHoldingV = c.id === 0 ? this.keys.has("KeyV") : false;
-            if (d < c.player.size + st.size + 30 && isHoldingV) {
+            const isHoldingT = c.id === 0 ? this.keys.has("KeyT") : d < 80 && !this.enemies.some((e) => Math.hypot(e.x - c.player.x, e.y - c.player.y) < 220);
+            if (d < c.player.size + st.size + 40 && isHoldingT) {
               isBeingRevived = true;
+              reviverCid = c.id;
               break;
             }
           }
         }
         if (isBeingRevived) {
           st.reviveProgress += dt;
+          if (reviverCid === 0) {
+            this.humanInteractProgress = Math.min(1, st.reviveProgress / 5);
+            this.humanInteractLabel = "\u6B63\u5728\u590D\u6D3B\u961F\u53CB (5s)...";
+          }
           if (st.reviveProgress >= 5) {
             const deadC = this.combatants.find((c) => c.id === st.deadCid);
             if (deadC && deadC.player.hp <= 0) {
@@ -12188,7 +14124,7 @@ ${results}`;
               deadC.deadTimer = 0;
               deadC.respawnTimer = 0;
               this.statues = this.statues.filter((s) => s.id !== st.id);
-              this.addScoreFeed(deadC.id === 0 ? "\u4F60\u5DF2\u88AB\u590D\u6D3B" : `${deadC.name} \u5DF2\u88AB\u590D\u6D3B`, 0);
+              this.addScoreFeed(deadC.id === 0 ? "\u4F60\u5DF2\u88AB\u590D\u6D3B\uFF01" : `${deadC.name} \u5DF2\u88AB\u590D\u6D3B\uFF01`, 0);
             }
           }
         } else {

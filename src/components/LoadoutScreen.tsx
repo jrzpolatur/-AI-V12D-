@@ -417,9 +417,9 @@ export default function LoadoutScreen({
     }
     return ["turret_mg", "turret_cannon", "mine_explosive"];
   });
-  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch" | "team_deathmatch" | "cashout">(() => {
+  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch" | "team_deathmatch" | "cashout" | "cashout_5v5">(() => {
     const m = localStorage.getItem("dm_loadout.gameMode");
-    return m === "biohazard" || m === "deathmatch" || m === "team_deathmatch" || m === "cashout" ? (m as never) : "biohazard";
+    return m === "biohazard" || m === "deathmatch" || m === "team_deathmatch" || m === "cashout" || m === "cashout_5v5" ? (m as never) : "biohazard";
   });
   const [dmPlayerCount, setDmPlayerCount] = useState<4 | 6 | 8>(() => {
     const p = parseInt(localStorage.getItem("dm_loadout.dmPlayerCount") || "4", 10);
@@ -432,6 +432,24 @@ export default function LoadoutScreen({
   const [netStatus, setNetStatus] = useState<NetStatus>("idle");
   const [netInfo, setNetInfo] = useState<string>("");
   const advanced = useRef(false);
+
+  // 联机匹配时循环播放的外链背景音乐 —— 换成你自己的链接即可。
+  const MATCH_MUSIC_URL =
+    "https://cdn.pixabay.com/audio/2022/03/15/audio_8cb749cba8.mp3";
+
+  // 进入匹配（connecting / waiting）时播放音乐，匹配成功或离开时停止。
+  useEffect(() => {
+    if (netStatus === "waiting" || netStatus === "connecting") {
+      sound.playMusic(MATCH_MUSIC_URL);
+    } else {
+      sound.stopMusic();
+    }
+  }, [netStatus]);
+
+  // 卸载本界面（取消匹配/返回菜单）时确保停止音乐。
+  useEffect(() => {
+    return () => sound.stopMusic();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -870,6 +888,16 @@ export default function LoadoutScreen({
                   <span className="text-xs font-semibold">排位提现</span>
                   <span className="text-[10px] text-slate-400">3v3v3v3 提现争夺战</span>
                 </PickCard>
+
+              <PickCard
+                  active={gameMode === "cashout_5v5"}
+                  accent="#f59e0b"
+                  onClick={() => setGameMode("cashout_5v5")}
+                >
+                  <span className="text-xl">🏆</span>
+                  <span className="text-xs font-semibold">5v5 提现</span>
+                  <span className="text-[10px] text-slate-400">2小队 5v5 现金决战</span>
+                </PickCard>
               </Section>
             )}
 
@@ -880,6 +908,7 @@ export default function LoadoutScreen({
             <span><kbd className="kbd">鼠标左键</kbd> 攻击</span>
             <span><kbd className="kbd">Q</kbd> 技能</span>
             <span><kbd className="kbd">R</kbd> 换弹</span>
+            <span><kbd className="kbd">T</kbd> 按住复活队友(5s)</span>
             <span><kbd className="kbd">1-9/0 · [ ] · 滚轮</kbd> 切换武器</span>
             <span><kbd className="kbd">1/2/3 · 滚轮</kbd> 选择道具 · <kbd className="kbd">左键</kbd> 部署</span>
             <span><kbd className="kbd">大锤右键</kbd> 砸地拆墙</span>

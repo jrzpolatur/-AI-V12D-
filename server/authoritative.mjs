@@ -217,8 +217,10 @@ wss.on("connection", (ws) => {
       if (room.peers.size === 2) notifyReady(room);
     } else if (msg.t === "find") {
       const name = String(msg.name || "玩家").slice(0, 16);
-      if (queue.length > 0) {
-        const other = queue.shift();
+      const mode = msg.mode || "default";
+      if (!queues[mode]) queues[mode] = [];
+      if (queues[mode].length > 0) {
+        const other = queues[mode].shift();
         const code = genRoom();
         const room = { code, peers: new Map(), engine: null, timer: null };
         rooms.set(code, room);
@@ -230,8 +232,7 @@ wss.on("connection", (ws) => {
         send(ws, { t: "joined", room: code, pid: 2 });
         notifyReady(room);
       } else {
-        queue.push({ ws, name });
-        ws.pid = pidCounter++;
+        queues[mode].push({ ws, name });
         send(ws, { t: "queued" });
       }
     } else if (msg.t === "msg") {
@@ -294,8 +295,11 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    const qi = queue.findIndex((q) => q.ws === ws);
-    if (qi >= 0) queue.splice(qi, 1);
+    // a waiting client (still in queue, no room yet) just drops
+    for (const k of Object.keys(queues)) {
+      const qi = queues[k].findIndex((q) => q.ws === ws);
+      if (qi >= 0) { queues[k].splice(qi, 1); break; }
+    }
     const room = ws.room && rooms.get(ws.room);
     if (!room) return;
     const peer = ws.pid != null ? room.peers.get(ws.pid) : null;
