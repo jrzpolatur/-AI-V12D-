@@ -137,7 +137,7 @@ export default function App() {
           className="mt-auto pb-6 text-center text-xs text-white/80"
           style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
         >
-          本游戏由人工智能生成，能工智人@Zpolatur负责策划和Prompt
+          AI 制作 · 策划 @Zpolatur
         </p>
       </div>
     </div>

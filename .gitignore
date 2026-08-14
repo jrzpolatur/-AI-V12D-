@@ -5,3 +5,15 @@ dist
 npm-debug.log*
 .DS_Store
 server/announcements.json
+*.log
+*.txt
+fix_*.cjs
+test_*.js
+test_*.ts
+test_*.mjs
+test-*.cjs
+test-*.mjs
+*.py
+*.id
+check_inputs.cjs
+

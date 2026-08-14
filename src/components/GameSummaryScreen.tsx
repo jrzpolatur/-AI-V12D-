@@ -27,10 +27,10 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="rounded bg-rose-500/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-rose-400 border border-rose-500/30">
-              Match Summary
+              SUMMARY
             </span>
-            <h1 className="text-2xl font-black tracking-tight text-white">
-              总览 THE BOUNDLESS
+            <h1 className="finals-title text-2xl uppercase tracking-tight text-white">
+              比赛结算
             </h1>
           </div>
           <p className="text-sm font-semibold text-slate-400 mt-1">
@@ -39,11 +39,11 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
         </div>
 
         <div className="text-right">
-          <div className={`text-2xl font-black ${isVictory ? "text-amber-400" : "text-rose-400"} tracking-wide uppercase`}>
-            {isVictory ? "比赛胜利者" : "战败"}
+          <div className={`finals-title text-2xl ${isVictory ? "text-amber-400" : "text-rose-400"} tracking-wide uppercase`}>
+            {isVictory ? "胜利" : "战败"}
           </div>
           <div className="text-xs text-slate-500 uppercase tracking-widest font-mono mt-0.5">
-            SUMMARY RESULT
+            RESULT
           </div>
         </div>
       </div>
@@ -54,7 +54,7 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
           <div
             key={player.id || idx}
             style={{ animationDelay: `${idx * 100}ms` }}
-            className={`relative w-72 rounded-2xl border ${
+            className={`finals-panel relative w-72 border ${
               player.isMvp
                 ? "border-amber-400/60 bg-gradient-to-b from-amber-950/40 via-[#16172e] to-[#0f1024] shadow-[0_0_30px_rgba(251,191,36,0.15)]"
                 : player.isLocal
@@ -65,7 +65,7 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
             {/* MVP Badge */}
             {player.isMvp && (
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 px-3 py-0.5 text-xs font-black text-slate-950 shadow-md tracking-wider flex items-center gap-1">
-                ★ MVP 杰出选手
+                MVP
               </div>
             )}
 
@@ -100,8 +100,8 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
 
             {/* Main Score Display */}
             <div className="rounded-xl bg-black/30 p-3 mb-4 text-center border border-white/5">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">战斗得分 / TOTAL SCORE</div>
-              <div className="text-3xl font-black text-amber-300 tracking-tight">
+              <div className="text-xs text-slate-400 uppercase tracking-wider mb-0.5">得分 / SCORE</div>
+              <div className="text-3xl font-black text-amber-300 tracking-tight tnum">
                 {player.score.toLocaleString()}
               </div>
             </div>
@@ -109,19 +109,19 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
             {/* Stats Grid */}
             <div className="space-y-2 text-xs">
               <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">淘汰 (Kills)</span>
+                <span className="text-slate-400">淘汰</span>
                 <span className="font-bold text-emerald-400">{player.kills}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">阵亡 (Deaths)</span>
+                <span className="text-slate-400">阵亡</span>
                 <span className="font-bold text-rose-400">{player.deaths}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">造成伤害 (Dealt)</span>
+                <span className="text-slate-400">造成伤害</span>
                 <span className="font-bold text-cyan-400">{player.damageDealt.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-white/5">
-                <span className="text-slate-400">承受伤害 (Taken)</span>
+                <span className="text-slate-400">承受伤害</span>
                 <span className="font-bold text-amber-400/90">{player.damageTaken.toLocaleString()}</span>
               </div>
             </div>
@@ -132,7 +132,7 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
       {/* Footer Controls */}
       <div className="flex items-center justify-between border-t border-white/10 pt-4">
         <div className="text-xs text-slate-500">
-          按按钮继续与队友并肩作战或返回装配大厅
+          继续战斗，或返回大厅
         </div>
         <div className="flex items-center gap-4">
           <button
@@ -145,7 +145,7 @@ export const GameSummaryScreen: React.FC<GameSummaryScreenProps> = ({
             onClick={onRestart}
             className="rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 px-8 py-2.5 font-black text-slate-950 shadow-lg shadow-amber-500/20 transition hover:scale-105 hover:brightness-110 active:scale-95"
           >
-            ↻ 再来一局 (AGAIN)
+            再来一局
           </button>
         </div>
       </div>

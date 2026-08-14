@@ -34,6 +34,11 @@ export interface GameSettings {
   botAiHz: number;
   /** graphics quality: low (dpr=1, no shadows/particles), medium, high */
   quality: "low" | "medium" | "high";
+  /** retro pixel-art mode: renders the world & HUD on a low-res buffer then
+   *  nearest-neighbor upscales it for a chunky 8/16-bit look. */
+  pixel: boolean;
+  /** pixel density factor (how many real pixels one "game pixel" spans). 1=off. */
+  pixelSize: number;
   /** on-screen mobile control buttons */
   mobile: MobileButtonCfg[];
 }
@@ -64,6 +69,8 @@ function defaultSettings(): GameSettings {
     fps: 60,
     botAiHz: 16,
     quality: "high",
+    pixel: true,
+    pixelSize: 4,
     mobile: defaultMobileLayout(),
   };
 }
@@ -89,7 +96,12 @@ function load(): GameSettings {
         typeof parsed.quality === "string" && ["low", "medium", "high"].includes(parsed.quality)
           ? (parsed.quality as "low" | "medium" | "high")
           : base.quality,
-      // merge saved buttons onto defaults so newly added actions still appear
+      pixel:
+        typeof parsed.pixel === "boolean" ? parsed.pixel : base.pixel,
+      pixelSize:
+        typeof parsed.pixelSize === "number"
+          ? Math.min(4, Math.max(1, Math.floor(parsed.pixelSize)))
+          : base.pixelSize,
       mobile: base.mobile.map((def) => {
         const saved = (parsed.mobile ?? []).find((m) => m.id === def.id);
         return saved ? { ...def, ...saved } : def;

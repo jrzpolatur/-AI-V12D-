@@ -14,6 +14,12 @@ body {
   overscroll-behavior: none;
 }
 
+canvas {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
 .kbd {
   display: inline-block;
   padding: 1px 6px;
@@ -142,5 +148,41 @@ button,
 a,
 [role="button"] {
   touch-action: manipulation;
+}
+
+/* ============================================================
+   THE FINALS style helpers — chamfered panels, condensed bold
+   display type, tabular numerals.
+   ============================================================ */
+
+/* Angular broadcast panels: chamfered (clipped) corners instead of rounded. */
+.finals-panel {
+  clip-path: polygon(
+    14px 0, calc(100% - 14px) 0, 100% 14px,
+    100% calc(100% - 14px), calc(100% - 14px) 100%,
+    14px 100%, 0 calc(100% - 14px), 0 14px
+  );
+}
+.finals-panel-sm {
+  clip-path: polygon(
+    9px 0, calc(100% - 9px) 0, 100% 9px,
+    100% calc(100% - 9px), calc(100% - 9px) 100%,
+    9px 100%, 0 calc(100% - 9px), 0 9px
+  );
+}
+
+/* Condensed, heavy, uppercase display type (mirrors THE FINALS' HUD type). */
+.finals-title {
+  font-family: "Arial Narrow", "Roboto Condensed", "DIN Condensed",
+    "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-stretch: condensed;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+/* Monospaced, tabular numbers so scores / timers don't jitter as digits change. */
+.tnum {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 

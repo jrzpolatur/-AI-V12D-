@@ -5,15 +5,75 @@ import {
   OUTFITS,
   SKILLS,
   GADGETS,
+  SCENES,
   getGun,
 } from "../game/content";
 import { sound } from "../game/sound";
-import type { Loadout } from "../game/engine";
+import type { Loadout, CustomMapConfig } from "../game/engine";
 import type { GunDef } from "../game/types";
 import { drawCharacter, drawWeaponIcon, drawWeaponModel, drawGadgetIcon, rgba } from "../game/draw";
 import { cn } from "../utils/cn";
 import { Net, type NetStatus } from "../net/Net";
 import { tabLock } from "../utils/tabLock";
+
+export const ADVANCED_MAP_THEMES = [
+  { id: "random", name: "🎲 随机场景", desc: "每次对局随机生成独特世界", color: "#6366f1", icon: "🎲" },
+  { id: "neon", name: "🏙️ 霓虹都市", desc: "赛博高楼与霓虹天际线", color: "#818cf8", icon: "🏙️" },
+  { id: "desert", name: "🏜️ 沙漠废墟", desc: "西部沙龙酒吧、仙人掌与木结构建筑", color: "#d97706", icon: "🏜️" },
+  { id: "arctic", name: "❄️ 冰原基地", desc: "积雪冰原、极地特快列车与科研哨所", color: "#38bdf8", icon: "❄️" },
+  { id: "ruin", name: "🏚️ 末日废墟", desc: "坍塌厂房、藤蔓石垣与散乱残骸", color: "#f87171", icon: "🏚️" },
+  { id: "cyber", name: "🌌 赛博都市", desc: "蓝紫光幕天台与全息能量塔", color: "#00f0ff", icon: "🌌" },
+  { id: "wild_west", name: "🤠 西部牛仔", desc: "经典木质沙龙、边境工坊与仙人掌", color: "#f59e0b", icon: "🤠" },
+  { id: "jungle", name: "🌿 幽静丛林", desc: "茂密古树、藤蔓神庙与温馨木屋", color: "#4ade80", icon: "🌿" },
+  { id: "arctic_zone", name: "🏔️ 极寒地带", desc: "终年冻土、极地列车与冰川堡垒", color: "#0284c7", icon: "🏔️" },
+];
+
+export const ADVANCED_MAP_LAYOUTS = [
+  { id: "default", name: "⚖️ 经典平衡", desc: "场景特色对称建筑与掩体布局" },
+  { id: "open", name: "🏟️ 开放竞技场", desc: "超大视野，适合中远距离极速刚枪" },
+  { id: "maze", name: "🧱 迷宫巷战", desc: "纵横密集窄巷，适合近距离拐角拼枪" },
+  { id: "fortress", name: "🏰 堡垒要塞", desc: "中央重装堡垒与四方外围防御哨" },
+  { id: "scattered", name: "🎲 战术废墟", desc: "散落的散兵掩体、木箱石堆与残垣" },
+];
+
+export const ADVANCED_WEATHERS = [
+  { id: "random", label: "随机", icon: "🎲", desc: "对局自动随机气象" },
+  { id: "clear", label: "晴天", icon: "☀️", desc: "晴空万里，视野极佳" },
+  { id: "fog", label: "大雾", icon: "🌫️", desc: "迷雾笼罩，近距作战" },
+  { id: "overcast", label: "阴天", icon: "☁️", desc: "阴云密布，柔和光照" },
+  { id: "rain", label: "雨天", icon: "🌧️", desc: "暴雨倾盆，雨滴水花" },
+  { id: "snow", label: "雪天", icon: "❄️", desc: "漫天飞雪，晶莹雪花" },
+  { id: "sandstorm", label: "沙尘", icon: "🌪️", desc: "狂暴沙尘，橙黄风暴" },
+];
+
+/** Weapon categories shown in the loadout picker (ordered). */
+const GUN_GROUPS: { key: string; label: string }[] = [
+  { key: "pistol", label: "手枪" },
+  { key: "smg", label: "冲锋枪" },
+  { key: "rifle", label: "步枪" },
+  { key: "shotgun", label: "霰弹" },
+  { key: "sniper", label: "狙击" },
+  { key: "explosive", label: "爆炸" },
+  { key: "energy", label: "能量" },
+  { key: "spray", label: "喷射" },
+  { key: "melee", label: "近战" },
+  { key: "special", label: "投掷" },
+];
+
+/** Map a gun to one of the categories above by its class + key stats. */
+function gunCategory(g: GunDef): string {
+  if (g.weaponClass === "melee" || g.weaponClass === "shield") return "melee";
+  if (g.weaponClass === "beam" || g.kind === "ion") return "energy";
+  if (g.weaponClass === "flamethrower" || g.weaponClass === "poison_mist" || g.kind === "flame") return "spray";
+  if (g.weaponClass === "bow") return "special";
+  if (g.weaponClass === "shotgun" || g.kind === "pellet") return "shotgun";
+  if (g.kind === "boomerang" || g.kind === "knife" || g.shape === "knife") return "special";
+  if (g.explosive || g.kind === "rocket" || g.kind === "grenade") return "explosive";
+  if (g.shape === "sniper") return "sniper";
+  if (g.shape === "pistol") return "pistol";
+  if (g.shape === "mac11" || g.shape === "mp5") return "smg";
+  return "rifle";
+}
 
 function CharPreview({
   loadout,
@@ -417,15 +477,40 @@ export default function LoadoutScreen({
     }
     return ["turret_mg", "turret_cannon", "mine_explosive"];
   });
-  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch" | "team_deathmatch" | "cashout" | "cashout_5v5">(() => {
+  const [gameMode, setGameMode] = useState<"biohazard" | "deathmatch" | "team_deathmatch">(() => {
     const m = localStorage.getItem("dm_loadout.gameMode");
-    return m === "biohazard" || m === "deathmatch" || m === "team_deathmatch" || m === "cashout" || m === "cashout_5v5" ? (m as never) : "biohazard";
+    return m === "biohazard" || m === "deathmatch" || m === "team_deathmatch" ? (m as never) : "biohazard";
   });
-  const [dmPlayerCount, setDmPlayerCount] = useState<4 | 6 | 8>(() => {
+  const [dmPlayerCount, setDmPlayerCount] = useState<4 | 6 | 8 | 10>(() => {
     const p = parseInt(localStorage.getItem("dm_loadout.dmPlayerCount") || "4", 10);
-    return (p === 4 || p === 6 || p === 8) ? (p as 4 | 6 | 8) : 4;
+    return (p === 4 || p === 6 || p === 8 || p === 10) ? (p as 4 | 6 | 8 | 10) : 4;
   });
   const [isNetworkPlay, setIsNetworkPlay] = useState(false);
+  
+  const [weatherOverride, setWeatherOverride] = useState<string>(() => {
+    return localStorage.getItem("dm_loadout.weatherOverride") || "random";
+  });
+
+  // Custom Map & Advanced Settings State
+  const [customMapTheme, setCustomMapTheme] = useState<string>(() => {
+    return localStorage.getItem("dm_loadout.customMapTheme") || "random";
+  });
+  const [customMapLayout, setCustomMapLayout] = useState<"default" | "open" | "maze" | "fortress" | "scattered">(() => {
+    return (localStorage.getItem("dm_loadout.customMapLayout") as any) || "default";
+  });
+  const [customMapDensity, setCustomMapDensity] = useState<"sparse" | "normal" | "dense">(() => {
+    return (localStorage.getItem("dm_loadout.customMapDensity") as any) || "normal";
+  });
+  const [customMapTrain, setCustomMapTrain] = useState<"auto" | "always" | "never">(() => {
+    return (localStorage.getItem("dm_loadout.customMapTrain") as any) || "auto";
+  });
+  const [customMapDecorations, setCustomMapDecorations] = useState<boolean>(() => {
+    const v = localStorage.getItem("dm_loadout.customMapDecorations");
+    return v !== null ? v === "true" : true;
+  });
+
+  const [showAdvancedModal, setShowAdvancedModal] = useState(false);
+  const [advancedTab, setAdvancedTab] = useState<"map" | "weather">("map");
   
   // Net stuff
   const netRef = useRef<Net | null>(null);
@@ -470,7 +555,27 @@ export default function LoadoutScreen({
     localStorage.setItem("dm_loadout.gadgetIds", JSON.stringify(gadgetIds));
     localStorage.setItem("dm_loadout.gameMode", gameMode);
     localStorage.setItem("dm_loadout.dmPlayerCount", String(dmPlayerCount));
-  }, [characterId, outfitId, gunIds, skillId, gadgetIds, gameMode, dmPlayerCount]);
+    localStorage.setItem("dm_loadout.weatherOverride", weatherOverride);
+    localStorage.setItem("dm_loadout.customMapTheme", customMapTheme);
+    localStorage.setItem("dm_loadout.customMapLayout", customMapLayout);
+    localStorage.setItem("dm_loadout.customMapDensity", customMapDensity);
+    localStorage.setItem("dm_loadout.customMapTrain", customMapTrain);
+    localStorage.setItem("dm_loadout.customMapDecorations", String(customMapDecorations));
+  }, [
+    characterId,
+    outfitId,
+    gunIds,
+    skillId,
+    gadgetIds,
+    gameMode,
+    dmPlayerCount,
+    weatherOverride,
+    customMapTheme,
+    customMapLayout,
+    customMapDensity,
+    customMapTrain,
+    customMapDecorations,
+  ]);
 
   const gunId = gunIds[0] ?? "mac11";
   const toggleGun = (id: string) => {
@@ -496,9 +601,7 @@ export default function LoadoutScreen({
     });
   };
 
-  /** Wipe the saved loadout and fall back to the factory defaults. The
-   *  effect below then persists these defaults back to localStorage, so the
-   *  player starts fresh next time they open the screen. */
+  /** Wipe the saved loadout and fall back to the factory defaults. */
   const resetToDefaults = () => {
     setCharacterId("raider");
     setOutfitId("tactical");
@@ -506,6 +609,12 @@ export default function LoadoutScreen({
     setSkillId("dash");
     setGadgetIds(["turret_mg", "turret_cannon", "mine_explosive"]);
     setGameMode("biohazard");
+    setWeatherOverride("random");
+    setCustomMapTheme("random");
+    setCustomMapLayout("default");
+    setCustomMapDensity("normal");
+    setCustomMapTrain("auto");
+    setCustomMapDecorations(true);
   };
 
   const loadout: Loadout = {
@@ -517,14 +626,22 @@ export default function LoadoutScreen({
     gadgetIds,
     gameMode: isMultiplayer ? "deathmatch" : gameMode,
     dmPlayerCount,
+    weatherOverride,
+    customMap: {
+      themeId: customMapTheme,
+      layoutStyle: customMapLayout,
+      density: customMapDensity,
+      trainMode: customMapTrain,
+      decorations: customMapDecorations,
+    },
   };
 
   const handleStart = () => {
     sound.ensure();
-    if (gameMode === "team_deathmatch" && isNetworkPlay) {
+    if (gameMode === "team_deathmatch" && isNetworkPlay && dmPlayerCount !== 10) {
       const handleConflict = () => {
         setNetStatus("error");
-        setNetInfo("检测到您在另一个标签页中已开始匹配或游戏！请关闭其他标签页。");
+        setNetInfo("已在其他标签页开始匹配，请先关闭该标签页。");
         netRef.current?.disconnect();
       };
       
@@ -608,14 +725,14 @@ export default function LoadoutScreen({
     <div className="no-scrollbar min-h-screen w-full overflow-y-auto bg-gradient-to-b from-[#0f1030] via-[#13143a] to-[#0b0c22] text-slate-100 pt-safe pb-safe pl-safe pr-safe">
       <div className="mx-auto max-w-6xl px-5 py-8">
         <header className="mb-6 text-center">
-          <h1 className="bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl">
+          <h1 className="finals-title bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300 bg-clip-text text-4xl tracking-tight text-transparent sm:text-5xl">
             FIRING STICKERS
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            2D 俯视角射击 · 生化生存与人机对战 · 自由搭配人物、服饰、枪械、技能与道具
+            俯视角射击 · 搭配人物、武器、技能与道具
           </p>
           <p className="mt-1 text-[11px] text-emerald-400/80">
-            📌 你的配置会自动保存，退出后再进来也会保留上次的选择
+            配置会自动保存
           </p>
         </header>
 
@@ -657,7 +774,7 @@ export default function LoadoutScreen({
 
           {/* Selectors */}
           <div className="space-y-5">
-            <Section label="选择人物">
+            <Section label="人物">
               {CHARACTERS.map((c) => (
                 <PickCard
                   key={c.id}
@@ -678,7 +795,7 @@ export default function LoadoutScreen({
               ))}
             </Section>
 
-            <Section label="搭配服饰">
+            <Section label="服饰">
               {OUTFITS.map((o) => (
                 <PickCard
                   key={o.id}
@@ -701,43 +818,57 @@ export default function LoadoutScreen({
               ))}
             </Section>
 
-            <Section label={`选择 2 把武器（已选 ${gunIds.length}/2，游戏中按 E 切换）`}>
-              {GUNS.map((g) => {
-                const idx = gunIds.indexOf(g.id);
-                const selected = idx >= 0;
+            <Section label={`武器（已选 ${gunIds.length}/2）`}>
+              {GUN_GROUPS.map((grp) => {
+                const guns = GUNS.filter((g) => gunCategory(g) === grp.key);
+                if (!guns.length) return null;
                 return (
-                  <PickCard
-                    key={g.id}
-                    active={selected}
-                    accent={g.glow}
-                    onClick={() => toggleGun(g.id)}
-                  >
-                    {selected && (
-                      <span className="absolute -top-1.5 -left-1.5 grid h-5 w-5 place-items-center rounded-full bg-cyan-400 text-[10px] font-bold text-slate-900">
-                        {idx + 1}
-                      </span>
-                    )}
-                    <WeaponIcon iconShape={g.iconShape} glow={g.glow} gunId={g.id} size={32} />
-                    <span className="text-xs font-semibold">{g.name}</span>
-                    <span className="text-[10px] text-slate-400">
-                      {g.weaponClass === "melee"
-                        ? "近战"
-                        : g.weaponClass === "beam"
-                        ? `${g.damage} 激光/秒`
-                        : g.weaponClass === "flamethrower"
-                        ? `${g.damage} 火焰/秒`
-                        : g.weaponClass === "bow"
-                        ? "蓄力弓"
-                        : g.weaponClass === "shield"
-                        ? "盾牌"
-                        : `DMG ${g.damage} · ${g.fireRate}/s`}
-                    </span>
-                  </PickCard>
+                  <div key={grp.key} className="w-full">
+                    <div className="mb-1.5 flex items-baseline gap-1.5 border-b border-white/5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      {grp.label}
+                      <span className="font-normal text-slate-600">{guns.length}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {guns.map((g) => {
+                        const idx = gunIds.indexOf(g.id);
+                        const selected = idx >= 0;
+                        return (
+                          <PickCard
+                            key={g.id}
+                            active={selected}
+                            accent={g.glow}
+                            onClick={() => toggleGun(g.id)}
+                          >
+                            {selected && (
+                              <span className="absolute -top-1.5 -left-1.5 grid h-5 w-5 place-items-center rounded-full bg-cyan-400 text-[10px] font-bold text-slate-900">
+                                {idx + 1}
+                              </span>
+                            )}
+                            <WeaponIcon iconShape={g.iconShape} glow={g.glow} gunId={g.id} size={32} />
+                            <span className="text-xs font-semibold">{g.name}</span>
+                            <span className="text-[10px] text-slate-400">
+                              {g.weaponClass === "melee"
+                                ? "近战"
+                                : g.weaponClass === "beam"
+                                ? `${g.damage} 激光/秒`
+                                : g.weaponClass === "flamethrower"
+                                ? `${g.damage} 火焰/秒`
+                                : g.weaponClass === "bow"
+                                ? "蓄力弓"
+                                : g.weaponClass === "shield"
+                                ? "盾牌"
+                                : `DMG ${g.damage} · ${g.fireRate}/s`}
+                            </span>
+                          </PickCard>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </Section>
 
-            <Section label="技能（按 Q 释放）">
+            <Section label="技能">
               {SKILLS.map((s) => (
                 <PickCard
                   key={s.id}
@@ -754,7 +885,7 @@ export default function LoadoutScreen({
               ))}
             </Section>
 
-            <Section label={`战术道具（最多携带 3 个，已选 ${gadgetIds.length}/3，游戏中 1/2/3 或滚轮选择，左键投掷/部署）`}>
+            <Section label={`道具（已选 ${gadgetIds.length}/3）`}>
               {GADGETS.map((gd) => {
                 const idx = gadgetIds.indexOf(gd.id);
                 const selected = idx >= 0;
@@ -784,24 +915,25 @@ export default function LoadoutScreen({
         </div>
 
             {!isMultiplayer && (
-              <Section label="游戏模式（单机）">
+              <Section label="游戏模式">
                 <PickCard
                   active={gameMode === "biohazard"}
                   accent="#a3e635"
                   onClick={() => setGameMode("biohazard")}
                 >
-                  <span className="text-xl">☣</span>
-                  <span className="text-xs font-semibold">生化危机</span>
-                  <span className="text-[10px] text-slate-400">尸潮生存 · 新武器</span>
+                  <span className="text-xs font-semibold">生存模式</span>
+                  <span className="text-[10px] text-slate-400">抵御尸潮</span>
                 </PickCard>
                 <PickCard
                 active={gameMode === "deathmatch"}
                 accent="#f472b6"
-                onClick={() => setGameMode("deathmatch")}
+                onClick={() => {
+                  setGameMode("deathmatch");
+                  if (dmPlayerCount === 10) setDmPlayerCount(4);
+                }}
               >
-                <span className="text-xl">🤖</span>
-                <span className="text-xs font-semibold">人机对战</span>
-                <span className="text-[10px] text-slate-400">离线 PvP · 先达目标杀敌数胜</span>
+                <span className="text-xs font-semibold">死亡竞赛</span>
+                <span className="text-[10px] text-slate-400">先达目标击杀</span>
               </PickCard>
               
               {gameMode === "deathmatch" && (
@@ -816,7 +948,7 @@ export default function LoadoutScreen({
                       key={opt.count}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setDmPlayerCount(opt.count as 4 | 6 | 8);
+                        setDmPlayerCount(opt.count as 4 | 6 | 8 | 10);
                       }}
                       className={`flex-1 rounded-lg py-1.5 flex flex-col items-center justify-center text-[10px] border transition-colors ${
                         dmPlayerCount === opt.count
@@ -836,9 +968,8 @@ export default function LoadoutScreen({
                 accent="#8b5cf6"
                 onClick={() => setGameMode("team_deathmatch")}
               >
-                <span className="text-xl">🤝</span>
-                <span className="text-xs font-semibold">双排死斗</span>
-                <span className="text-[10px] text-slate-400">2人小队对抗 · 先达目标杀敌数胜</span>
+                <span className="text-xs font-semibold">团队死斗</span>
+                <span className="text-[10px] text-slate-400">小队对抗</span>
               </PickCard>
               
               {gameMode === "team_deathmatch" && (
@@ -848,13 +979,14 @@ export default function LoadoutScreen({
                     {[
                       { count: 4, label: "2队4人", kills: 20 },
                       { count: 6, label: "3队6人", kills: 30 },
-                      { count: 8, label: "4队8人", kills: 40 }
+                      { count: 8, label: "4队8人", kills: 40 },
+                      { count: 10, label: "5v5", kills: 30 }
                     ].map((opt) => (
                       <button
                         key={opt.count}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDmPlayerCount(opt.count as 4 | 6 | 8);
+                          setDmPlayerCount(opt.count as 4 | 6 | 8 | 10);
                         }}
                         className={`flex-1 rounded-lg py-1.5 flex flex-col items-center justify-center text-[10px] border transition-colors ${
                           dmPlayerCount === opt.count
@@ -867,39 +999,79 @@ export default function LoadoutScreen({
                       </button>
                     ))}
                   </div>
-                  <label className="flex items-center gap-2 mt-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isNetworkPlay}
-                      onChange={(e) => setIsNetworkPlay(e.target.checked)}
-                      className="accent-violet-500"
-                    />
-                    <span className="text-xs text-slate-300">网络联机匹配 (匹配一名真人队友)</span>
-                  </label>
+                  {dmPlayerCount === 10 ? (
+                    <span className="mt-1 text-[10px] text-violet-300/80">
+                      5v5 为本地人机对战 · 蓝队 vs 红队
+                    </span>
+                  ) : (
+                    <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isNetworkPlay}
+                        onChange={(e) => setIsNetworkPlay(e.target.checked)}
+                        className="accent-violet-500"
+                      />
+                      <span className="text-xs text-slate-300">网络联机匹配 (匹配一名真人队友)</span>
+                    </label>
+                  )}
                 </div>
               )}
 
-              <PickCard
-                  active={gameMode === "cashout"}
-                  accent="#fbbf24"
-                  onClick={() => setGameMode("cashout")}
-                >
-                  <span className="text-xl">💰</span>
-                  <span className="text-xs font-semibold">排位提现</span>
-                  <span className="text-[10px] text-slate-400">3v3v3v3 提现争夺战</span>
-                </PickCard>
-
-              <PickCard
-                  active={gameMode === "cashout_5v5"}
-                  accent="#f59e0b"
-                  onClick={() => setGameMode("cashout_5v5")}
-                >
-                  <span className="text-xl">🏆</span>
-                  <span className="text-xs font-semibold">5v5 提现</span>
-                  <span className="text-[10px] text-slate-400">2小队 5v5 现金决战</span>
-                </PickCard>
               </Section>
             )}
+
+            {/* 高级设置卡片入口 */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <div
+                onClick={() => setShowAdvancedModal(true)}
+                className="group relative flex flex-col gap-2 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900/60 p-4 transition-all duration-200 hover:border-indigo-400/60 hover:from-indigo-900/50 hover:shadow-lg hover:shadow-indigo-500/10 cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/20 text-xl text-indigo-300 border border-indigo-400/20 shadow-inner">
+                      ⚙️
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                        高级设置
+                        <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                          自定义地图 · 动态天气
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        自由定制对局场景风格、战术布局、掩体密度与动态天气
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAdvancedModal(true);
+                    }}
+                    className="flex items-center gap-1 rounded-xl bg-indigo-500/20 px-3.5 py-1.5 text-xs font-bold text-indigo-300 border border-indigo-500/30 transition-all group-hover:bg-indigo-500 group-hover:text-white"
+                  >
+                    配置 ⚙️
+                  </button>
+                </div>
+
+                {/* 状态徽章条 */}
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 text-[11px] text-slate-300 border border-white/5">
+                    🗺️ 场景: <strong className="text-indigo-300">{ADVANCED_MAP_THEMES.find(t => t.id === customMapTheme)?.name.replace(/^[^\s]+\s*/, '') || "随机"}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 text-[11px] text-slate-300 border border-white/5">
+                    🏗️ 布局: <strong className="text-indigo-300">{ADVANCED_MAP_LAYOUTS.find(l => l.id === customMapLayout)?.name.replace(/^[^\s]+\s*/, '') || "经典平衡"}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 text-[11px] text-slate-300 border border-white/5">
+                    🌦️ 天气: <strong className="text-indigo-300">{ADVANCED_WEATHERS.find(w => w.id === weatherOverride)?.label || "随机"}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 text-[11px] text-slate-300 border border-white/5">
+                    🧱 密度: <strong className="text-indigo-300">{customMapDensity === "sparse" ? "稀疏 50%" : customMapDensity === "dense" ? "密集 150%" : "标准 100%"}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
 
         {/* Controls + start */}
         <div className="mt-6 flex flex-col items-center gap-4">
@@ -908,10 +1080,8 @@ export default function LoadoutScreen({
             <span><kbd className="kbd">鼠标左键</kbd> 攻击</span>
             <span><kbd className="kbd">Q</kbd> 技能</span>
             <span><kbd className="kbd">R</kbd> 换弹</span>
-            <span><kbd className="kbd">T</kbd> 按住复活队友(5s)</span>
-            <span><kbd className="kbd">1-9/0 · [ ] · 滚轮</kbd> 切换武器</span>
+            <span><kbd className="kbd">E</kbd> 切换武器</span>
             <span><kbd className="kbd">1/2/3 · 滚轮</kbd> 选择道具 · <kbd className="kbd">左键</kbd> 部署</span>
-            <span><kbd className="kbd">大锤右键</kbd> 砸地拆墙</span>
             <span><kbd className="kbd">P</kbd> 暂停</span>
           </div>
           <div className="show-touch flex flex-col items-center gap-1 text-center text-xs text-slate-400">
@@ -937,11 +1107,266 @@ export default function LoadoutScreen({
               onClick={handleStart}
               className="relative rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-12 py-3 text-lg font-bold text-slate-900 shadow-lg shadow-violet-500/30 transition-transform hover:scale-105 active:scale-95"
             >
-              {netStatus === "waiting" || netStatus === "connecting" ? "匹配中..." : "开始战斗 ▶"}
+              {netStatus === "waiting" || netStatus === "connecting" ? "匹配中…" : "开始战斗"}
             </button>
           </div>
         </div>
       </div>
+
+      {/* 高级设置模态弹窗 (Advanced Settings Modal) */}
+      {showAdvancedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-3xl border border-white/15 bg-gradient-to-b from-[#181938] via-[#101229] to-[#0a0b1c] p-6 shadow-2xl shadow-indigo-950/50 text-slate-100">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-500/20 text-2xl text-indigo-300 border border-indigo-400/30">
+                  ⚙️
+                </span>
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    高级设置
+                    <span className="text-xs font-normal text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20">
+                      自定义地图与天气
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    定制专属战局场景、战术建筑布局、障碍物密度与天气环境
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAdvancedModal(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 my-4 p-1 rounded-2xl bg-black/40 border border-white/5">
+              <button
+                onClick={() => setAdvancedTab("map")}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                  advancedTab === "map"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                🗺️ 自定义地图与机制
+              </button>
+              <button
+                onClick={() => setAdvancedTab("weather")}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                  advancedTab === "weather"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                🌦️ 动态天气系统
+              </button>
+            </div>
+
+            {/* Tab Body */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-5 no-scrollbar max-h-[55vh]">
+              {advancedTab === "map" ? (
+                <>
+                  {/* 场景主题 */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-2">
+                      <span className="h-2 w-2 rounded-full bg-indigo-400"></span>
+                      地图场景风格 (Map Theme)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {ADVANCED_MAP_THEMES.map((theme) => {
+                        const active = customMapTheme === theme.id;
+                        return (
+                          <button
+                            key={theme.id}
+                            onClick={() => setCustomMapTheme(theme.id)}
+                            className={`flex flex-col text-left p-3 rounded-2xl border transition-all ${
+                              active
+                                ? "bg-indigo-500/20 border-indigo-400 text-white shadow-md shadow-indigo-500/10"
+                                : "bg-black/30 border-white/5 text-slate-400 hover:border-white/20 hover:bg-black/40"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-bold text-slate-100">{theme.name}</span>
+                              <span className="text-xs opacity-80" style={{ color: theme.color }}>●</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 leading-snug line-clamp-2">
+                              {theme.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 战术布局风格 */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-2">
+                      <span className="h-2 w-2 rounded-full bg-indigo-400"></span>
+                      地图战术结构 (Layout Pattern)
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {ADVANCED_MAP_LAYOUTS.map((layout) => {
+                        const active = customMapLayout === layout.id;
+                        return (
+                          <button
+                            key={layout.id}
+                            onClick={() => setCustomMapLayout(layout.id as any)}
+                            className={`flex flex-col text-left p-3 rounded-2xl border transition-all ${
+                              active
+                                ? "bg-indigo-500/20 border-indigo-400 text-white shadow-md shadow-indigo-500/10"
+                                : "bg-black/30 border-white/5 text-slate-400 hover:border-white/20 hover:bg-black/40"
+                            }`}
+                          >
+                            <span className="text-xs font-bold text-slate-100 mb-1">{layout.name}</span>
+                            <span className="text-[10px] text-slate-400 leading-snug">
+                              {layout.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 密度 & 机关 & 植被 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10">
+                    {/* 掩体密度 */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-bold text-slate-300">🧱 掩体建筑密度</span>
+                      <div className="flex rounded-xl bg-black/40 p-1 border border-white/5">
+                        {[
+                          { id: "sparse", label: "稀疏 50%" },
+                          { id: "normal", label: "标准" },
+                          { id: "dense", label: "密集 150%" },
+                        ].map((d) => (
+                          <button
+                            key={d.id}
+                            onClick={() => setCustomMapDensity(d.id as any)}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                              customMapDensity === d.id
+                                ? "bg-indigo-500 text-white"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 极地列车 */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-bold text-slate-300">🚂 极地特快列车</span>
+                      <div className="flex rounded-xl bg-black/40 p-1 border border-white/5">
+                        {[
+                          { id: "auto", label: "仅冰雪" },
+                          { id: "always", label: "始终开启" },
+                          { id: "never", label: "关闭" },
+                        ].map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setCustomMapTrain(t.id as any)}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                              customMapTrain === t.id
+                                ? "bg-indigo-500 text-white"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 生态装饰 */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-bold text-slate-300">🌵 植被与生态动物</span>
+                      <div className="flex rounded-xl bg-black/40 p-1 border border-white/5">
+                        <button
+                          onClick={() => setCustomMapDecorations(true)}
+                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                            customMapDecorations
+                              ? "bg-indigo-500 text-white"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          开启生态
+                        </button>
+                        <button
+                          onClick={() => setCustomMapDecorations(false)}
+                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                            !customMapDecorations
+                              ? "bg-indigo-500 text-white"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          纯净关闭
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* 天气选项 */
+                <div>
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-2">
+                    <span className="h-2 w-2 rounded-full bg-indigo-400"></span>
+                    动态气象系统 (Dynamic Weather)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {ADVANCED_WEATHERS.map((w) => {
+                      const active = weatherOverride === w.id;
+                      return (
+                        <button
+                          key={w.id}
+                          onClick={() => setWeatherOverride(w.id)}
+                          className={`flex flex-col items-center text-center p-3 rounded-2xl border transition-all ${
+                            active
+                              ? "bg-sky-500/20 border-sky-400 text-white shadow-md shadow-sky-500/10"
+                              : "bg-black/30 border-white/5 text-slate-400 hover:border-white/20 hover:bg-black/40"
+                          }`}
+                        >
+                          <span className="text-2xl mb-1">{w.icon}</span>
+                          <span className="text-xs font-bold text-slate-100">{w.label}</span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">{w.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/10">
+              <button
+                onClick={() => {
+                  setCustomMapTheme("random");
+                  setCustomMapLayout("default");
+                  setCustomMapDensity("normal");
+                  setCustomMapTrain("auto");
+                  setCustomMapDecorations(true);
+                  setWeatherOverride("random");
+                }}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-white/10 hover:text-slate-200"
+              >
+                恢复默认参数
+              </button>
+              <button
+                onClick={() => setShowAdvancedModal(false)}
+                className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 px-6 py-2 text-xs font-bold text-white shadow-lg shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-transform"
+              >
+                保存设置并返回
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

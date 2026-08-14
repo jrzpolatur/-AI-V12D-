@@ -72,7 +72,7 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
             <section className="mb-5">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-bold tracking-wider text-amber-300">
-                  📢 公告
+                  公告
                 </h3>
                 <button
                   onClick={() => setOpen(false)}
@@ -95,19 +95,19 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
             {/* ---- Quick start guide ---- */}
             <section className="mb-5">
               <h3 className="mb-2 text-sm font-bold tracking-wider text-cyan-300">
-                ❓ 快速上手
+                操作指南
               </h3>
               <ul className="space-y-1.5 text-xs leading-relaxed text-slate-300">
-                <li><b className="text-slate-100">目标</b>：消灭敌人、累计击杀与赏金，撑到回合结束。</li>
+                <li><b className="text-slate-100">目标</b>：击杀敌人，达成目标或撑到结束。</li>
                 <li><b className="text-slate-100">移动</b>：WASD / 方向键；<b className="text-slate-100">瞄准</b>：鼠标。</li>
                 <li><b className="text-slate-100">射击</b>：鼠标左键（按住连射）。</li>
-                <li><b className="text-slate-100">近战奥义</b>：鼠标右键（长剑蓄力突刺、双刀举刀反弹子弹、锤子砸地）。</li>
+                <li><b className="text-slate-100">近战</b>：鼠标右键（长剑突刺、双刀反弹子弹、锤子砸地）。</li>
                 <li><b className="text-slate-100">技能/冲刺</b>：Q 或 空格。</li>
                 <li><b className="text-slate-100">换武器</b>：1 / 2 / 3 或 滚轮；<b className="text-slate-100">装填</b>：R；<b className="text-slate-100">交互</b>：F。</li>
                 <li><b className="text-slate-100">暂停/菜单</b>：P 或 Esc；游戏中按 <b className="text-slate-100">H</b> 看完整操作。</li>
-                <li><b className="text-slate-100">模式</b>：单人训练 · 死斗 · 生化 · 赏金占领。</li>
+                <li><b className="text-slate-100">模式</b>：生存 · 死亡竞赛 · 团队死斗。</li>
                 <li className="rounded-lg border border-cyan-300/20 bg-cyan-500/10 p-2 text-cyan-100">
-                  🔊 音效提示：听到 <b>kill confirm</b> = 你成功击杀；<b>death</b> = 你被淘汰。
+                  音效：击杀有确认音，被淘汰有提示音。
                 </li>
               </ul>
             </section>
@@ -117,7 +117,7 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
             {/* ---- Settings ---- */}
             <section>
               <h3 className="mb-3 text-sm font-bold tracking-wider text-slate-200">
-                ⚙ 设置
+                设置
               </h3>
 
               {/* Audio */}
@@ -135,7 +135,7 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
                         : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200")
                     }
                   >
-                    {s.muted ? "🔇 已静音" : "🔊 开启"}
+                    {s.muted ? "已静音" : "开启"}
                   </button>
                 </div>
                 <input

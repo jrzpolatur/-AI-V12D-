@@ -60,7 +60,7 @@ export default function SettingsOverlay({
                   : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200")
               }
             >
-              {s.muted ? "🔇 已静音" : "🔊 开启"}
+              {s.muted ? "已静音" : "开启"}
             </button>
           </div>
           <input
@@ -116,6 +116,44 @@ export default function SettingsOverlay({
                   (s.quality === o.value
                     ? "border-violet-300/60 bg-violet-500/20 text-violet-100"
                     : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10")
+                }
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* ---- Retro pixel art ---- */}
+        <section className="mb-5">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-200">像素风</h3>
+            <button
+              onClick={() => updateSettings({ pixel: !s.pixel })}
+              className={
+                "rounded-full border px-3 py-1 text-xs font-semibold " +
+                (s.pixel
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                  : "border-white/10 bg-white/5 text-slate-400")
+              }
+            >
+              {s.pixel ? "开启" : "关闭"}
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 opacity-80">
+            {[
+              { label: "细腻", value: 2 },
+              { label: "标准", value: 3 },
+              { label: "粗犷(推荐)", value: 4 },
+            ].map((o) => (
+              <button
+                key={o.value}
+                onClick={() => updateSettings({ pixel: true, pixelSize: o.value })}
+                className={
+                  "rounded-lg border py-2 text-xs font-bold transition " +
+                  (s.pixel && s.pixelSize === o.value
+                    ? "border-cyan-300/60 bg-cyan-500/20 text-cyan-100"
+                    : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10")
                 }
               >
                 {o.label}
