@@ -4,7 +4,10 @@ import { drawPixelWeapon, drawPixelWeaponIcon } from "./pixelWeapons";
 // ---------------------------------------------------------------------------
 // Color helpers
 // ---------------------------------------------------------------------------
+const _rgbCache = new Map<string, [number, number, number]>();
 export function hexToRgb(hex: string): [number, number, number] {
+  const cached = _rgbCache.get(hex);
+  if (cached) return cached;
   const h = hex.replace("#", "");
   const n = parseInt(
     h.length === 3
@@ -15,19 +18,35 @@ export function hexToRgb(hex: string): [number, number, number] {
       : h,
     16
   );
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const rgb: [number, number, number] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  _rgbCache.set(hex, rgb);
+  return rgb;
 }
 
+const _rgbaCache = new Map<string, string>();
 export function rgba(hex: string, a: number): string {
+  const aQ = Math.round(a * 100) / 100;
+  const key = `${hex}_${aQ}`;
+  const cached = _rgbaCache.get(key);
+  if (cached) return cached;
+  if (_rgbaCache.size > 2048) _rgbaCache.clear();
   const [r, g, b] = hexToRgb(hex);
-  return `rgba(${r},${g},${b},${a})`;
+  const res = `rgba(${r},${g},${b},${aQ})`;
+  _rgbaCache.set(key, res);
+  return res;
 }
 
+const _shadeCache = new Map<string, string>();
 export function shade(hex: string, amt: number): string {
+  const key = `${hex}_${amt}`;
+  const cached = _shadeCache.get(key);
+  if (cached) return cached;
   const [r, g, b] = hexToRgb(hex);
   const f = (c: number) =>
     Math.max(0, Math.min(255, Math.round(c + amt * 255)));
-  return `rgb(${f(r)},${f(g)},${f(b)})`;
+  const res = `rgb(${f(r)},${f(g)},${f(b)})`;
+  _shadeCache.set(key, res);
+  return res;
 }
 
 export const DARK = "#05060f";
@@ -35,23 +54,6 @@ const STEEL = "#475569";
 const STEEL_D = "#0f172a";
 const STEEL_L = "#94a3b8";
 const STEEL_X = "#cbd5e1";
-const WOOD = "#d97706";
-const WOOD_D = "#92400e";
-
-// ---------------------------------------------------------------------------
-// Cached radial-glow gradients. Created at the ORIGIN (0,0,r) so callers can
-// translate before filling and reuse one object across every instance instead
-// of rebuilding it every frame — a major win on integrated GPUs.
-// ---------------------------------------------------------------------------
-const glowCache = new Map<string, CanvasGradient>();
-function glow(ctx: CanvasRenderingContext2D, r: number, key: string, stops: [number, string][]): CanvasGradient {
-  const g = glowCache.get(key);
-  if (g) return g;
-  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-  for (const [o, c] of stops) grad.addColorStop(o, c);
-  glowCache.set(key, grad);
-  return grad;
-}
 
 // ---------------------------------------------------------------------------
 // Weapon drawing — drawn pointing along +x (grip at origin).
@@ -65,6 +67,7 @@ export function drawWeapon(
   t = 0,
   swing = 0
 ) {
+  if (!ctx) return;
   drawPixelWeapon(ctx, gun, accent, t, swing);
 }
 
@@ -72,80 +75,213 @@ export function drawWeapon(
 // Hat drawing (forward = +x)
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// Hat drawing (forward = +x) — 16-bit pixelated hats
 // ---------------------------------------------------------------------------
-function drawHat(
+// Hat drawing (forward = +x) — 16-bit pixelated hats with animated cyber visors (F01)
+// ---------------------------------------------------------------------------
+export function drawHat(
   ctx: CanvasRenderingContext2D,
   hat: HatType,
   accent: string,
-  r: number
+  r: number,
+  t: number = 0,
+  isFlash: boolean = false,
+  visorGlowColor?: string
 ) {
+  if (!ctx) return;
+  if (hat === "none") return;
   ctx.save();
+
+  if (isFlash) {
+    // Pure white silhouette on damage flash (F04)
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    if (hat === "helmet") {
+      ctx.fillRect(Math.round(-r * 0.5), Math.round(-r * 0.55), Math.round(r * 1.05), Math.round(r * 1.1));
+      ctx.strokeRect(Math.round(-r * 0.5), Math.round(-r * 0.55), Math.round(r * 1.05), Math.round(r * 1.1));
+    } else if (hat === "cap") {
+      ctx.fillRect(Math.round(-r * 0.45), Math.round(-r * 0.5), Math.round(r * 0.9), Math.round(r * 1.0));
+      ctx.fillRect(Math.round(r * 0.45), Math.round(-r * 0.35), Math.round(r * 0.5), Math.round(r * 0.7));
+    } else if (hat === "hood") {
+      ctx.fillRect(Math.round(-r * 0.62), Math.round(-r * 0.62), Math.round(r * 1.24), Math.round(r * 1.24));
+    } else if (hat === "visor") {
+      ctx.fillRect(Math.round(-r * 0.35), Math.round(-r * 0.5), Math.round(r * 0.75), Math.round(r * 1.0));
+    } else if (hat === "alien") {
+      ctx.fillRect(Math.round(r * 0.1), Math.round(-r * 0.4), Math.round(r * 0.4), Math.round(r * 0.8));
+    } else if (hat === "monkey") {
+      ctx.fillRect(Math.round(-r * 0.2), Math.round(-r * 0.8), Math.round(r * 0.4), Math.round(r * 1.6));
+    } else if (hat === "tycoon") {
+      ctx.fillRect(Math.round(-r * 0.7), Math.round(-r * 0.65), Math.round(r * 1.4), Math.round(r * 1.3));
+      ctx.fillRect(Math.round(-r * 0.45), Math.round(-r * 0.45), Math.round(r * 0.9), Math.round(r * 0.9));
+    }
+    ctx.restore();
+    return;
+  }
+
   if (hat === "helmet") {
-    // Pixel Tactical Combat Helmet
+    // 1. Pixel Tactical Combat Helmet Base
     ctx.fillStyle = accent;
-    ctx.fillRect(Math.round(-r * 0.5), Math.round(-r * 0.55), Math.round(r * 1.05), Math.round(r * 1.1));
+    const hx = Math.round(-r * 0.5);
+    const hy = Math.round(-r * 0.55);
+    const hw = Math.round(r * 1.05);
+    const hh = Math.round(r * 1.1);
+    ctx.fillRect(hx, hy, hw, hh);
     ctx.strokeStyle = "rgba(8,10,25,0.85)";
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(Math.round(-r * 0.5), Math.round(-r * 0.55), Math.round(r * 1.05), Math.round(r * 1.1));
-    // Visor brow strip
-    ctx.fillStyle = "rgba(190,230,255,0.9)";
-    ctx.fillRect(Math.round(r * 0.2), Math.round(-r * 0.45), Math.round(r * 0.42), Math.round(r * 0.9));
+    ctx.strokeRect(hx, hy, hw, hh);
+
+    // Top crown bevel / highlight ridge
+    ctx.fillStyle = shade(accent, 0.2);
+    ctx.fillRect(hx + 2, hy + 1, hw - 4, 2);
+
+    // 2. Visor Brow Socket & Dark Backing
+    const vx = Math.round(r * 0.18);
+    const vy = Math.round(-r * 0.45);
+    const vw = Math.round(r * 0.44);
+    const vh = Math.round(r * 0.9);
+    ctx.fillStyle = "rgba(8,12,28,0.95)";
+    ctx.fillRect(vx, vy, vw, vh);
+
+    // 3. Animated Pulsating Glowing Visor Slit (F01)
+    const vColor = visorGlowColor || "#38bdf8";
+    const vPulse = 0.75 + 0.25 * Math.sin(t * 8);
+
+    // Outer cyan/neon glow halo fringe
+    ctx.fillStyle = rgba(vColor, 0.45 * vPulse);
+    ctx.fillRect(vx + 1, vy + 2, vw - 2, vh - 4);
+
+    // High-intensity central visor slit
+    ctx.fillStyle = rgba(vColor, vPulse);
+    ctx.fillRect(vx + 2, vy + 4, vw - 4, vh - 8);
+
+    // Center white specular shine glint (moving glint oscillation)
+    const glintY = Math.round(Math.sin(t * 6) * (vh * 0.22));
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(vx + 3, glintY - 1, vw - 6, 2);
+
   } else if (hat === "cap") {
-    // Pixel Forward Cap
+    // Pixel Forward Tactical Cap
     ctx.fillStyle = accent;
     ctx.fillRect(Math.round(-r * 0.45), Math.round(-r * 0.5), Math.round(r * 0.9), Math.round(r * 1.0));
     ctx.strokeStyle = "rgba(8,10,25,0.7)";
     ctx.lineWidth = 1.2;
     ctx.strokeRect(Math.round(-r * 0.45), Math.round(-r * 0.5), Math.round(r * 0.9), Math.round(r * 1.0));
-    // Peak / Visor
-    ctx.fillStyle = shade(accent, -0.2);
+
+    // Peak / Visor Brim
+    ctx.fillStyle = shade(accent, -0.22);
     ctx.fillRect(Math.round(r * 0.45), Math.round(-r * 0.35), Math.round(r * 0.5), Math.round(r * 0.7));
-  } else if (hat === "hood") {
-    // Pixel Assassin Hood
-    ctx.fillStyle = shade(accent, -0.12);
-    ctx.fillRect(Math.round(-r * 0.6), Math.round(-r * 0.6), Math.round(r * 1.2), Math.round(r * 1.2));
     ctx.strokeStyle = "rgba(8,10,25,0.6)";
+    ctx.strokeRect(Math.round(r * 0.45), Math.round(-r * 0.35), Math.round(r * 0.5), Math.round(r * 0.7));
+
+    // Cap front insignia / team badge
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(Math.round(r * 0.15), -1, 3, 3);
+    ctx.fillStyle = accent;
+    ctx.fillRect(Math.round(r * 0.15) + 1, 0, 1, 1);
+
+  } else if (hat === "hood") {
+    // Pixel Assassin Hood with layered shadow cowl
+    const hx = Math.round(-r * 0.62);
+    const hy = Math.round(-r * 0.62);
+    const hw = Math.round(r * 1.24);
+    const hh = Math.round(r * 1.24);
+    // Outer cowl fold
+    ctx.fillStyle = shade(accent, -0.15);
+    ctx.fillRect(hx, hy, hw, hh);
+    ctx.strokeStyle = "rgba(8,10,25,0.65)";
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(Math.round(-r * 0.6), Math.round(-r * 0.6), Math.round(r * 1.2), Math.round(r * 1.2));
+    ctx.strokeRect(hx, hy, hw, hh);
+
+    // Inner deep shadow fold around face opening
+    ctx.fillStyle = shade(accent, -0.38);
+    ctx.fillRect(Math.round(-r * 0.15), Math.round(-r * 0.42), Math.round(r * 0.68), Math.round(r * 0.84));
+
+    // Hood peak point at back/top
+    ctx.fillStyle = shade(accent, -0.2);
+    ctx.fillRect(Math.round(-r * 0.75), -2, 4, 4);
+
+    // Accent trim line
+    ctx.fillStyle = accent;
+    ctx.fillRect(hx + 1, hy + 1, hw - 2, 2);
+
   } else if (hat === "visor") {
-    // Pixel Cyber Visor
-    ctx.fillStyle = "rgba(8,12,30,0.92)";
-    ctx.fillRect(Math.round(-r * 0.35), Math.round(-r * 0.5), Math.round(r * 0.75), Math.round(r * 1.0));
+    // Pixel Cyber Visor with animated neon core & glint sweep (F01)
+    const vx = Math.round(-r * 0.35);
+    const vy = Math.round(-r * 0.5);
+    const vw = Math.round(r * 0.75);
+    const vh = Math.round(r * 1.0);
+    ctx.fillStyle = "rgba(8,12,30,0.95)";
+    ctx.fillRect(vx, vy, vw, vh);
     ctx.strokeStyle = accent;
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(Math.round(-r * 0.35), Math.round(-r * 0.5), Math.round(r * 0.75), Math.round(r * 1.0));
-    // Glowing neon visor line
-    ctx.fillStyle = accent;
+    ctx.strokeRect(vx, vy, vw, vh);
+
+    // Animated glowing neon visor bar
+    const vColor = visorGlowColor || accent;
+    const vPulse = 0.7 + 0.3 * Math.sin(t * 8);
+
+    // Outer neon glow
+    ctx.fillStyle = rgba(vColor, 0.4 + 0.4 * vPulse);
     ctx.fillRect(Math.round(r * 0.15), Math.round(-r * 0.45), Math.round(r * 0.35), Math.round(r * 0.9));
+
+    // Core bright laser strip
+    ctx.fillStyle = rgba(vColor, vPulse);
+    ctx.fillRect(Math.round(r * 0.2), Math.round(-r * 0.38), Math.round(r * 0.25), Math.round(r * 0.76));
+
+    // Dynamic Cyber Visor Scanline / Highlight Glint Sweep
+    const sweepY = Math.sin(t * 6) * (r * 0.28);
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillRect(Math.round(r * 0.22), Math.round(sweepY - 1), Math.round(r * 0.2), 2);
+
   } else if (hat === "alien") {
-    // Pixel Alien head with square eyes & stepped antennae
+    // Pixel Alien head with optic sockets & pulsating antenna beacons
     ctx.fillStyle = "#0b1020";
     ctx.fillRect(Math.round(r * 0.1), Math.round(-r * 0.4), Math.round(r * 0.4), Math.round(r * 0.28));
     ctx.fillRect(Math.round(r * 0.1), Math.round(r * 0.12), Math.round(r * 0.4), Math.round(r * 0.28));
-    ctx.fillStyle = accent;
+
+    // Glowing pupil glint
+    const eyePulse = 0.75 + 0.25 * Math.sin(t * 6);
+    ctx.fillStyle = rgba(accent, eyePulse);
     ctx.fillRect(Math.round(r * 0.25), Math.round(-r * 0.3), 3, 3);
     ctx.fillRect(Math.round(r * 0.25), Math.round(r * 0.2), 3, 3);
-    // Antennae pixels
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(Math.round(r * 0.27), Math.round(-r * 0.28), 1, 1);
+    ctx.fillRect(Math.round(r * 0.27), Math.round(r * 0.22), 1, 1);
+
+    // Antennae pixels with pulsating beacon tips
+    const beaconPulse = 0.5 + 0.5 * Math.sin(t * 10);
     for (const sy of [-1, 1]) {
       const ay = sy > 0 ? Math.round(r * 0.55) : Math.round(-r * 0.75);
       ctx.fillStyle = accent;
       ctx.fillRect(Math.round(-r * 0.2), ay, 4, 4);
       ctx.fillRect(Math.round(-r * 0.4), sy > 0 ? ay + 3 : ay - 3, 4, 4);
+      // Beacon tip
+      ctx.fillStyle = rgba("#ffffff", beaconPulse);
+      ctx.fillRect(Math.round(-r * 0.42), sy > 0 ? ay + 4 : ay - 4, 2, 2);
     }
+
   } else if (hat === "monkey") {
     // Pixel Monkey Ears & Muzzle
     ctx.fillStyle = shade(accent, -0.1);
     ctx.fillRect(Math.round(-r * 0.2), Math.round(-r * 0.8), Math.round(r * 0.4), Math.round(r * 0.35));
     ctx.fillRect(Math.round(-r * 0.2), Math.round(r * 0.45), Math.round(r * 0.4), Math.round(r * 0.35));
+    ctx.fillStyle = shade(accent, -0.25);
+    ctx.fillRect(Math.round(-r * 0.15), Math.round(-r * 0.72), Math.round(r * 0.25), Math.round(r * 0.2));
+    ctx.fillRect(Math.round(-r * 0.15), Math.round(r * 0.52), Math.round(r * 0.25), Math.round(r * 0.2));
+
     // Muzzle
     ctx.fillStyle = "#e8c79a";
     ctx.fillRect(Math.round(r * 0.2), Math.round(-r * 0.25), Math.round(r * 0.45), Math.round(r * 0.5));
     ctx.fillStyle = "rgba(40,25,15,0.8)";
     ctx.fillRect(Math.round(r * 0.45), -2, 2, 2);
     ctx.fillRect(Math.round(r * 0.45), 1, 2, 2);
+
+    // Headband
+    ctx.fillStyle = accent;
+    ctx.fillRect(Math.round(-r * 0.35), Math.round(-r * 0.45), Math.round(r * 0.75), 3);
+
   } else if (hat === "tycoon") {
-    // Pixel Top Hat 🎩 with gold band
+    // Pixel Top Hat 🎩 with gold band & specular shimmer tick
     ctx.fillStyle = "#0b0c22";
     // Brim
     ctx.fillRect(Math.round(-r * 0.7), Math.round(-r * 0.65), Math.round(r * 1.4), Math.round(r * 1.3));
@@ -158,21 +294,210 @@ function drawHat(
     // Gold band
     ctx.fillStyle = accent;
     ctx.fillRect(Math.round(-r * 0.45), Math.round(-r * 0.08), Math.round(r * 0.9), 3);
+    // Specular shine pixel sliding across band
+    const shineX = Math.round(-r * 0.45 + ((t * 1.6) % 1.0) * (r * 0.9));
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillRect(shineX, Math.round(-r * 0.08), 2, 3);
   }
+
   ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
-// Character drawing — top-down, forward = +x (rotate the context to the aim)
-// 16-bit Neo-Retro Pixel Character Rendering with Zero-GC overhead
+// Forcefield Shield Halo — 16-bit rotating dashed octagon (F05)
 // ---------------------------------------------------------------------------
-export interface DrawCharOpts {
+export function drawShieldHalo(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  time: number,
+  shieldTime: number
+): void {
+  if (!ctx) return;
+  if (shieldTime <= 0) return;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  const alpha = Math.min(1, shieldTime / 0.6);
+  const pulse = 1 + Math.sin(time * 8) * 0.04;
+  const rr = Math.round(radius * 1.85 * pulse);
+
+  // 1. Inner translucent energy fill
+  ctx.fillStyle = rgba("#38bdf8", alpha * 0.16);
+  ctx.beginPath();
+  const rot = time * 2.0;
+  for (let i = 0; i < 8; i++) {
+    const a = rot + (i * Math.PI) / 4;
+    const px = Math.round(Math.cos(a) * rr);
+    const py = Math.round(Math.sin(a) * rr);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. Animated rotating octagonal dashed shield boundary
+  ctx.strokeStyle = rgba("#60a5fa", alpha * 0.85);
+  ctx.lineWidth = 2;
+  if (typeof ctx.setLineDash === "function") {
+    ctx.setLineDash([5, 4]);
+  }
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = rot + (i * Math.PI) / 4;
+    const px = Math.round(Math.cos(a) * rr);
+    const py = Math.round(Math.sin(a) * rr);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  if (typeof ctx.setLineDash === "function") {
+    ctx.setLineDash([]);
+  }
+
+  // 3. 8 Octagonal corner node highlights
+  for (let i = 0; i < 8; i++) {
+    const a = rot + (i * Math.PI) / 4;
+    const nx = Math.round(Math.cos(a) * rr);
+    const ny = Math.round(Math.sin(a) * rr);
+    // Outer cyan node
+    ctx.fillStyle = rgba("#60a5fa", alpha * 0.95);
+    ctx.fillRect(nx - 2, ny - 2, 4, 4);
+    // Core white pixel glint
+    ctx.fillStyle = rgba("#ffffff", alpha);
+    ctx.fillRect(nx - 1, ny - 1, 2, 2);
+  }
+
+  // 4. 4 Counter-rotating orbiting satellite spark nodes
+  const satRot = -time * 3.2;
+  const satR = rr + 5;
+  for (let i = 0; i < 4; i++) {
+    const a = satRot + (i * Math.PI) / 2;
+    const sx = Math.round(Math.cos(a) * satR);
+    const sy = Math.round(Math.sin(a) * satR);
+    ctx.fillStyle = rgba("#93c5fd", alpha * 0.9);
+    ctx.fillRect(sx - 2, sy - 2, 4, 4);
+    ctx.fillStyle = rgba("#ffffff", alpha);
+    ctx.fillRect(sx - 1, sy - 1, 2, 2);
+  }
+
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Respawn / Invulnerability Golden Protection Ring (F06)
+// ---------------------------------------------------------------------------
+export function drawRespawnProtectionRing(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  time: number,
+  iframes: number
+): void {
+  if (!ctx) return;
+  if (iframes <= 0) return;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+
+  const alpha = Math.min(1, iframes / 0.5) * (0.65 + 0.35 * Math.sin(time * 12));
+  const pulse = Math.sin(time * 6) * 1.5;
+  const r = Math.round(radius * 1.7 + pulse);
+
+  // 1. Concentric inner golden aura
+  ctx.fillStyle = rgba("#fbbf24", alpha * 0.18);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Main concentric golden glowing protection ring
+  ctx.strokeStyle = rgba("#fbbf24", alpha * 0.9);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 3. Outer dashed golden radiant ring
+  ctx.strokeStyle = rgba("#fde047", alpha * 0.75);
+  ctx.lineWidth = 1.5;
+  if (typeof ctx.setLineDash === "function") {
+    ctx.setLineDash([4, 3]);
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, r + 4, 0, Math.PI * 2);
+  ctx.stroke();
+  if (typeof ctx.setLineDash === "function") {
+    ctx.setLineDash([]);
+  }
+
+  // 4. Shimmering Radian Ticks (12 radial tick notches)
+  const tickRot = time * 1.8;
+  ctx.strokeStyle = rgba("#fde047", alpha * 0.9);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < 12; i++) {
+    const phi = tickRot + (i * Math.PI) / 6;
+    const cos = Math.cos(phi);
+    const sin = Math.sin(phi);
+    ctx.moveTo(Math.round(cos * (r - 3)), Math.round(sin * (r - 3)));
+    ctx.lineTo(Math.round(cos * (r + 4)), Math.round(sin * (r + 4)));
+  }
+  ctx.stroke();
+
+  // 5. 6 Orbiting Golden Diamond Rune Glyphs
+  const runeRot = -time * 2.2;
+  const runeR = r + 7;
+  for (let k = 0; k < 6; k++) {
+    const a = runeRot + (k * Math.PI) / 3;
+    const rx = Math.round(Math.cos(a) * runeR);
+    const ry = Math.round(Math.sin(a) * runeR);
+    // Diamond shape
+    ctx.fillStyle = rgba("#fbbf24", alpha * 0.95);
+    ctx.fillRect(rx - 2, ry - 1, 4, 2);
+    ctx.fillRect(rx - 1, ry - 2, 2, 4);
+    ctx.fillStyle = rgba("#ffffff", alpha);
+    ctx.fillRect(rx - 1, ry - 1, 2, 2);
+  }
+
+  // 6. Orbiting golden sparkle particles
+  for (let i = 0; i < 4; i++) {
+    const sa = time * 3.5 + (i * Math.PI) / 2;
+    const sr = r - 4 + Math.sin(time * 8 + i) * 3;
+    const sx = Math.round(Math.cos(sa) * sr);
+    const sy = Math.round(Math.sin(sa) * sr);
+    ctx.fillStyle = rgba("#fef08a", alpha * 0.85);
+    ctx.fillRect(sx - 1, sy - 1, 2, 2);
+  }
+
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Character drawing options & interfaces (F01–F07)
+// ---------------------------------------------------------------------------
+export interface CharacterDrawOptions {
+  visorGlowColor?: string;
+  visorPulse?: number;
+  hasCape?: boolean;
+  capeColor?: string;
+  armorLevel?: number;
+  isHurtFlash?: boolean;
+  shieldActive?: boolean;
+  isInvulnerable?: boolean;
+  isCloaked?: boolean;
+  walkCycle?: number;
+  aimAngle?: number;
+}
+
+export interface DrawCharOpts extends Partial<CharacterDrawOptions> {
   x: number;
   y: number;
   angle: number;
   character: CharacterDef;
   outfit: OutfitDef;
   size: number;
+  speed?: number;
   t?: number;
   flash?: number;
   glow?: string;
@@ -193,32 +518,55 @@ export function drawCharacter(
   ctx: CanvasRenderingContext2D,
   opts: DrawCharOpts
 ) {
-  const { x, y, angle, character, outfit, size, flash = 0 } = opts;
+  if (!ctx) return;
+  const { x, y, angle, character, outfit, size } = opts;
   const t = opts.t ?? 0;
   const isMoving = (opts.speed ?? 0) > 10;
-  // 4-frame discrete idle cycle (0, 1, 2, 3)
+  const isFlash = ((opts.flash ?? 0) > 0) || Boolean(opts.isHurtFlash);
+
+  // Gait Bobbing & Run Animation (F03)
+  const runCycle = opts.walkCycle !== undefined ? opts.walkCycle : (t * 9);
+  const runFrame = Math.floor(Math.abs(runCycle)) % 6;
   const idleFrame = Math.floor((t * 4) % 4);
   const idleBob = (idleFrame === 1 || idleFrame === 2) ? 1 : 0;
-  // 6-frame discrete running cycle (0..5)
-  const runFrame = Math.floor((t * 9) % 6);
-  const bootOffL = isMoving
-    ? (runFrame === 0 ? 3 : runFrame === 1 ? 4 : runFrame === 2 ? 1 : runFrame === 3 ? -3 : runFrame === 4 ? -4 : -1)
-    : 0;
-  const bootOffR = isMoving ? -bootOffL : 0;
-  const bodyBob = isMoving ? ((runFrame === 1 || runFrame === 4) ? 1 : 0) : idleBob;
+
+  let bootOffL = 0;
+  let bootOffR = 0;
+  let bootLiftL = 0;
+  let bootLiftR = 0;
+  if (isMoving) {
+    switch (runFrame) {
+      case 0: bootOffL = 4; bootOffR = -4; bootLiftL = 0; bootLiftR = 0; break;
+      case 1: bootOffL = 2; bootOffR = -2; bootLiftL = -1; bootLiftR = 0; break;
+      case 2: bootOffL = 0; bootOffR = 0; bootLiftL = 0; bootLiftR = 0; break;
+      case 3: bootOffL = -4; bootOffR = 4; bootLiftL = 0; bootLiftR = 0; break;
+      case 4: bootOffL = -2; bootOffR = 2; bootLiftL = 0; bootLiftR = -1; break;
+      case 5: bootOffL = 0; bootOffR = 0; bootLiftL = 0; bootLiftR = 0; break;
+    }
+  }
+  const bodyBob = isMoving
+    ? (runFrame === 1 || runFrame === 4 ? 1 : (runFrame === 2 || runFrame === 5 ? -1 : 0))
+    : idleBob;
 
   ctx.save();
+
+  // Stealth Refraction & Transparency (F07)
   if (opts.isCloaked) {
-    ctx.globalAlpha = opts.cloakAlpha ?? 0.15;
+    ctx.globalAlpha = opts.cloakAlpha ?? 0.18;
   }
 
-  // 1. Stepped Pixel Shadow (dithered pixel shadow)
+  // 1. Stepped Pixel Drop Shadow Under Feet (F03)
   ctx.save();
-  ctx.fillStyle = "rgba(0,0,0,0.32)";
   const sy = Math.round(y + size * 0.74);
   const sw = Math.round(size * 0.9);
-  ctx.fillRect(Math.round(x - sw), sy - 3, sw * 2, 6);
+  // Outer rim
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.fillRect(Math.round(x - sw * 1.1), sy - 3, Math.round(sw * 2.2), 6);
+  // Mid tier
+  ctx.fillStyle = "rgba(0,0,0,0.26)";
   ctx.fillRect(Math.round(x - sw * 0.75), sy - 6, Math.round(sw * 1.5), 12);
+  // Core contact shadow
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
   ctx.fillRect(Math.round(x - sw * 0.4), sy - 8, Math.round(sw * 0.8), 16);
   ctx.restore();
 
@@ -231,24 +579,49 @@ export function drawCharacter(
 
   const r = Math.round(size);
   const suit = outfit.suit;
-  const suitDark = outfit.suitDark;
-  const isFlash = flash > 0;
 
-  // 2. Chunky Pixel Boots (with 6-frame run stepping)
+  // 2. Multi-layer Cloak & Cape (F02) — Layer 1.5 (Behind torso/boots)
+  const hasCape = opts.hasCape ?? (outfit.hat === "hood" || outfit.id === "assassin" || outfit.id === "cloak");
+  if (hasCape) {
+    const capeCol = opts.capeColor || (outfit.hat === "hood" ? outfit.suit : outfit.accent);
+    const sway = (isMoving ? Math.sin(t * 9) * 3.5 : Math.sin(t * 3) * 1.2);
+    const wave2 = Math.cos(t * 8) * (isMoving ? 2 : 0.8);
+
+    // Inner shadow cape layer
+    ctx.fillStyle = isFlash ? "#ffffff" : shade(capeCol, -0.38);
+    ctx.fillRect(Math.round(-r * 1.45), Math.round(-r * 0.7 + sway), Math.round(r * 0.9), Math.round(r * 1.4));
+
+    // Outer cape fold layer
+    ctx.fillStyle = isFlash ? "#ffffff" : shade(capeCol, -0.18);
+    ctx.fillRect(Math.round(-r * 1.35), Math.round(-r * 0.58 + sway * 0.8 + wave2 * 0.5), Math.round(r * 0.8), Math.round(r * 1.16));
+
+    // Cape accent rim hem
+    ctx.fillStyle = isFlash ? "#ffffff" : outfit.accent;
+    ctx.fillRect(Math.round(-r * 1.45), Math.round(-r * 0.65 + sway), 2, Math.round(r * 1.3));
+
+    if (!isFlash) {
+      ctx.strokeStyle = DARK;
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(Math.round(-r * 1.45), Math.round(-r * 0.7 + sway), Math.round(r * 0.9), Math.round(r * 1.4));
+    }
+  }
+
+  // 3. Chunky Pixel Boots (with 6-frame run stepping & gait lift)
   ctx.fillStyle = isFlash ? "#ffffff" : shade(suit, -0.22);
-  ctx.strokeStyle = DARK;
+  ctx.strokeStyle = isFlash ? "#ffffff" : DARK;
   ctx.lineWidth = 1.8;
   for (const bsy of [-1, 1]) {
     const isLeft = bsy < 0;
     const bOff = isLeft ? bootOffL : bootOffR;
-    const by = bsy > 0 ? Math.round(r * 0.26) : Math.round(-r * 0.6);
+    const bLift = isLeft ? bootLiftL : bootLiftR;
+    const by = (bsy > 0 ? Math.round(r * 0.26) : Math.round(-r * 0.6)) + bLift;
     ctx.fillRect(Math.round(-r * 1.15 + bOff), by, Math.round(r * 0.52), Math.round(r * 0.34));
     ctx.strokeRect(Math.round(-r * 1.15 + bOff), by, Math.round(r * 0.52), Math.round(r * 0.34));
   }
 
-  // 3. Chunky Pixel Tactical Backpack / Rig (with 4/6-frame bob)
+  // 4. Chunky Pixel Tactical Backpack / Rig (with synchronized bob)
   ctx.fillStyle = isFlash ? "#ffffff" : shade(suit, -0.16);
-  ctx.strokeStyle = DARK;
+  ctx.strokeStyle = isFlash ? "#ffffff" : DARK;
   ctx.lineWidth = 1.8;
   const packW = Math.round(r * 0.5);
   const packH = Math.round(r * 0.96);
@@ -256,13 +629,13 @@ export function drawCharacter(
   const packY = Math.round(-packH / 2);
   ctx.fillRect(packX, packY, packW, packH);
   ctx.strokeRect(packX, packY, packW, packH);
-  // Backpack vibrant accent stripe
-  ctx.fillStyle = outfit.accent;
+  // Backpack accent stripe
+  ctx.fillStyle = isFlash ? "#ffffff" : outfit.accent;
   ctx.fillRect(packX + 2, packY + 2, 3, packH - 4);
 
-  // 4. Chunky Pixel Torso (Bold solid pixel block + frame bob)
+  // 5. Chunky Pixel Torso (Solid block + bob)
   ctx.fillStyle = isFlash ? "#ffffff" : suit;
-  ctx.strokeStyle = DARK;
+  ctx.strokeStyle = isFlash ? "#ffffff" : DARK;
   ctx.lineWidth = 2.2;
   const torsoW = Math.round(r * 1.5);
   const torsoH = Math.round(r * 1.3);
@@ -283,43 +656,62 @@ export function drawCharacter(
   ctx.fill();
   ctx.stroke();
 
-  // 5. High-Saturation Chest Armor Plate & Insignia
+  // 6. Multi-layer Chest Armor Plate Grading & Insignia (F02)
   if (!isFlash) {
-    ctx.fillStyle = character.bodyColor;
     const plateW = Math.round(r * 0.65);
     const plateH = Math.round(r * 0.72);
     const plateX = Math.round(torsoX + torsoW * 0.42);
     const plateY = Math.round(-plateH / 2);
+
+    // Tier 1 Base Armor Plate
+    ctx.fillStyle = character.bodyColor;
     ctx.fillRect(plateX, plateY, plateW, plateH);
     ctx.strokeStyle = DARK;
     ctx.lineWidth = 1.4;
     ctx.strokeRect(plateX, plateY, plateW, plateH);
 
-    // Accent insignia center dot (large 4x4 block)
+    // Tier 2 Bevel Top Highlight & Bottom Shadow
+    ctx.fillStyle = shade(character.bodyColor, 0.2);
+    ctx.fillRect(plateX + 1, plateY + 1, plateW - 2, 2);
+    ctx.fillStyle = shade(character.bodyColor, -0.28);
+    ctx.fillRect(plateX + 1, plateY + plateH - 3, plateW - 2, 2);
+
+    // Tier 3 Central Reactor Insignia
     ctx.fillStyle = character.accent;
     ctx.fillRect(plateX + Math.round(plateW / 2) - 3, plateY + Math.round(plateH / 2) - 3, 6, 6);
+    // Glowing reactor center glint
+    const coreAlpha = 0.7 + 0.3 * Math.sin(t * 6);
+    ctx.fillStyle = rgba("#ffffff", coreAlpha);
+    ctx.fillRect(plateX + Math.round(plateW / 2) - 1, plateY + Math.round(plateH / 2) - 1, 2, 2);
 
-    // Utility belt pouches (solid chunky pixel squares)
+    // Utility belt pouches
     ctx.fillStyle = shade(suit, -0.32);
     for (const py of [-r * 0.48, -r * 0.16, r * 0.16, r * 0.48]) {
       ctx.fillRect(Math.round(torsoX + 2), Math.round(py - 3), 5, 6);
     }
   }
 
-  // 6. Shoulders + Arms
+  // 7. Shoulders (Pauldrons) + Arms (F02)
   const swing = opts.meleeSwing ?? 0;
   const lean = swing > 0 ? Math.sin(swing * Math.PI) * r * 0.24 : 0;
   ctx.fillStyle = isFlash ? "#ffffff" : shade(suit, -0.06);
-  ctx.strokeStyle = DARK;
+  ctx.strokeStyle = isFlash ? "#ffffff" : DARK;
   ctx.lineWidth = 1.8;
 
-  // Shoulder blocks
+  // Multi-tier Shoulder Pauldron Blocks (F02)
   for (const sy of [-1, 1]) {
     const shX = Math.round(r * (0.2 + lean) - r * 0.22);
     const shY = Math.round(sy * r * 0.62 - r * 0.22);
     const shSz = Math.round(r * 0.46);
+    // Upper pauldron plate
+    ctx.fillStyle = isFlash ? "#ffffff" : shade(suit, 0.08);
     ctx.fillRect(shX, shY, shSz, shSz);
     ctx.strokeRect(shX, shY, shSz, shSz);
+    // Pauldron accent trim
+    if (!isFlash) {
+      ctx.fillStyle = outfit.accent;
+      ctx.fillRect(shX + 1, shY + 1, 2, shSz - 2);
+    }
   }
 
   // Left arm (resting)
@@ -349,15 +741,15 @@ export function drawCharacter(
   ctx.fillRect(weaponHandX - 4, weaponHandY - 4, 8, 8);
   ctx.strokeRect(weaponHandX - 4, weaponHandY - 4, 8, 8);
 
-  // 7. Chunky Pixel Head & Helmet / Visor (forward, +x)
-  const headX = Math.round(r * 0.18);
+  // 8. Chunky Pixel Head & Helmet / Visor
+  const headX = Math.round(r * 0.18 + bodyBob * 0.5);
   const headW = Math.round(r * 0.84);
   const headH = Math.round(r * 0.84);
   const headLeft = Math.round(headX - headW / 2);
   const headTop = Math.round(-headH / 2);
 
   ctx.fillStyle = isFlash ? "#ffffff" : (outfit.skin ?? character.skin);
-  ctx.strokeStyle = DARK;
+  ctx.strokeStyle = isFlash ? "#ffffff" : DARK;
   ctx.lineWidth = 1.8;
   ctx.fillRect(headLeft, headTop, headW, headH);
   ctx.strokeRect(headLeft, headTop, headW, headH);
@@ -383,13 +775,13 @@ export function drawCharacter(
     ctx.fillRect(eyeX + 1, Math.round(r * 0.08), 1, 1);
   }
 
-  // 8. Pixel Hat
+  // 9. Pixel Hat / Helmet / Visor (F01)
   ctx.save();
   ctx.translate(headX, 0);
-  drawHat(ctx, outfit.hat, outfit.suit, r * 0.62);
+  drawHat(ctx, outfit.hat, outfit.suit, r * 0.62, t, isFlash, opts.visorGlowColor);
   ctx.restore();
 
-  // 9. Held Weapon / Gadget
+  // 10. Held Weapon / Gadget
   if (opts.gadget) {
     ctx.save();
     ctx.translate(weaponHandX, weaponHandY);
@@ -407,26 +799,62 @@ export function drawCharacter(
     ctx.restore();
   }
 
-  // 10. Front Pixel Highlight rim
+  // 11. Front Pixel Highlight rim
   if (!isFlash) {
     ctx.fillStyle = outfit.accent;
     ctx.fillRect(torsoX + torsoW - 2, torsoY + 2, 3, torsoH - 4);
   }
 
-  ctx.restore();
-  ctx.restore();
+  ctx.restore(); // pop rotation
+  ctx.restore(); // pop save
 
-  // Cloaked effect (pixel dither shimmer)
+  // 12. Optional Integrated Shield & Protection Rings (F05, F06)
+  if (opts.shieldActive) {
+    drawShieldHalo(ctx, x, y, size, t, 1.0);
+  }
+  if (opts.isInvulnerable) {
+    drawRespawnProtectionRing(ctx, x, y, size, t, 1.0);
+  }
+
+  // 13. Stealth Refraction & Transparency Shimmer (F07)
   if (opts.isCloaked) {
     const pulse = 0.5 + 0.5 * Math.sin(t * 6);
     ctx.save();
-    ctx.fillStyle = rgba("#00f0ff", 0.25 + 0.2 * pulse);
-    // 4 micro corner shimmer pixels
-    const cs = Math.round(size * 0.85);
-    ctx.fillRect(Math.round(x - cs), Math.round(y - cs), 3, 3);
-    ctx.fillRect(Math.round(x + cs - 3), Math.round(y - cs), 3, 3);
-    ctx.fillRect(Math.round(x - cs), Math.round(y + cs - 3), 3, 3);
-    ctx.fillRect(Math.round(x + cs - 3), Math.round(y + cs - 3), 3, 3);
+    const cs = Math.round(size * 0.9);
+
+    // Iridescent Cyan edge fringe
+    ctx.fillStyle = rgba("#22d3ee", (0.3 + 0.2 * pulse) * (opts.cloakAlpha ?? 1));
+    ctx.fillRect(Math.round(x - cs), Math.round(y - cs), cs * 2, 1);
+    ctx.fillRect(Math.round(x - cs), Math.round(y + cs - 1), cs * 2, 1);
+    // Iridescent Magenta/Violet edge fringe
+    ctx.fillStyle = rgba("#c084fc", (0.25 + 0.2 * pulse) * (opts.cloakAlpha ?? 1));
+    ctx.fillRect(Math.round(x - cs), Math.round(y - cs), 1, cs * 2);
+    ctx.fillRect(Math.round(x + cs - 1), Math.round(y - cs), 1, cs * 2);
+
+    // 4 Stepped Corner Digital Glitch Brackets (┌ ┐ └ ┘)
+    const bLen = 5;
+    ctx.fillStyle = rgba("#22d3ee", 0.6 + 0.3 * pulse);
+    // Top-Left ┌
+    ctx.fillRect(Math.round(x - cs), Math.round(y - cs), bLen, 2);
+    ctx.fillRect(Math.round(x - cs), Math.round(y - cs), 2, bLen);
+    // Top-Right ┐
+    ctx.fillRect(Math.round(x + cs - bLen), Math.round(y - cs), bLen, 2);
+    ctx.fillRect(Math.round(x + cs - 2), Math.round(y - cs), 2, bLen);
+    // Bottom-Left └
+    ctx.fillRect(Math.round(x - cs), Math.round(y + cs - 2), bLen, 2);
+    ctx.fillRect(Math.round(x - cs), Math.round(y + cs - bLen), 2, bLen);
+    // Bottom-Right ┘
+    ctx.fillRect(Math.round(x + cs - bLen), Math.round(y + cs - 2), bLen, 2);
+    ctx.fillRect(Math.round(x + cs - 2), Math.round(y + cs - bLen), 2, bLen);
+
+    // Micro Glitch Artifact Pixels
+    for (let i = 0; i < 4; i++) {
+      const gx = Math.round(x + Math.sin(t * 12 + i * 2.5) * (size * 0.8));
+      const gy = Math.round(y + Math.cos(t * 10 + i * 1.8) * (size * 0.8));
+      ctx.fillStyle = i % 2 === 0 ? "rgba(34, 211, 238, 0.7)" : "rgba(192, 132, 252, 0.7)";
+      ctx.fillRect(gx - 1, gy - 1, 2, 2);
+    }
+
     ctx.restore();
   }
 }
@@ -450,6 +878,7 @@ export interface DrawMonsterOpts {
 }
 
 export function drawMonster(ctx: CanvasRenderingContext2D, opts: DrawMonsterOpts) {
+  if (!ctx) return;
   const { behavior, size, color, glow, angle, t } = opts;
   const flash = opts.flash ?? 0;
   const poison = opts.poison ?? false;
@@ -609,6 +1038,7 @@ export function roundRect(
   h: number,
   r: number
 ) {
+  if (!ctx) return;
   if (r <= 1 || w < 6 || h < 6) {
     ctx.beginPath();
     ctx.rect(x, y, w, h);
@@ -640,6 +1070,7 @@ export function drawWeaponIcon(
   glow: string,
   gun?: GunDef
 ) {
+  if (!ctx) return;
   drawPixelWeaponIcon(ctx, iconShape, cx, cy, s * 2, glow, gun);
 }
 
@@ -650,6 +1081,7 @@ export function drawGadgetIcon(
   cy: number,
   s: number
 ) {
+  if (!ctx) return;
   ctx.save();
   ctx.translate(cx, cy);
   const sc = s / 16;
@@ -997,6 +1429,7 @@ export function drawGadgetModel(
   color: string,
   t: number = 0
 ) {
+  if (!ctx) return;
   ctx.lineJoin = "miter";
   ctx.lineCap = "square";
 
@@ -1113,5 +1546,6 @@ export function drawWeaponModel(
   cy: number,
   size: number
 ) {
+  if (!ctx) return;
   drawPixelWeaponIcon(ctx, gun.iconShape || gun.shape || gun.id, cx, cy, size, gun.glow, gun);
 }

@@ -68,6 +68,12 @@ function botLOS(x0: number, y0: number, x1: number, y1: number): boolean {
   return true;
 }
 
+let _gScore = new Float32Array(0);
+let _fScore = new Float32Array(0);
+let _cameFrom = new Int32Array(0);
+let _inOpen = new Uint8Array(0);
+let _lastCells = 0;
+
 function findBotPath(startX: number, startY: number, targetX: number, targetY: number, pSize: number): { x: number; y: number } {
   if (botLOS(startX, startY, targetX, targetY)) {
     const ang = Math.atan2(targetY - startY, targetX - startX);
@@ -96,11 +102,22 @@ function findBotPath(startX: number, startY: number, targetX: number, targetY: n
   };
 
   const totalCells = cols * rows;
+  if (totalCells > _lastCells) {
+    _gScore = new Float32Array(totalCells);
+    _fScore = new Float32Array(totalCells);
+    _cameFrom = new Int32Array(totalCells);
+    _inOpen = new Uint8Array(totalCells);
+    _lastCells = totalCells;
+  }
+  _gScore.fill(Infinity, 0, totalCells);
+  _fScore.fill(Infinity, 0, totalCells);
+  _cameFrom.fill(-1, 0, totalCells);
+  _inOpen.fill(0, 0, totalCells);
   const openSet: number[] = [];
-  const gScore = new Float32Array(totalCells).fill(Infinity);
-  const fScore = new Float32Array(totalCells).fill(Infinity);
-  const cameFrom = new Int32Array(totalCells).fill(-1);
-  const inOpen = new Uint8Array(totalCells);
+  const gScore = _gScore;
+  const fScore = _fScore;
+  const cameFrom = _cameFrom;
+  const inOpen = _inOpen;
 
   const startIdx = startRow * cols + startCol;
   const targetIdx = targetRow * cols + targetCol;
@@ -175,7 +192,8 @@ function findBotPath(startX: number, startY: number, targetX: number, targetY: n
     return { x: Math.cos(ang), y: Math.sin(ang) };
   }
 
-  while (cameFrom[curr] !== -1 && cameFrom[curr] !== startIdx) {
+  let traceLimit = 350;
+  while (cameFrom[curr] !== -1 && cameFrom[curr] !== startIdx && traceLimit-- > 0) {
     curr = cameFrom[curr];
   }
 

@@ -20,6 +20,26 @@ canvas {
   image-rendering: crisp-edges;
 }
 
+/* 16-bit Retro CRT Scanline overlay */
+.crt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.18) 50%
+  );
+  background-size: 100% 4px;
+  z-index: 15;
+}
+
+.pixel-font {
+  font-family: 'Press Start 2P', 'ZCOOL KuaiLe', monospace, sans-serif;
+}
+
 .kbd {
   display: inline-block;
   padding: 1px 6px;
@@ -151,8 +171,7 @@ a,
 }
 
 /* ============================================================
-   THE FINALS style helpers — chamfered panels, condensed bold
-   display type, tabular numerals.
+   THE FINALS & OVERWATCH Style HUD Helpers
    ============================================================ */
 
 /* Angular broadcast panels: chamfered (clipped) corners instead of rounded. */
@@ -171,13 +190,30 @@ a,
   );
 }
 
-/* Condensed, heavy, uppercase display type (mirrors THE FINALS' HUD type). */
-.finals-title {
-  font-family: "Arial Narrow", "Roboto Condensed", "DIN Condensed",
+/* Overwatch / The Finals slanted HUD elements */
+.hud-skew {
+  transform: skewX(-8deg);
+}
+.hud-skew-reverse {
+  transform: skewX(8deg);
+}
+
+/* Condensed, heavy, uppercase display type (mirrors THE FINALS & OW HUD type). */
+.finals-title,
+.hud-title {
+  font-family: "Saira Condensed", "Impact", "Arial Narrow", "Roboto Condensed", "DIN Condensed",
     "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-stretch: condensed;
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.hud-numbers {
+  font-family: "Saira Condensed", "Impact", "Arial Black", "Roboto Condensed", "DIN Condensed",
+    sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 /* Monospaced, tabular numbers so scores / timers don't jitter as digits change. */
@@ -185,4 +221,82 @@ a,
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
+
+@keyframes lowHealthPulse {
+  0%, 100% {
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.4), inset 0 0 12px rgba(239, 68, 68, 0.3);
+    border-color: rgba(248, 113, 113, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(239, 68, 68, 0.8), inset 0 0 20px rgba(239, 68, 68, 0.6);
+    border-color: rgba(239, 68, 68, 1);
+  }
+}
+
+.animate-low-health {
+  animation: lowHealthPulse 1s ease-in-out infinite;
+}
+
+@keyframes skillReadyPulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(167, 139, 250, 0.9), 0 0 40px rgba(192, 132, 252, 0.6);
+  }
+}
+
+.animate-skill-ready {
+  animation: skillReadyPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes titleGlow {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(56, 189, 248, 0.6), 0 0 40px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    text-shadow: 0 0 30px rgba(56, 189, 248, 0.9), 0 0 60px rgba(168, 85, 247, 0.7);
+  }
+}
+
+.animate-title-glow {
+  animation: titleGlow 3s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+.animate-live-pulse {
+  animation: livePulse 2s infinite;
+}
+
+.cyber-glass-panel {
+  background: rgba(11, 12, 34, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.cyber-card-glow {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-card-glow:hover {
+  transform: translateY(-2px);
+  border-color: rgba(129, 140, 248, 0.5);
+  box-shadow: 0 12px 30px -10px rgba(99, 102, 241, 0.4);
+}
+
 

@@ -3,12 +3,49 @@
 
 export type NetMode = "local" | "host" | "guest" | "server";
 
-/** Control messages exchanged with the relay server. */
+export interface RoomPeerInfo {
+  pid: number;
+  name: string;
+  isHost: boolean;
+  ready: boolean;
+  loadout?: any;
+  ping?: number;
+}
+
+export interface RoomSummary {
+  code: string;
+  name: string;
+  hostName: string;
+  count: number;
+  max: number;
+  mode: string;
+  state: "lobby" | "in_game" | "summary";
+}
+
+export interface RoomState {
+  code: string;
+  name: string;
+  hostPid: number;
+  mode: string;
+  maxPlayers: number;
+  targetKills: number;
+  state: "lobby" | "in_game" | "summary";
+  peers: RoomPeerInfo[];
+}
+
+/** Control messages exchanged with the relay/authoritative server. */
 export type RelayIn =
   | { t: "create"; name?: string }
   | { t: "join"; room: string; name?: string }
-  | { t: "find"; name?: string } // quick-match: pair with next waiting player
+  | { t: "find"; name?: string; mode?: string } // quick-match: pair with next waiting player
   | { t: "rejoin"; room: string; pid: number; name?: string; loadout?: unknown } // resume a matched room after a transient disconnect
+  | { t: "roomList" }
+  | { t: "createRoom"; name: string; roomName: string; mode?: string; loadout?: unknown }
+  | { t: "joinRoom"; room: string; name: string; loadout?: unknown }
+  | { t: "leaveRoom" }
+  | { t: "setReady"; ready: boolean }
+  | { t: "updateRoomLoadout"; loadout: unknown }
+  | { t: "startMatch" }
   | { t: "msg"; data: GameMsg };
 
 export type RelayOut =
@@ -17,6 +54,9 @@ export type RelayOut =
   | { t: "queued" } // find() accepted, waiting for an opponent
   | { t: "peer"; pid: number; name: string; host: boolean }
   | { t: "start"; youPid?: number }
+  | { t: "roomList"; rooms: RoomSummary[] }
+  | { t: "roomState"; room: RoomState; youPid: number }
+  | { t: "matchStart"; room: string; youPid: number; totalPlayers: number }
   | { t: "msg"; data: GameMsg }
   | { t: "peerGone" } // opponent transiently disconnected (rejoin possible)
   | { t: "peerBack" } // opponent reconnected
@@ -32,7 +72,8 @@ export interface InputFrame {
   vmy: number; // virtual move Y (on-screen joystick, -1..1)
   firing: boolean;
   gadget: number; // -1 none, else 0..2 deploy request (one-shot)
-  weaponSwitch: boolean; // E pressed (one-shot)
+  weaponSwitch: boolean; // E / cycle pressed (one-shot)
+  gunIndex?: number; // direct gun switch request (0..guns.length-1)
   skill: boolean; // Q pressed (one-shot)
   reload: boolean; // R pressed (one-shot)
   secondaryFiring?: boolean;
@@ -41,6 +82,12 @@ export interface InputFrame {
 /** Compact player state for snapshots. */
 export interface SnapPlayer {
   id: number;
+  name?: string;
+  isBot?: boolean;
+  kills?: number;
+  score?: number;
+  color?: string;
+  teamId?: number;
   x: number;
   y: number;
   angle: number;

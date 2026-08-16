@@ -28,17 +28,18 @@ export interface GameSettings {
   muted: boolean;
   /** target frame rate; 0 = uncapped (follow the display refresh) */
   fps: number;
+  /** show real-time FPS counter in HUD */
+  showFps: boolean;
+  /** show comprehensive performance monitoring (FPS, CPU sim time, GPU render time, Memory) in HUD */
+  perfMonitor: boolean;
   /** bot AI decision frequency in *decisions per second*. Decoupled from the
    *  render frame rate — this is the single "step" knob that controls bot
    *  strength: higher Hz = bots re-decide more often (smarter, but more CPU). */
   botAiHz: number;
   /** graphics quality: low (dpr=1, no shadows/particles), medium, high */
   quality: "low" | "medium" | "high";
-  /** retro pixel-art mode: renders the world & HUD on a low-res buffer then
-   *  nearest-neighbor upscales it for a chunky 8/16-bit look. */
-  pixel: boolean;
-  /** pixel density factor (how many real pixels one "game pixel" spans). 1=off. */
-  pixelSize: number;
+  /** CRT scanlines retro arcade filter overlay */
+  crt: boolean;
   /** on-screen mobile control buttons */
   mobile: MobileButtonCfg[];
 }
@@ -67,10 +68,11 @@ function defaultSettings(): GameSettings {
     volume: 0.5,
     muted: false,
     fps: 60,
+    showFps: false,
+    perfMonitor: false,
     botAiHz: 16,
     quality: "high",
-    pixel: true,
-    pixelSize: 4,
+    crt: true,
     mobile: defaultMobileLayout(),
   };
 }
@@ -81,6 +83,8 @@ function load(): GameSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return base;
     const parsed = JSON.parse(raw) as Partial<GameSettings>;
+    const showFpsVal = typeof parsed.showFps === "boolean" ? parsed.showFps : base.showFps;
+    const perfMonVal = typeof parsed.perfMonitor === "boolean" ? parsed.perfMonitor : showFpsVal;
     return {
       volume:
         typeof parsed.volume === "number"
@@ -88,6 +92,8 @@ function load(): GameSettings {
           : base.volume,
       muted: typeof parsed.muted === "boolean" ? parsed.muted : base.muted,
       fps: typeof parsed.fps === "number" ? parsed.fps : base.fps,
+      showFps: perfMonVal,
+      perfMonitor: perfMonVal,
       botAiHz:
         typeof parsed.botAiHz === "number"
           ? Math.min(120, Math.max(2, parsed.botAiHz))
@@ -96,12 +102,7 @@ function load(): GameSettings {
         typeof parsed.quality === "string" && ["low", "medium", "high"].includes(parsed.quality)
           ? (parsed.quality as "low" | "medium" | "high")
           : base.quality,
-      pixel:
-        typeof parsed.pixel === "boolean" ? parsed.pixel : base.pixel,
-      pixelSize:
-        typeof parsed.pixelSize === "number"
-          ? Math.min(4, Math.max(1, Math.floor(parsed.pixelSize)))
-          : base.pixelSize,
+      crt: typeof parsed.crt === "boolean" ? parsed.crt : base.crt,
       mobile: base.mobile.map((def) => {
         const saved = (parsed.mobile ?? []).find((m) => m.id === def.id);
         return saved ? { ...def, ...saved } : def;

@@ -184,6 +184,7 @@ class SoundManager {
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     osc.connect(g);
     g.connect(this.master);
+    osc.onended = () => { try { osc.disconnect(); g.disconnect(); } catch {} };
     osc.start(t);
     osc.stop(t + dur + 0.02);
   }
@@ -210,6 +211,7 @@ class SoundManager {
     src.connect(filter);
     filter.connect(g);
     g.connect(this.master);
+    src.onended = () => { try { src.disconnect(); filter.disconnect(); g.disconnect(); } catch {} };
     src.start(t);
     src.stop(t + dur + 0.02);
   }
@@ -431,6 +433,10 @@ class SoundManager {
 
   hit(x?: number, y?: number) {
     this.noiseBurst(0.05, 0.12, 2200, 1.2, x, y);
+  }
+
+  playHit(x?: number, y?: number) {
+    this.hit(x, y);
   }
 
   /** Melee swing whooshes — enhanced aerodynamic slice sounds for all blade & impact weapons */

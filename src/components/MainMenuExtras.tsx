@@ -3,6 +3,8 @@ import { useSettings, updateSettings } from "../game/settings";
 import { isTouchDevice } from "../utils/device";
 import MobileKeybindEditor from "./MobileKeybindEditor";
 import BotStrengthControl from "./BotStrengthControl";
+import { useServerConfig } from "../utils/serverConfig";
+import ServerSelectModal from "./ServerSelectModal";
 
 const FPS_OPTIONS = [
   { label: "不限制", value: 0 },
@@ -18,6 +20,8 @@ const FPS_OPTIONS = [
 export default function MainMenuExtras({ announce }: { announce: string }) {
   const [open, setOpen] = useState(false);
   const [editingKeys, setEditingKeys] = useState(false);
+  const { config, updateConfig, modeLabel } = useServerConfig();
+  const [showServerModal, setShowServerModal] = useState(false);
   const s = useSettings();
   const isTouch = isTouchDevice();
   const [isFull, setIsFull] = useState(false);
@@ -98,17 +102,12 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
                 操作指南
               </h3>
               <ul className="space-y-1.5 text-xs leading-relaxed text-slate-300">
-                <li><b className="text-slate-100">目标</b>：击杀敌人，达成目标或撑到结束。</li>
-                <li><b className="text-slate-100">移动</b>：WASD / 方向键；<b className="text-slate-100">瞄准</b>：鼠标。</li>
-                <li><b className="text-slate-100">射击</b>：鼠标左键（按住连射）。</li>
-                <li><b className="text-slate-100">近战</b>：鼠标右键（长剑突刺、双刀反弹子弹、锤子砸地）。</li>
-                <li><b className="text-slate-100">技能/冲刺</b>：Q 或 空格。</li>
-                <li><b className="text-slate-100">换武器</b>：1 / 2 / 3 或 滚轮；<b className="text-slate-100">装填</b>：R；<b className="text-slate-100">交互</b>：F。</li>
-                <li><b className="text-slate-100">暂停/菜单</b>：P 或 Esc；游戏中按 <b className="text-slate-100">H</b> 看完整操作。</li>
-                <li><b className="text-slate-100">模式</b>：生存 · 死亡竞赛 · 团队死斗。</li>
-                <li className="rounded-lg border border-cyan-300/20 bg-cyan-500/10 p-2 text-cyan-100">
-                  音效：击杀有确认音，被淘汰有提示音。
-                </li>
+                <li><b className="text-slate-100">移动/瞄准</b>：WASD 移动 · 鼠标瞄准</li>
+                <li><b className="text-slate-100">射击/近战</b>：左键射击 · 右键近战/格挡/突刺</li>
+                <li><b className="text-slate-100">技能/翻滚</b>：Q 释放特工技能</li>
+                <li><b className="text-slate-100">切换/装填</b>：E 或 滚轮切枪 · R 换弹</li>
+                <li><b className="text-slate-100">战术道具</b>：1/2/3 选道具 · 左键部署</li>
+                <li><b className="text-slate-100">菜单/指南</b>：Esc 设置 · H 键帮助</li>
               </ul>
             </section>
 
@@ -148,11 +147,28 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
                 />
               </div>
 
-              {/* Frame rate */}
+              {/* Frame rate & Performance monitor */}
               <div className="mb-4">
-                <span className="mb-2 block text-xs font-semibold text-slate-300">
-                  帧率
-                </span>
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-300 block">
+                      性能监测与帧率
+                    </span>
+                    <span className="text-[10px] text-slate-400">实时显示 FPS、CPU/GPU 耗时与内存</span>
+                  </div>
+                  <button
+                    onClick={() => updateSettings({ perfMonitor: !s.perfMonitor, showFps: !s.perfMonitor })}
+                    className={
+                      "rounded-full border px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 " +
+                      (s.perfMonitor
+                        ? "border-cyan-400/50 bg-cyan-500/25 text-cyan-200"
+                        : "border-white/10 bg-white/5 text-slate-400 hover:text-slate-200")
+                    }
+                  >
+                    <span className={s.perfMonitor ? "h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" : "h-1.5 w-1.5 rounded-full bg-slate-500"} />
+                    <span>{s.perfMonitor ? "性能监测: 开启" : "性能监测: 关闭"}</span>
+                  </button>
+                </div>
                 <div className="grid grid-cols-4 gap-2">
                   {FPS_OPTIONS.map((o) => (
                     <button
@@ -174,6 +190,26 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
               {/* Bot strength (AI step, decoupled from frame rate) */}
               <BotStrengthControl />
 
+              {/* CRT Scanlines */}
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">
+                    CRT 扫描线
+                  </span>
+                  <button
+                    onClick={() => updateSettings({ crt: !s.crt })}
+                    className={
+                      "rounded-full border px-3 py-1 text-xs font-semibold " +
+                      (s.crt
+                        ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
+                        : "border-white/10 bg-white/5 text-slate-400")
+                    }
+                  >
+                    {s.crt ? "已开启" : "已关闭"}
+                  </button>
+                </div>
+              </div>
+
               {/* Display */}
               <div className="mb-4">
                 <span className="mb-2 block text-xs font-semibold text-slate-300">
@@ -189,7 +225,7 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
 
               {/* Mobile keybindings */}
               {isTouch && (
-                <div>
+                <div className="mb-4">
                   <span className="mb-2 block text-xs font-semibold text-slate-300">
                     自定义键位
                   </span>
@@ -201,10 +237,39 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
                   </button>
                 </div>
               )}
+
+              {/* 联机服务器设置 */}
+              <div className="pt-2 border-t border-white/10">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">
+                    联机服务器节点
+                  </span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${modeLabel.color}`}>
+                    {modeLabel.tag}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowServerModal(true)}
+                  className="w-full rounded-lg border border-indigo-500/30 bg-indigo-500/15 py-2 text-xs font-bold text-indigo-200 hover:bg-indigo-500/25 transition flex items-center justify-center gap-1.5"
+                >
+                  <span>🌐</span>
+                  <span>配置服务器 (本地/Render)</span>
+                </button>
+              </div>
             </section>
           </div>
         </>
       )}
+
+      {/* 服务器选择弹窗 */}
+      <ServerSelectModal
+        isOpen={showServerModal}
+        currentConfig={config}
+        onClose={() => setShowServerModal(false)}
+        onSave={(newCfg) => {
+          updateConfig(newCfg);
+        }}
+      />
     </div>
   );
 }

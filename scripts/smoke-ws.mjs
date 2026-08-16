@@ -58,6 +58,7 @@ const waitMsg = async (ws, pred) => {
 const lastSnap = (ws) => {
   for (let i = ws.msgs.length - 1; i >= 0; i--) {
     const m = ws.msgs[i];
+    if (m.t === "snap" && m.snap) return m.snap;
     if (m.t === "msg" && m.data && m.data.t === "snap") return m.data.snap;
   }
   return null;
@@ -65,35 +66,37 @@ const lastSnap = (ws) => {
 
 try {
   const a = await connect();
-  a.send(JSON.stringify({ t: "create", name: "A" }));
-  const created = await waitMsg(a, (m) => m.t === "created");
-  const room = created.room;
+  a.send(JSON.stringify({ t: "createRoom", name: "A", loadout: loadout() }));
+  const created = await waitMsg(a, (m) => m.t === "roomState");
+  const room = created.room.code;
 
   const b = await connect();
-  b.send(JSON.stringify({ t: "join", room, name: "B" }));
-  await waitMsg(b, (m) => m.t === "joined");
-
-  a.send(JSON.stringify({ t: "msg", data: { t: "hello", name: "A", loadout: loadout() } }));
   b.send(
     JSON.stringify({
-      t: "msg",
-      data: {
-        t: "hello",
-        name: "B",
-        loadout: loadout({
-          characterId: "juggernaut",
-          gunId: "akm",
-          gunIds: ["akm", "mac11"],
-          gadgetIds: ["turret_cannon", "mine_poison", "fire_grenade"],
-        }),
-      },
+      t: "joinRoom",
+      room,
+      name: "B",
+      loadout: loadout({
+        characterId: "juggernaut",
+        gunId: "akm",
+        gunIds: ["akm", "mac11"],
+        gadgetIds: ["turret_cannon", "mine_poison", "fire_grenade"],
+      }),
     })
   );
+  await waitMsg(b, (m) => m.t === "roomState" && m.room && m.room.peers.length === 2);
 
-  const sa = await waitMsg(a, (m) => m.t === "start");
-  await waitMsg(b, (m) => m.t === "start");
+  // B sets ready
+  b.send(JSON.stringify({ t: "setReady", ready: true }));
+  await waitMsg(a, (m) => m.t === "roomState" && m.room && m.room.peers.some((p) => p.pid === 2 && p.ready));
+
+  // Host starts match
+  a.send(JSON.stringify({ t: "startMatch" }));
+
+  const sa = await waitMsg(a, (m) => m.t === "matchStart");
+  const sb = await waitMsg(b, (m) => m.t === "matchStart");
   const aPid = sa.youPid;
-  const bPid = b.msgs.find((m) => m.t === "start").youPid;
+  const bPid = sb.youPid;
   console.log("A pid =", aPid, " B pid =", bPid);
 
   await sleep(100); // let a few snapshots arrive

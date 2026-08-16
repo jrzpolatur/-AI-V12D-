@@ -1,8 +1,8 @@
-// Thin WebSocket client for the relay server.
+// Thin WebSocket client for the relay / authoritative server.
 // Responsibilities: connect, create/join a room, exchange opaque game
 // messages with the peer, and surface lobby/control events to the UI.
 
-import type { GameMsg, RelayIn, RelayOut } from "./protocol";
+import type { GameMsg, RelayIn, RelayOut, RoomState, RoomSummary } from "./protocol";
 
 export type NetStatus =
   | "idle"
@@ -20,6 +20,9 @@ export interface NetEvents {
   onPeerGone?: () => void;
   onPeerBack?: () => void;
   onGameMsg?: (m: GameMsg) => void;
+  onRoomList?: (rooms: RoomSummary[]) => void;
+  onRoomState?: (room: RoomState, youPid: number) => void;
+  onMatchStart?: (room: string, youPid: number, totalPlayers: number) => void;
 }
 
 export class Net {
@@ -51,15 +54,18 @@ export class Net {
 
   onPeerGone(cb: () => void) {
     this.peerGoneCbs.push(cb);
+    return () => { this.peerGoneCbs = this.peerGoneCbs.filter(c => c !== cb); };
   }
   onPeerBack(cb: () => void) {
     this.peerBackCbs.push(cb);
+    return () => { this.peerBackCbs = this.peerBackCbs.filter(c => c !== cb); };
   }
   onPeerLeft(cb: () => void) {
     this.peerLeftCbs.push(cb);
+    return () => { this.peerLeftCbs = this.peerLeftCbs.filter(c => c !== cb); };
   }
 
-  constructor(private events: NetEvents = {}) {}
+  constructor(public events: NetEvents = {}) {}
 
   get isConnected() {
     return this.ws?.readyState === WebSocket.OPEN;
@@ -116,6 +122,43 @@ export class Net {
       }
       this.handle(msg);
     };
+  }
+
+  // ---------------------------------------------------- Room management APIs
+  fetchRoomList() {
+    this.send({ t: "roomList" });
+  }
+
+  createRoom(roomName: string, name: string, loadout?: unknown, mode = "deathmatch") {
+    this.name = name;
+    this.lastLoadout = loadout;
+    this.send({ t: "createRoom", name, roomName, mode, loadout });
+  }
+
+  joinRoom(roomCode: string, name: string, loadout?: unknown) {
+    this.name = name;
+    this.lastLoadout = loadout;
+    this.room = roomCode.toUpperCase();
+    this.send({ t: "joinRoom", room: this.room, name, loadout });
+  }
+
+  leaveRoom() {
+    this.send({ t: "leaveRoom" });
+    this.room = "";
+    this.pid = 0;
+  }
+
+  setReady(ready: boolean) {
+    this.send({ t: "setReady", ready });
+  }
+
+  updateRoomLoadout(loadout: unknown) {
+    this.lastLoadout = loadout;
+    this.send({ t: "updateRoomLoadout", loadout });
+  }
+
+  startMatch() {
+    this.send({ t: "startMatch" });
   }
 
   create(name: string) {
@@ -176,6 +219,26 @@ export class Net {
 
   private handle(m: RelayOut) {
     switch (m.t) {
+      case "roomList":
+        this.events.onRoomList?.(m.rooms);
+        break;
+      case "roomState":
+        this.room = m.room.code;
+        this.pid = m.youPid;
+        this.youPid = m.youPid;
+        this.mode = m.room.hostPid === m.youPid ? "host" : "guest";
+        this.events.onRoomState?.(m.room, m.youPid);
+        break;
+      case "matchStart":
+        this.pendingFind = null;
+        this.room = m.room;
+        this.youPid = m.youPid;
+        this.pid = m.youPid;
+        this.isAuthoritative = true;
+        this.setStatus("ready");
+        this.events.onMatchStart?.(m.room, m.youPid, m.totalPlayers);
+        this.events.onStart?.();
+        break;
       case "created":
         this.room = m.room!;
         this.pid = m.pid!;
@@ -197,11 +260,6 @@ export class Net {
       case "start":
         this.pendingFind = null;
         this.isAuthoritative = (m as { youPid?: number }).youPid !== undefined;
-        // The authoritative server sends an explicit `youPid` (1/2). The relay
-        // server does NOT, so fall back to the role derived from playerMode:
-        // host = creator = pid 1, guest = joiner = pid 2. Without this, relay
-        // clients kept youPid = 0, so the engine's selfPid became 0 and the
-        // guest could never locate its own avatar in the snapshot.
         this.youPid =
           (m as { youPid?: number }).youPid ?? (this.mode === "host" ? 1 : 2);
         this.setStatus("ready");
@@ -224,8 +282,6 @@ export class Net {
         this.peerLeftCbs.forEach((c) => c());
         break;
       case "error":
-        // a "room expired" error means our previous match is gone: forget it so
-        // the UI lets the player re-match instead of looping on a dead room.
         if (m.msg.includes("重新匹配") || m.msg.includes("失效")) {
           this.room = "";
           this.pid = 0;
@@ -241,3 +297,4 @@ export class Net {
     this.events.onStatus?.(s, info);
   }
 }
+

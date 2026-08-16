@@ -174,6 +174,7 @@ export function drawPixelWeapon(
   t = 0,
   swing = 0
 ) {
+  if (!ctx) return;
   ctx.save();
   ctx.lineJoin = "miter";
   ctx.lineCap = "square";
@@ -1044,6 +1045,7 @@ export function drawPixelWeaponIcon(
   glow: string,
   gun?: GunDef
 ) {
+  if (!ctx) return;
   ctx.save();
   ctx.translate(cx, cy);
 

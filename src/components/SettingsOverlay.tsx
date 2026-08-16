@@ -78,10 +78,28 @@ export default function SettingsOverlay({
           </div>
         </section>
 
-        {/* ---- Frame rate ---- */}
+        {/* ---- 性能监测与帧率控制 ---- */}
         <section className="mb-5">
-          <h3 className="mb-2 text-sm font-semibold text-slate-200">帧率</h3>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-200">性能监测与帧率</h3>
+              <p className="text-[10px] text-slate-400">实时显示 FPS、CPU 模拟、GPU 渲染及内存利用率</p>
+            </div>
+            <button
+              onClick={() => updateSettings({ perfMonitor: !s.perfMonitor, showFps: !s.perfMonitor })}
+              className={
+                "rounded-full border px-3 py-1 text-xs font-bold transition flex items-center gap-1.5 " +
+                (s.perfMonitor
+                  ? "border-cyan-400/50 bg-cyan-500/25 text-cyan-200 shadow-md shadow-cyan-950/40"
+                  : "border-white/10 bg-white/5 text-slate-400 hover:text-slate-200")
+              }
+              title="在游戏画面顶部 HUD 实时显示 FPS、CPU、GPU 及内存监控"
+            >
+              <span className={s.perfMonitor ? "h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" : "h-1.5 w-1.5 rounded-full bg-slate-500"} />
+              <span>{s.perfMonitor ? "性能监测: 开启" : "性能监测: 关闭"}</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-2 mt-2">
             {FPS_OPTIONS.map((o) => (
               <button
                 key={o.value}
@@ -101,64 +119,51 @@ export default function SettingsOverlay({
 
         {/* ---- Graphics Quality ---- */}
         <section className="mb-5">
-          <h3 className="mb-2 text-sm font-semibold text-slate-200">画质 (影响性能)</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-slate-200">画面质量 (性能优化)</h3>
+            <span className="text-[11px] text-cyan-300">保持 100% 完整全景视野</span>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "低", value: "low" },
-              { label: "中", value: "medium" },
-              { label: "高", value: "high" },
+              { label: "低 (极速流畅)", value: "low", desc: "精简光影/满帧" },
+              { label: "中 (平衡模式)", value: "medium", desc: "适中画质" },
+              { label: "高 (全景特效)", value: "high", desc: "完整特效" },
             ].map((o) => (
               <button
                 key={o.value}
                 onClick={() => updateSettings({ quality: o.value as any })}
                 className={
-                  "rounded-lg border py-2 text-sm font-bold transition " +
+                  "rounded-xl border py-2 px-1 text-center transition flex flex-col items-center justify-center " +
                   (s.quality === o.value
-                    ? "border-violet-300/60 bg-violet-500/20 text-violet-100"
+                    ? "border-violet-300/60 bg-violet-500/20 text-violet-100 shadow-md shadow-violet-950/40"
                     : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10")
                 }
               >
-                {o.label}
+                <span className="text-xs font-bold">{o.label}</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">{o.desc}</span>
               </button>
             ))}
           </div>
         </section>
 
-        {/* ---- Retro pixel art ---- */}
+        {/* ---- CRT Scanlines ---- */}
         <section className="mb-5">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-200">像素风</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-200">CRT 扫描线效果</h3>
+              <p className="text-[11px] text-slate-400">复古街机微光与扫描线滤镜</p>
+            </div>
             <button
-              onClick={() => updateSettings({ pixel: !s.pixel })}
+              onClick={() => updateSettings({ crt: !s.crt })}
               className={
-                "rounded-full border px-3 py-1 text-xs font-semibold " +
-                (s.pixel
-                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                "rounded-full border px-3.5 py-1 text-xs font-bold transition " +
+                (s.crt
+                  ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-200 shadow-md shadow-emerald-950/40"
                   : "border-white/10 bg-white/5 text-slate-400")
               }
             >
-              {s.pixel ? "开启" : "关闭"}
+              {s.crt ? "已开启" : "已关闭"}
             </button>
-          </div>
-          <div className="grid grid-cols-3 gap-2 opacity-80">
-            {[
-              { label: "细腻", value: 2 },
-              { label: "标准", value: 3 },
-              { label: "粗犷(推荐)", value: 4 },
-            ].map((o) => (
-              <button
-                key={o.value}
-                onClick={() => updateSettings({ pixel: true, pixelSize: o.value })}
-                className={
-                  "rounded-lg border py-2 text-xs font-bold transition " +
-                  (s.pixel && s.pixelSize === o.value
-                    ? "border-cyan-300/60 bg-cyan-500/20 text-cyan-100"
-                    : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10")
-                }
-              >
-                {o.label}
-              </button>
-            ))}
           </div>
         </section>
 

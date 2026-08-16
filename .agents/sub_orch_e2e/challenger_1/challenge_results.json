@@ -1,0 +1,168 @@
+{
+  "determinism": {
+    "passed": true,
+    "runs": 15,
+    "minTimeMs": 1481.4116999999999,
+    "maxTimeMs": 2668.545399999999,
+    "avgTimeMs": 1869.6713666666665
+  },
+  "cliFlags": {
+    "passed": true,
+    "tests": [
+      {
+        "name": "Single tier: --tier=1",
+        "passed": true,
+        "error": ""
+      },
+      {
+        "name": "Single tier: --tier=2",
+        "passed": true,
+        "error": ""
+      },
+      {
+        "name": "Single tier: --tier=3",
+        "passed": true,
+        "error": ""
+      },
+      {
+        "name": "Single tier: --tier=4",
+        "passed": true,
+        "error": ""
+      },
+      {
+        "name": "Multi tier comma: --tier=1,3",
+        "passed": true,
+        "error": ""
+      },
+      {
+        "name": "Multi tier space: --tier 2,4",
+        "passed": true,
+        "error": ""
+      },
+      {
+        "name": "Short flag: -t 3",
+        "passed": true,
+        "error": ""
+      },
+      {
+        "name": "Non-existent tier: --tier=99",
+        "passed": true,
+        "error": ""
+      }
+    ]
+  },
+  "mutations": {
+    "passed": true,
+    "testedMutants": 8,
+    "caughtMutants": 8,
+    "details": [
+      {
+        "name": "Mutant 1: Viewport aspect ratio distortion (Scale calculated without Math.min)",
+        "caught": true,
+        "reason": "Caught mutant: scale was 4 instead of 1"
+      },
+      {
+        "name": "Mutant 2: Zero-GC Y-Sort Render Queue sorting corruption (Descending instead of ascending)",
+        "caught": true,
+        "reason": "Cannot read properties of undefined (reading 'push')"
+      },
+      {
+        "name": "Mutant 3: Weapon orbital mount flip threshold error (Flipping on positive X aim)",
+        "caught": true,
+        "reason": "Caught mutant: Inverted weapon flip rule detected"
+      },
+      {
+        "name": "Mutant 4: 2.5D Shell casing gravity inversion (Negative gravity / rising forever)",
+        "caught": true,
+        "reason": "Caught mutant: Shell casing failed to hit floor and settle"
+      },
+      {
+        "name": "Mutant 5: Bitmask Autotiler Neighbor Logic (Missing West bitmask calculation)",
+        "caught": true,
+        "reason": "Caught mutant: Broken mask 1 does not equal expected 9"
+      },
+      {
+        "name": "Mutant 6: Authoritative GameEngine HP underflow (Allowing negative HP instead of clamp 0)",
+        "caught": true,
+        "reason": "Cannot read properties of undefined (reading 'characterId')"
+      },
+      {
+        "name": "Mutant 7: Weapon Recoil vector inversion (Pushing player forward instead of kickback)",
+        "caught": true,
+        "reason": "Caught mutant: Recoil propelled player forward instead of kickback"
+      },
+      {
+        "name": "Mutant 8: BOT AI Line-of-sight ignoring Solid Wall Obstacles",
+        "caught": true,
+        "reason": "Cannot read properties of undefined (reading 'characterId')"
+      }
+    ]
+  },
+  "enduranceAndMemory": {
+    "passed": true,
+    "initialHeapMb": 7.43621826171875,
+    "finalHeapMb": 41.37461853027344,
+    "heapGrowthMb": 33.93840026855469,
+    "snapshots": [
+      {
+        "frame": 1000,
+        "heapMb": "16.09",
+        "bullets": 9,
+        "combatants": 10
+      },
+      {
+        "frame": 2000,
+        "heapMb": "26.85",
+        "bullets": 22,
+        "combatants": 10
+      },
+      {
+        "frame": 3000,
+        "heapMb": "32.74",
+        "bullets": 12,
+        "combatants": 10
+      },
+      {
+        "frame": 4000,
+        "heapMb": "26.78",
+        "bullets": 2,
+        "combatants": 10
+      },
+      {
+        "frame": 5000,
+        "heapMb": "41.37",
+        "bullets": 15,
+        "combatants": 10
+      }
+    ]
+  },
+  "edgeCases": {
+    "passed": true,
+    "integrity": [
+      {
+        "check": "Tier 1 has exactly 34 features with >=5 tests each (170 total)",
+        "status": true
+      },
+      {
+        "check": "Tier 2 has boundary tests across all 34 features (170 total)",
+        "status": true
+      },
+      {
+        "check": "Tier 3 pairwise cross-feature tests >= 36 (actual: 42)",
+        "status": true
+      },
+      {
+        "check": "Tier 4 real-world match workloads >= 18 (actual: 19)",
+        "status": true
+      },
+      {
+        "check": "Total test count >= 400 (actual: 401)",
+        "status": true
+      },
+      {
+        "check": "No mock context throw or unhandled promise rejection",
+        "status": true
+      }
+    ]
+  }
+}

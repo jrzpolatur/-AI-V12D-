@@ -319,7 +319,7 @@ export function drawPixelSaloon(
   y: number,
   w: number,
   h: number,
-  t = 0
+  _t = 0
 ) {
   ctx.save();
   const px = Math.round(x);
@@ -572,7 +572,7 @@ export function drawPixelDesertFort(
   y: number,
   w: number,
   h: number,
-  t = 0
+  _t = 0
 ) {
   ctx.save();
   const px = Math.round(x);
@@ -713,7 +713,7 @@ export function drawPixelArcticBunker(
   w: number,
   h: number,
   t = 0,
-  accent = "#38bdf8"
+  _accent = "#38bdf8"
 ) {
   ctx.save();
   const px = Math.round(x);
@@ -805,7 +805,7 @@ export function drawPixelRuinFactory(
   y: number,
   w: number,
   h: number,
-  t = 0
+  _t = 0
 ) {
   ctx.save();
   const px = Math.round(x);
@@ -1306,7 +1306,7 @@ export function drawPixelCabinShop(
   y: number,
   w: number,
   h: number,
-  t = 0
+  _t = 0
 ) {
   ctx.save();
   const px = Math.round(x);
@@ -1650,7 +1650,7 @@ export function drawPixelTrain(
   y: number,
   dir = 1,
   t = 0,
-  warning = false
+  _warning = false
 ) {
   ctx.save();
   const ty = Math.round(y);
@@ -1854,7 +1854,7 @@ export function drawPixelCactus(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  t = 0,
+  _t = 0,
   variant: 0 | 1 | 2 = 0,
   scale = 1
 ) {

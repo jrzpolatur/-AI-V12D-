@@ -2,7 +2,7 @@
   {
     "id": "silenced_pistol",
     "name": "消音手枪",
-    "desc": "半自动消音手枪，隐蔽精准",
+    "desc": "半自动消音，隐蔽精准",
     "weaponClass": "ranged",
     "shape": "pistol",
     "iconShape": "pistol",
@@ -27,7 +27,7 @@
   {
     "id": "mac11",
     "name": "MAC11",
-    "desc": "超高射速微型冲锋枪，泼水压制",
+    "desc": "极速连发，近身泼水",
     "weaponClass": "ranged",
     "shape": "mac11",
     "iconShape": "mac11",
@@ -51,7 +51,7 @@
   {
     "id": "mp5",
     "name": "MP5",
-    "desc": "伤害高于 MAC11 的紧凑冲锋枪，射速稍低但更稳更狠",
+    "desc": "紧凑高伤，稳定连发",
     "weaponClass": "ranged",
     "shape": "mp5",
     "iconShape": "mp5",
@@ -75,7 +75,7 @@
   {
     "id": "mortar",
     "name": "投射榴弹炮",
-    "desc": "专属瞄准指示器的榴弹炮：8 发弹仓，抛射爆炸，威力低于 MGL32",
+    "desc": "抛射弹道，范围爆破",
     "weaponClass": "ranged",
     "shape": "mortar",
     "iconShape": "mortar",
@@ -104,7 +104,7 @@
   {
     "id": "sniper",
     "name": "狙击枪",
-    "desc": "超高伤害，可穿透多人",
+    "desc": "超高伤害，穿透多人",
     "weaponClass": "ranged",
     "shape": "sniper",
     "iconShape": "sniper",
@@ -128,7 +128,7 @@
   {
     "id": "rocket",
     "name": "火箭筒",
-    "desc": "范围爆炸，威力巨大",
+    "desc": "巨额伤害，范围爆炸",
     "weaponClass": "ranged",
     "shape": "rocket",
     "iconShape": "rocket",
@@ -154,7 +154,7 @@
   {
     "id": "akm",
     "name": "AKM",
-    "desc": "均衡的突击步枪，中远程全能",
+    "desc": "均衡稳健，全距作战",
     "weaponClass": "ranged",
     "shape": "akm",
     "iconShape": "akm",
@@ -178,7 +178,7 @@
   {
     "id": "fcar",
     "name": "FCAR",
-    "desc": "重型突击步枪：高伤害、射速慢、弹匣较小",
+    "desc": "高伤重步枪，穿透点射",
     "weaponClass": "ranged",
     "shape": "fcar",
     "iconShape": "fcar",
@@ -202,7 +202,7 @@
   {
     "id": "pulse",
     "name": "脉冲",
-    "desc": "连续激光冲锋枪，过热后需冷却",
+    "desc": "连续光束，过热需冷",
     "weaponClass": "beam",
     "shape": "pulse",
     "iconShape": "pulse",
@@ -227,7 +227,7 @@
   {
     "id": "lightsaber",
     "name": "光剑",
-    "desc": "近距离横扫，炫酷光效，连续挥砍",
+    "desc": "近战横扫，连击收割",
     "weaponClass": "melee",
     "shape": "lightsaber",
     "iconShape": "lightsaber",
@@ -251,7 +251,7 @@
   {
     "id": "hammer",
     "name": "大锤",
-    "desc": "左键挥砍 · 右键砸地（拆墙）",
+    "desc": "左键挥砍 · 右键砸地拆墙",
     "weaponClass": "melee",
     "shape": "hammer",
     "iconShape": "hammer",
@@ -277,7 +277,7 @@
   {
     "id": "flamethrower",
     "name": "火焰喷射器",
-    "desc": "锥形持续灼烧，贴脸毁灭性输出",
+    "desc": "扇形火海，近身灼烧",
     "weaponClass": "flamethrower",
     "shape": "flamethrower",
     "iconShape": "flamethrower",
@@ -303,7 +303,7 @@
   {
     "id": "sa1216",
     "name": "SA1216",
-    "desc": "作战距离较近的连喷，爆发伤害高",
+    "desc": "四连重喷，近战高爆发",
     "weaponClass": "ranged",
     "shape": "sa1216",
     "iconShape": "sa1216",
@@ -327,7 +327,7 @@
   {
     "id": "mgl32",
     "name": "MGL32",
-    "desc": "榴弹发射器，反弹一次后爆炸",
+    "desc": "反弹榴弹，范围杀伤",
     "weaponClass": "ranged",
     "shape": "mgl32",
     "iconShape": "mgl32",
@@ -354,7 +354,7 @@
   {
     "id": "spear",
     "name": "长矛",
-    "desc": "酷炫连招系统，位移同时造成伤害",
+    "desc": "三段突刺，位移重击",
     "weaponClass": "melee",
     "shape": "spear",
     "iconShape": "spear",
@@ -379,7 +379,7 @@
   {
     "id": "drone",
     "name": "浮游炮",
-    "desc": "发射离子团，碰敌伤害、不伤建筑、反弹3次",
+    "desc": "离子穿墙，反弹贯敌",
     "weaponClass": "ranged",
     "shape": "drone",
     "iconShape": "drone",
@@ -405,7 +405,7 @@
   {
     "id": "recurve_bow",
     "name": "反曲弓",
-    "desc": "蓄力越久箭矢越快越狠，满蓄可穿透",
+    "desc": "蓄力贯穿，远程重矢",
     "weaponClass": "bow",
     "shape": "recurve_bow",
     "iconShape": "recurve_bow",
@@ -432,7 +432,7 @@
   {
     "id": "riot_shield",
     "name": "防爆盾",
-    "desc": "左键挥击 · 右键举盾抵挡子弹",
+    "desc": "左键击退 · 右键举盾格挡",
     "weaponClass": "shield",
     "shape": "riot_shield",
     "iconShape": "riot_shield",
@@ -461,7 +461,7 @@
   {
     "id": "shak50",
     "name": "SHAK-50",
-    "desc": "双管大口径步枪·一次并排两发·随距离逐渐扩散·近战爆发强",
+    "desc": "双发并射，近身重创",
     "weaponClass": "ranged",
     "shape": "shak50",
     "iconShape": "shak50",
@@ -488,7 +488,7 @@
   {
     "id": "r357",
     "name": "R.357 左轮",
-    "desc": "6 发左轮手枪·单发高伤害·半自动精准",
+    "desc": "单发重击，半自动精准",
     "weaponClass": "ranged",
     "shape": "pistol",
     "iconShape": "pistol",
@@ -513,7 +513,7 @@
   {
     "id": "gold_barrett",
     "name": "黄金巴雷特",
-    "desc": "高伤害反器材狙击·穿透极强·金色传说",
+    "desc": "反器材重狙，终极穿甲",
     "weaponClass": "ranged",
     "shape": "sniper",
     "iconShape": "sniper",
@@ -537,7 +537,7 @@
   {
     "id": "gatling",
     "name": "加特林",
-    "desc": "极高射速，300发弹容量，但开火前需要预热（转速提升后射速与伤害才拉满）",
+    "desc": "预热加特林，300发倾泻",
     "weaponClass": "ranged",
     "shape": "gatling",
     "iconShape": "gatling",
@@ -564,7 +564,7 @@
   {
     "id": "poison_mist",
     "name": "毒雾喷射机",
-    "desc": "向前喷出小范围毒雾，敌人停留越久中毒越深、受到伤害越高（与毒气地雷同款剧毒）",
+    "desc": "范围毒雾，持续蚀伤",
     "weaponClass": "poison_mist",
     "shape": "poison_mist",
     "iconShape": "poison_mist",
@@ -590,7 +590,7 @@
   {
     "id": "lightning_whip",
     "name": "闪电鞭",
-    "desc": "快速左右挥动甩击，命中敌人造成减速（对生化、人机与对手均生效）",
+    "desc": "范围甩击，命中减速",
     "weaponClass": "melee",
     "shape": "lightning_whip",
     "iconShape": "lightning_whip",
@@ -616,7 +616,7 @@
   {
     "id": "dual_blades",
     "name": "双刃",
-    "desc": "左键连段(55/55/70/70/200)·右键举刀反弹子弹(承5%伤,降15%移速)",
+    "desc": "五段连斩，右键弹反子弹",
     "weaponClass": "melee",
     "shape": "dual_blades",
     "iconShape": "dual_blades",
@@ -650,7 +650,7 @@
   {
     "id": "thrust_sword",
     "name": "突刺长剑",
-    "desc": "左键挥击84·右键蓄力(≥0.5s)冲刺造成140伤害",
+    "desc": "轻击挥斩，蓄力高速突刺",
     "weaponClass": "melee",
     "shape": "thrust_sword",
     "iconShape": "thrust_sword",
@@ -678,7 +678,7 @@
   {
     "id": "dragon_breath",
     "name": "龙息喷",
-    "desc": "龙息连发散弹·喷射密集交织的龙息火羽与明火，附带强力灼烧(1.5s)",
+    "desc": "龙息烈焰，强力灼烧",
     "weaponClass": "shotgun",
     "shape": "dragon_breath",
     "iconShape": "dragon_breath",
@@ -701,7 +701,7 @@
   {
     "id": "plasma_rifle",
     "name": "电浆步枪",
-    "desc": "半自动三连发等离子步枪：弹体硕大命中率高，约 1/4 子弹可贯穿墙体",
+    "desc": "三发等离子，概率穿墙",
     "weaponClass": "ranged",
     "shape": "plasma_rifle",
     "iconShape": "plasma_rifle",
@@ -729,7 +729,7 @@
   {
     "id": "lewis",
     "name": "刘易斯机枪",
-    "desc": "经典气冷轻机枪：高伤害、中射速、弹鼓容量大，散布略宽",
+    "desc": "大容量弹鼓，持续压制",
     "weaponClass": "ranged",
     "shape": "lewis",
     "iconShape": "lewis",
@@ -753,7 +753,7 @@
   {
     "id": "scout",
     "name": "斥候",
-    "desc": "远距离射手步枪：半自动精准点射，高伤害可穿透，适合远距离压制",
+    "desc": "射手步枪，半自动精准穿透",
     "weaponClass": "ranged",
     "shape": "sniper",
     "iconShape": "sniper",
@@ -780,7 +780,7 @@
   {
     "id": "m1887",
     "name": "M1887 泵动霰弹枪",
-    "desc": "经典泵动霰弹枪：近距离瞬间高爆发，中远距离衰减明显，适合贴脸压制。",
+    "desc": "泵动重霰，贴脸高爆发",
     "weaponClass": "ranged",
     "shape": "m1887",
     "damage": 14,
@@ -804,7 +804,7 @@
   {
     "id": "throwing_knife",
     "name": "飞刀",
-    "desc": "可投掷的利刃：飞行极快、可穿透一名敌人，适合灵活补刀与绕后偷袭。",
+    "desc": "极速飞刀，穿刺补刀",
     "weaponClass": "ranged",
     "shape": "knife",
     "damage": 50,
@@ -826,7 +826,7 @@
   {
     "id": "flame_boomerang",
     "name": "火焰回旋镖",
-    "desc": "掷出后向前飞出再回旋归来，沿途灼烧敌人，去程与回程各造成一次伤害且可多次穿透。",
+    "desc": "回旋飞刃，双程贯穿灼烧",
     "weaponClass": "ranged",
     "shape": "boomerang",
     "damage": 46,
@@ -848,7 +848,7 @@
   {
     "id": "railgun",
     "name": "轨道狙击炮",
-    "desc": "射速极慢但拥有超高单发伤害与穿透能力的能量狙击枪",
+    "desc": "能量重炮，超高贯穿",
     "weaponClass": "ranged",
     "shape": "sniper",
     "damage": 140,
@@ -869,7 +869,7 @@
   {
     "id": "plasma_repeater",
     "name": "等离子连发枪",
-    "desc": "发射能在墙壁上反弹的等离子弹",
+    "desc": "等离子弹，折射反弹",
     "weaponClass": "ranged",
     "shape": "rifle",
     "damage": 25,
@@ -891,7 +891,7 @@
   {
     "id": "chemical_sprayer",
     "name": "化学喷射器",
-    "desc": "持续喷射剧毒物质，造成高频率伤害并穿透敌人",
+    "desc": "剧毒激流，穿透腐蚀",
     "weaponClass": "ranged",
     "shape": "heavy",
     "damage": 18,
@@ -912,7 +912,7 @@
   {
     "id": "shuriken",
     "name": "影流手里剑",
-    "desc": "一次掷出3枚呈扇形的穿透手里剑",
+    "desc": "三枚散布，穿透暗器",
     "weaponClass": "ranged",
     "shape": "knife",
     "damage": 31,
@@ -933,7 +933,7 @@
   {
     "id": "chainsaw",
     "name": "狂怒电锯",
-    "desc": "按住攻击可像电锯一样极速切割前方的敌人",
+    "desc": "高速电锯，贴身撕裂",
     "weaponClass": "melee",
     "shape": "sword",
     "damage": 21,

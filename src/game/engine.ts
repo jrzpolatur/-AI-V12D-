@@ -1,6 +1,11 @@
 import { GUNS, GADGETS, MONSTERS, getCharacter, getOutfit, getSkill, SCENES, CHARACTERS, OUTFITS, SKILLS } from "./content";
 import type { GunDef, SkillDef, WeaponClass, GadgetDef, GadgetKind, CharacterDef, OutfitDef } from "./types";
-import { drawCharacter, drawMonster, rgba, shade, roundRect, DARK, drawGadgetIcon, drawGadgetModel } from "./draw";
+import { drawHat, drawCharacter, drawShieldHalo, drawRespawnProtectionRing, hexToRgb, rgba, shade, drawMonster, roundRect, drawGadgetIcon, drawGadgetModel } from "./draw";
+export { drawHat, drawCharacter, drawShieldHalo, drawRespawnProtectionRing, hexToRgb, rgba, shade, drawMonster, roundRect, drawGadgetIcon, drawGadgetModel } from "./draw";
+export { PixelLightingSystem, createPixelLightingSystem, THEME_LIGHTING_PRESETS } from "./lighting";
+export { RenderQueue, RenderLayer, createRenderQueue } from "./renderQueue";
+export type { PixelViewport } from "./viewport";
+export { createPixelViewport } from "./viewport";
 import {
   drawPixelBamboo,
   drawPixelSakuraTree,
@@ -29,6 +34,15 @@ import {
 } from "./pixelSprites";
 import { sound } from "./sound";
 import { RUNTIME } from "./runtimeConfig";
+import { PixelViewport, createPixelViewport } from "./viewport";
+import { RenderQueue, RenderLayer, createRenderQueue } from "./renderQueue";
+import { PixelLightingSystem, createPixelLightingSystem } from "./lighting";
+import { PixelParticleSystem, createPixelParticleSystem } from "./pixelParticles";
+import { FloatingTextSystem, createFloatingTextSystem } from "./floatingText";
+import { PixelMinimap, createPixelMinimap } from "./minimap";
+import { PixelTilemap, createPixelTilemap } from "./tilemap";
+import { createRecoilState, applyRecoilImpulse, updateRecoil } from "./weaponMount";
+import type { RecoilState } from "./weaponMount";
 // @ts-ignore
 import AiWorker from './ai.worker.ts?worker&inline';
 import type { NetMode, InputFrame, Snapshot, SnapPlayer, SnapEffect, SnapFeedEvent } from "../net/protocol";
@@ -264,6 +278,8 @@ export interface HudState {
   gold: number;
   activeScoreFeed: { totalScore: number; timer: number; events: { id: number; text: string; victimName?: string; subScore: number }[]; totalKills: number } | null;
   killFeed: { id: number; type: "kill" | "event"; text?: string; teamColor?: string; killerName?: string; victimName?: string; weaponIconShape?: string; weaponGlow?: string; weaponId?: string }[];
+  /** performance monitoring metrics (cpu sim ms, gpu render ms, memory heap mb) */
+  perfStats?: { cpuMs: number; gpuMs: number; memoryMb?: number };
   /** bow charge 0..1 (0 when not drawing) */
   bowChargePct: number;
   /** shield HP (null if not a shield weapon) */
@@ -851,19 +867,31 @@ export const DAMAGE_LOG_WINDOW = 10;
 export class GameEngine {
   private canvas: HTMLCanvasElement | null;
   private ctx: CanvasRenderingContext2D | null;
+  public viewport: PixelViewport;
+  public renderQueue: RenderQueue;
+  /** M2: Dynamic lighting and ambient lantern system. */
+  public lighting: PixelLightingSystem;
+  /** M2: Pixel particle system (muzzle flash, shell casings, explosions). */
+  public pixelParticles: PixelParticleSystem;
+  /** M2: Player weapon recoil state. */
+  private recoilState: RecoilState;
+  /** M4: Floating combat text system. */
+  public floatingText: FloatingTextSystem;
+  /** M4: Retro radar minimap. */
+  public minimap: PixelMinimap;
+  /** M3: Pixel tilemap for floor & wall rendering. */
+  public tilemap: PixelTilemap | null = null;
   private loadout: Loadout;
   private onHud: (h: HudState) => void;
-  private quality: "low" | "medium" | "high" = "high";
-  /** retro pixel-art density (1 = off). Populated from settings on start. */
-  private pixelSize: number = 1;
+  public quality: "low" | "medium" | "high" = "high";
 
-  private W = 800;
-  private H = 600;
+  public W = 960;
+  public H = 540;
   /** world dimensions (larger than viewport) */
-  private worldW = RUNTIME.worldW;
-  private worldH = RUNTIME.worldH;
-  private camX = 0;
-  private camY = 0;
+  public worldW = RUNTIME.worldW;
+  public worldH = RUNTIME.worldH;
+  public camX = 0;
+  public camY = 0;
   private raf = 0;
   /** Cached radial gradients for glows, keyed by radius+color. Canvas gradients
    *  are bound to the user-space at paint time, so we create them centred at the
@@ -874,9 +902,9 @@ export class GameEngine {
   /** Offscreen cache for the static background (linear gradient + vignette). */
   private bgCache?: HTMLCanvasElement;
   private bgCacheKey = "";
-  private sceneTheme = SCENES[0];
+  public sceneTheme = SCENES[0];
   /** index into SCENES[] chosen by the host (authoritative); synced to the guest */
-  private sceneIndex = 0;
+  public sceneIndex = 0;
   private last = 0;
   private running = false;
   /** guest-side interpolation state for smooth rendering between 30Hz snapshots */
@@ -885,7 +913,7 @@ export class GameEngine {
   private gxInit = false;
   private netRender = new Map<number, { x: number; y: number }>();
   /** host-authored effects mirrored from the latest snapshot (guest/authoritative) */
-  private netEffects: SnapEffect[] = [];
+  public netEffects: SnapEffect[] = [];
   private netFxPrev = 0;
   /** host-authored grenades + deployables mirrored so the guest can render them */
   private netGrenades: Grenade[] = [];
@@ -907,16 +935,16 @@ export class GameEngine {
   /** Gameplay (waves / enemy spawns) may advance. Gated on `peerReady` for net. */
   private matchLive = false;
 
-  private character = getCharacter("raider");
-  private outfit = getOutfit("tactical");
-  private skill: SkillDef = getSkill("dash");
+  public character = getCharacter("raider");
+  public outfit = getOutfit("tactical");
+  public skill: SkillDef = getSkill("dash");
 
-  private player!: Player;
-  private bullets: Bullet[] = [];
-  private enemyBullets: EnemyBullet[] = [];
-  private enemies: Enemy[] = [];
-  private particles: Particle[] = [];
-  private effects: Effect[] = [];
+  public player!: Player;
+  public bullets: Bullet[] = [];
+  public enemyBullets: EnemyBullet[] = [];
+  public enemies: Enemy[] = [];
+  public particles: Particle[] = [];
+  public effects: Effect[] = [];
   public meleeTrails: MeleeTrail[] = [];
   public raindrops: Raindrop[] = [];
   public weather: WeatherType = "clear";
@@ -924,16 +952,16 @@ export class GameEngine {
   /** floating score / heal number popups (declared since the gadget heal
    *  system pushes into it — previously missing, causing a runtime crash). */
   private scorePopups: ScorePopup[] = [];
-  private pickups: Pickup[] = [];
-  private grenades: Grenade[] = [];
+  public pickups: Pickup[] = [];
+  public grenades: Grenade[] = [];
   // spatial hash grid for broad-phase collision/damage queries (perf)
   private grid = new Map<string, GridItem[]>();
   private gridMaxR = 0;
   private particlePool: Particle[] = [];
-  private walls: Wall[] = [];
-  private deployables: Deployable[] = [];
-  private base!: Base;
-  private enemyBase!: Base;
+  public walls: Wall[] = [];
+  public deployables: Deployable[] = [];
+  public base!: Base;
+  public enemyBase!: Base;
   private weaponStates = new Map<string, WeaponState>();
 
   // Arctic Railway & Express Train Hazard System
@@ -950,25 +978,25 @@ export class GameEngine {
   private guns = GUNS;
   private gunIndex = 0;
   /** gadgets the player is carrying this run (max 3) */
-  private gadgets: GadgetDef[] = [];
+  public gadgets: GadgetDef[] = [];
   /** currently selected (highlighted) gadget; -1 = none. Selecting does NOT deploy. */
-  private selectedGadget = -1;
+  public selectedGadget = -1;
   /** index of last gadget used via scroll, for wheel cycling */
   private lastGadget = 0;
   /** semi-auto latch: blocks re-fire until the trigger is released */
   private semiAutoLatch = false;
 
   // ---- multiplayer ----
-  private mode: NetMode = "local";
+  public mode: NetMode = "local";
   /** true when playing through the authoritative server: BOTH clients only
    *  send input + mirror the server snapshot (no local world simulation). */
   private authoritative = false;
   private net: Net | null = null;
   /** single-player sub-mode */
-  private gameMode: "biohazard" | "deathmatch" | "team_deathmatch" = "biohazard";
-  private selfPid = 0;
+  public gameMode: "biohazard" | "deathmatch" | "team_deathmatch" = "biohazard";
+  public selfPid = 0;
   private peerPid = 0;
-  private peerName = "";
+  public peerName = "";
   /** caller-requested pids (authoritative-client thin mode); overrides role default */
   private reqSelfPid?: number;
   private reqPeerPid?: number;
@@ -980,11 +1008,11 @@ export class GameEngine {
   private snapAccum = 0;
   private inpAccum = 0;
   /** the opponent avatar (simulated on host, mirrored on guest) */
-  private foe: Player | null = null;
-  private foeChar: CharacterDef | null = null;
-  private foeOutfit: OutfitDef | null = null;
+  public foe: Player | null = null;
+  public foeChar: CharacterDef | null = null;
+  public foeOutfit: OutfitDef | null = null;
   /** the opponent's own weapon list (from their loadout, mirrored via "hello") */
-  private foeGuns: GunDef[] = [];
+  public foeGuns: GunDef[] = [];
   /** the opponent's own gadget list (from their loadout, mirrored via "hello") */
   private foeGadgets: GadgetDef[] = [];
   /** the opponent's per-gadget cooldown timers (separate from the host's own) */
@@ -998,12 +1026,13 @@ export class GameEngine {
   private pendSkill = false;
   private pendReload = false;
   private pendWeapon = false;
+  private pendGunIndex: number | null = null;
   /** authoritative-server mode: latest InputFrame received from each peer (pid -> frame) */
   private peerInput = new Map<number, InputFrame>();
   /** latched one-shot actions so a discrete input (weapon switch / skill / reload /
    *  gadget) is never dropped just because a later no-op frame overwrote the latest
    *  frame before the authoritative tick consumed it. */
-  private peerLatch = new Map<number, { weaponSwitch: boolean; skill: boolean; reload: boolean; gadget: number }>();
+  private peerLatch = new Map<number, { weaponSwitch: boolean; gunIndex?: number; skill: boolean; reload: boolean; gadget: number }>();
   /** enemies still queued to spawn this wave (local/host HUD; mirrored value on guest) */
   private spawnQueue = 0;
   /** total remaining enemies shown in the HUD (live for host, mirrored for guest) */
@@ -1161,30 +1190,34 @@ export class GameEngine {
 
   addKillFeed(killerName: string, victimName: string, weaponId?: string, killerC?: Combatant) {
     if (this.gameMode === "biohazard") return;
-    let iconShape = "pistol";
-    let glow = "#ef4444";
-    const wId = weaponId || (killerC ? killerC.guns[killerC.gunIndex]?.id : undefined);
-    if (wId) {
-      const g = GUNS.find(gn => gn.id === wId);
-      if (g) {
-        iconShape = g.iconShape;
-        glow = g.color;
+    try {
+      let iconShape = "pistol";
+      let glow = "#ef4444";
+      const wId = weaponId || (killerC?.guns?.[killerC?.gunIndex ?? 0]?.id);
+      if (wId) {
+        const g = GUNS.find(gn => gn.id === wId);
+        if (g) {
+          iconShape = g.iconShape || "pistol";
+          glow = g.color || "#ef4444";
+        }
       }
+      this.killFeed.push({
+        type: "kill",
+        id: this.nextKillFeedId++,
+        killerName: killerName || "玩家",
+        victimName: victimName || "敌人",
+        weaponIconShape: iconShape,
+        weaponGlow: glow,
+        weaponId: wId,
+        timer: 4.0,
+      });
+      if (this.killFeed.length > 5) {
+        this.killFeed.shift();
+      }
+      this.emit(true);
+    } catch (err) {
+      console.error("[addKillFeed] exception:", err);
     }
-    this.killFeed.push({
-    type: "kill",
-      id: this.nextKillFeedId++,
-      killerName,
-      victimName,
-      weaponIconShape: iconShape,
-      weaponGlow: glow,
-      weaponId: wId,
-      timer: 4.0,
-    });
-    if (this.killFeed.length > 5) {
-      this.killFeed.shift();
-    }
-    this.emit(true);
   }
 
   public addEventMessage(text: string, teamColor?: string) {
@@ -1206,16 +1239,16 @@ export class GameEngine {
   private banner: { text: string; t: number } | null = null;
 
   private skillCd = 0;
-  private timewarp = 0;
+  public timewarp = 0;
   private hitSndCd = 0;
   private beamSndCd = 0;
   private flameSndCd = 0;
-  private shake = 0;
+  public shake = 0;
   private whipToggle = false;
-  private time = 0;
-  private gameOver = false;
+  public time = 0;
+  public gameOver = false;
   private gameOverReason = "";
-  private paused = false;
+  public paused = false;
   /** frame-rate cap: seconds per allowed frame (0 = uncapped / follow display). */
   private fpsInterval = 1 / 60;
   /** accumulator used to throttle the simulation+render to `fpsInterval`. */
@@ -1228,9 +1261,9 @@ export class GameEngine {
 
   // ---- deathmatch (offline PvP vs AI bots) ----
   /** true when the active sub-mode is deathmatch */
-  private isDM = false;
+  public isDM = false;
   /** all combatants: [0]=human, [1..3]=AI bots */
-  private combatants: Combatant[] = [];
+  public combatants: Combatant[] = [];
   /** combatant id whose context is currently "live" (so bullets/melee/beam
    *  credit the right attacker). 0 = human. */
   private activeId = 0;
@@ -1307,16 +1340,16 @@ export class GameEngine {
   private dashRecharge = 0; // progress toward next charge (0..DASH_RECHARGE)
 
   // gadget cooldowns
-  private gadgetCd = new Map<string, number>();
+  public gadgetCd = new Map<string, number>();
 
   // beam state
-  private beamActive = false;
-  private beamHit: BeamHit | null = null;
+  public beamActive = false;
+  public beamHit: BeamHit | null = null;
   // flamethrower state
-  private flameActive = false;
+  public flameActive = false;
 
   private keys = new Set<string>();
-  private mouse = { x: 400, y: 300 };
+  public mouse = { x: 400, y: 300 };
   /** screen-space cursor position relative to the canvas top-left (accumulated while pointer is locked) */
   private cursorScreen = { x: 0, y: 0 };
   /** true when the OS pointer lock is currently active (desktop only) */
@@ -1328,7 +1361,7 @@ export class GameEngine {
   /** virtual movement vector from the on-screen joystick (-1..1 each axis) */
   private virtualMove = { x: 0, y: 0 };
   /** touch device: enables the mobile on-screen controls + mobile-only aim assist */
-  private touchMode = false;
+  public touchMode = false;
 
   private hudAccum = 0;
   private boundKeyDown: (e: KeyboardEvent) => void;
@@ -1355,7 +1388,17 @@ export class GameEngine {
     // In server-authoritative mode the engine runs headless in Node with no
     // canvas — all rendering is skipped and only the simulation runs.
     this.ctx = canvas ? canvas.getContext("2d") : null;
-    if (this.ctx) this.ctx.imageSmoothingEnabled = this.pixelSize <= 1;
+    this.viewport = createPixelViewport({ virtualW: 960, virtualH: 540, integerScale: true, dynamic: true });
+    this.renderQueue = createRenderQueue(2048);
+    // M2-M4: Initialize new pixel engine subsystems
+    this.lighting = createPixelLightingSystem(this.viewport.virtualW, this.viewport.virtualH);
+    this.pixelParticles = createPixelParticleSystem(512);
+    this.recoilState = createRecoilState();
+    this.floatingText = createFloatingTextSystem(64);
+    this.minimap = createPixelMinimap({ size: 56, margin: 4 });
+    this.W = this.viewport.virtualW;
+    this.H = this.viewport.virtualH;
+    if (this.ctx) this.ctx.imageSmoothingEnabled = false;
     this.loadout = loadout;
     this.onHud = onHud;
     this.mode = opts.mode ?? "local";
@@ -1455,6 +1498,7 @@ export class GameEngine {
 
   // ---------------------------------------------------------------- lifecycle
   start() {
+    if (this.running) return;
     this.resize();
     this.resetState();
     this.attach();
@@ -1521,7 +1565,7 @@ export class GameEngine {
       this.player.bowDrawing = false;
       this.player.shieldBlockTime = 0;
       // set shield HP to max when switching to a shield weapon
-      if (this.gun.shieldMaxHp && this.player.shieldHp <= 0 && this.player.shieldCd <= 0) {
+      if (this.gun?.shieldMaxHp && this.player.shieldHp <= 0 && this.player.shieldCd <= 0) {
         this.player.shieldHp = this.gun.shieldMaxHp;
       }
       // sync to local combatant in deathmatch
@@ -1530,18 +1574,19 @@ export class GameEngine {
       if (localC) {
         localC.gunIndex = i;
       }
+      if (this.mode === "guest" || this.authoritative) {
+        this.pendWeapon = true;
+        this.pendGunIndex = i;
+      }
       this.emit(true);
     }
   }
 
-  /** Cycle to the next carried weapon (used by the mobile "切枪" button). */
+  /** Cycle to the next carried weapon (used by the mobile "切枪" button and KeyE). */
   cycleWeapon() {
     if (this.guns.length <= 1) return;
-    if (this.mode === "guest" || this.authoritative) {
-      this.pendWeapon = true;
-      return;
-    }
-    this.selectGun((this.gunIndex + 1) % this.guns.length);
+    const next = (this.gunIndex + 1) % this.guns.length;
+    this.selectGun(next);
   }
 
   triggerSkill() {
@@ -1599,11 +1644,9 @@ export class GameEngine {
   }
 
   reloadCurrent() {
-    if (this.mode === "guest" || this.authoritative) {
-      this.pendReload = true;
-      return;
-    }
+    this.pendReload = true;
     const g = this.gun;
+    if (!g) return;
     const ws = this.weaponStates.get(g.id);
     if (g.magazine && ws && ws.reload <= 0 && ws.ammo < g.magazine) {
       ws.reload = g.reloadTime ?? 1.5;
@@ -1648,6 +1691,32 @@ export class GameEngine {
       this.timeOfDay = Math.random() > 0.5 ? "afternoon" : "night";
     } else if (this.weather === "clear") {
       this.timeOfDay = Math.random() > 0.5 ? "morning" : "night";
+    }
+
+    this.raindrops = [];
+    if (this.weather === "rain" || this.weather === "snow" || this.weather === "sandstorm") {
+      const initCount = 200;
+      const w = this.worldW || 3000;
+      const h = this.worldH || 1800;
+      for (let i = 0; i < initCount; i++) {
+        const rx = Math.random() * w;
+        const ry = Math.random() * h;
+        let vx = 0, vy = 0, life = 1;
+        if (this.weather === "rain") {
+          vx = -350 - Math.random() * 120;
+          vy = 950 + Math.random() * 250;
+          life = 0.2 + Math.random() * 1.0;
+        } else if (this.weather === "snow") {
+          vx = (Math.random() - 0.5) * 160;
+          vy = 160 + Math.random() * 120;
+          life = 0.5 + Math.random() * 3.5;
+        } else if (this.weather === "sandstorm") {
+          vx = 1000 + Math.random() * 600;
+          vy = (Math.random() - 0.5) * 140;
+          life = 0.3 + Math.random() * 1.3;
+        }
+        this.raindrops.push({ x: rx, y: ry, vx, vy, life, maxLife: life });
+      }
     }
   }
 
@@ -1699,6 +1768,7 @@ export class GameEngine {
     this.grenades = [];
     this.deployables = [];
     this.walls = this.buildWalls();
+    this.initTilemap();
     this.syncWorker();
     this.base = {
       x: this.worldW / 2,
@@ -1825,7 +1895,7 @@ export class GameEngine {
       this.isDM = true;
       const isTeam = this.gameMode === "team_deathmatch";
       const pCount = this.loadout.dmPlayerCount || 4;
-      this.dmKillLimit = this.mode === "local" ? (isTeam ? (pCount === 4 ? 20 : pCount === 6 ? 30 : pCount === 10 ? 30 : 40) : (pCount === 4 ? 15 : pCount === 6 ? 18 : 24)) : (isTeam ? 20 : 8);
+      this.dmKillLimit = this.mode === "local" ? (isTeam ? (pCount === 4 ? 20 : pCount === 6 ? 30 : pCount === 10 ? 30 : 40) : (pCount === 4 ? 15 : pCount === 6 ? 18 : 24)) : (isTeam ? 20 : 24);
       this.base.hp = Infinity;
       this.base.maxHp = Infinity;
       this.enemyBase.hp = Infinity;
@@ -1992,6 +2062,14 @@ export class GameEngine {
         this.combatants = [c1, c2];
       }
     }
+
+    // Initialize camera position directly to follow player spawn position immediately
+    const px = (this.player && Number.isFinite(this.player.x)) ? this.player.x : this.worldW / 2;
+    const py = (this.player && Number.isFinite(this.player.y)) ? this.player.y : this.worldH / 2;
+    const vW = Number.isFinite(this.W) && this.W > 0 ? this.W : 960;
+    const vH = Number.isFinite(this.H) && this.H > 0 ? this.H : 540;
+    this.camX = px - vW / 2;
+    this.camY = py - vH / 2;
   }
 
   private makeFoe(): Player {
@@ -2428,6 +2506,22 @@ export class GameEngine {
     return walls;
   }
 
+  /** M3: Initialize pixel tilemap from current arena dimensions and walls. */
+  private initTilemap() {
+    const tileCols = Math.ceil(this.worldW / 48) + 2;
+    const tileRows = Math.ceil(this.worldH / 48) + 2;
+    const themeId = this.sceneTheme?.id ?? "cyber";
+    const style: "stone" | "metal" | "wood" | "dirt" =
+      themeId === "arctic" ? "metal" : themeId === "western" ? "dirt" : themeId === "forest" ? "wood" : "stone";
+    this.tilemap = createPixelTilemap({
+      cols: tileCols,
+      rows: tileRows,
+      tileSize: 48,
+      floorStyle: style,
+    });
+    this.tilemap.generateFromWalls(this.walls, this.worldW, this.worldH);
+  }
+
   // ---------------------------------------------------------------------------
   // Per-map layout builders. `b` = building, `c` = cover wall, `p` = pillar.
   // ---------------------------------------------------------------------------
@@ -2770,22 +2864,20 @@ export class GameEngine {
   private resize() {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
-    this.screenW = Math.max(320, rect.width);
-    this.screenH = Math.max(240, rect.height);
+    this.screenW = Math.max(320, Math.floor(rect.width));
+    this.screenH = Math.max(240, Math.floor(rect.height));
 
-    // True Retro Low-Res Viewport (The Binding of Isaac / Enter the Gungeon / Nuclear Throne)
-    // Scale factor: default 3.0 gives chunky retro pixels (~640x360), 4.0 gives super chunky (~480x270)
-    const px = Math.max(1, this.pixelSize || 3);
-    this.W = Math.max(320, Math.floor(this.screenW / px));
-    this.H = Math.max(240, Math.floor(this.screenH / px));
+    this.canvas.width = this.screenW;
+    this.canvas.height = this.screenH;
 
-    this.canvas.width = this.W;
-    this.canvas.height = this.H;
-    this.ctx?.setTransform(1, 0, 0, 1, 0, 0);
+    this.viewport.resize(this.screenW, this.screenH);
+    this.W = this.viewport.virtualW;
+    this.H = this.viewport.virtualH;
+    this.lighting.resize(this.W, this.H);
 
-    // Disable browser image smoothing so GPU upscales with nearest-neighbor crispness
     if (this.ctx) {
       this.ctx.imageSmoothingEnabled = false;
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
   }
 
@@ -2794,22 +2886,6 @@ export class GameEngine {
    *  re-sync here — the camera simply keeps following the player. */
   private onResize() {
     this.resize();
-  }
-
-  /** Retro pixel-art density: 1 = crisp/off, >1 = chunky pixel look. */
-  public setPixelSize(sz: number) {
-    const px = Math.max(1, Math.min(6, Math.floor(sz)));
-    if (this.pixelSize === px) return;
-    this.pixelSize = px;
-    this.resize();
-  }
-
-  /** Retro pixel-art viewport is already scaled via low-res canvas buffer (W, H)
-   *  with imageSmoothingEnabled = false and CSS image-rendering: pixelated.
-   *  Bypassing synchronous CPU getImageData/putImageData eliminates frame stalls
-   *  on low-end devices while preserving authentic crisp chunky pixels. */
-  private pixelate() {
-    // Hardware nearest-neighbor upscaling handles pixelation at full 60 FPS
   }
 
   public setQuality(q: "low" | "medium" | "high") {
@@ -2852,46 +2928,21 @@ export class GameEngine {
     if (this.gameOver || this.paused) return;
     if (KEYS_MOVE.has(e.code) || e.code === "KeyF" || e.code === "KeyV") this.keys.add(e.code);
 
-    // ---- guest: record intents, the host simulates them ----
-    if (this.mode === "guest") {
-      if (e.code === "KeyQ" || e.code === "Space") {
-        this.pendSkill = true;
-        this.localSkillCooldown();
-        e.preventDefault();
-      } else if (e.code === "KeyR") {
-        this.pendReload = true;
-      } else if (e.code.startsWith("Digit")) {
-        const n = parseInt(e.code.slice(5), 10);
-        if (n >= 1 && n <= this.gadgets.length) {
-          // selecting only highlights the gadget; the host deploys on click
-          this.selectGadget(n - 1);
-          e.preventDefault();
-        }
-      } else if (e.code === "KeyE") {
-        this.clearGadgetSelection();
-        this.pendWeapon = true;
-        e.preventDefault();
-      }
-      return;
-    }
-
     if (e.code === "KeyQ" || e.code === "Space") {
-      this.activateSkill();
+      this.triggerSkill();
       e.preventDefault();
-    }
-    if (e.code === "KeyR") this.reloadCurrent();
-    // number keys 1/2/3 select (highlight) a carried gadget — deployment is on left-click
-    if (e.code.startsWith("Digit")) {
+    } else if (e.code === "KeyR") {
+      this.reloadCurrent();
+      e.preventDefault();
+    } else if (e.code.startsWith("Digit")) {
       const n = parseInt(e.code.slice(5), 10);
       if (n >= 1 && n <= this.gadgets.length) {
         this.selectGadget(n - 1);
         e.preventDefault();
       }
-    }
-    // E cycles weapons (and clears any selected gadget)
-    if (e.code === "KeyE") {
+    } else if (e.code === "KeyE") {
       this.clearGadgetSelection();
-      this.selectGun((this.gunIndex + 1) % this.guns.length);
+      this.cycleWeapon();
       e.preventDefault();
     }
   }
@@ -2903,15 +2954,23 @@ export class GameEngine {
     }
   }
   exitMouseLock() {
-    if (document.pointerLockElement) { try { document.exitPointerLock(); } catch {} }
+    if (typeof document !== 'undefined' && document.pointerLockElement) {
+      try {
+        document.exitPointerLock();
+      } catch {
+      }
+    }
   }
   toggleMouseLock() {
-    if (document.pointerLockElement === this.canvas) this.exitMouseLock();
-    else this.requestMouseLock();
+    if (typeof document !== 'undefined' && document.pointerLockElement === this.canvas) {
+      this.exitMouseLock();
+    } else {
+      this.requestMouseLock();
+    }
   }
   isPointerLocked() { return this.pointerLocked; }
   private onPointerLockChange() {
-    this.pointerLocked = document.pointerLockElement === this.canvas;
+    this.pointerLocked = typeof document !== 'undefined' && document.pointerLockElement === this.canvas;
     if (this.pointerLocked && this.canvas) {
       // 进入锁定时从低分辨率画布中心开始，避免从旧的绝对坐标跳变
       this.cursorScreen.x = this.W / 2;
@@ -2923,24 +2982,32 @@ export class GameEngine {
   private onMouseMove(e: MouseEvent) {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.W / Math.max(1, rect.width);
-    const scaleY = this.H / Math.max(1, rect.height);
     if (this.pointerLocked) {
       // 锁定模式下增量累加
-      this.cursorScreen.x += e.movementX * scaleX;
-      this.cursorScreen.y += e.movementY * scaleY;
+      const delta = this.viewport.screenDeltaToVirtual(e.movementX, e.movementY);
+      this.cursorScreen.x += delta.x;
+      this.cursorScreen.y += delta.y;
     } else {
-      this.cursorScreen.x = (e.clientX - rect.left) * scaleX;
-      this.cursorScreen.y = (e.clientY - rect.top) * scaleY;
+      const clientX = e.clientX - rect.left;
+      const clientY = e.clientY - rect.top;
+      const v = this.viewport.screenToVirtual(clientX, clientY, true);
+      this.cursorScreen.x = v.x;
+      this.cursorScreen.y = v.y;
     }
     this.cursorScreen.x = Math.max(0, Math.min(this.W, this.cursorScreen.x));
     this.cursorScreen.y = Math.max(0, Math.min(this.H, this.cursorScreen.y));
-    this.mouse.x = this.cursorScreen.x + this.camX;
-    this.mouse.y = this.cursorScreen.y + this.camY;
+    const snapCam = this.viewport.snapCamera(this.camX, this.camY);
+    this.mouse.x = this.cursorScreen.x + snapCam.x;
+    this.mouse.y = this.cursorScreen.y + snapCam.y;
   }
 
   private onMouseDown(e: MouseEvent) {
     sound.ensure();
+    // 死亡重组等待中禁止开火
+    if ((this.player.deadTimer && this.player.deadTimer > 0) || this.player.hp <= 0) {
+      this.firing = false;
+      return;
+    }
     // 桌面端：游玩时点击画面即把鼠标锁定在画面内（按 U / Esc 解除）
     if (!this.touchMode && !this.pointerLocked && document.pointerLockElement !== this.canvas) {
       this.requestMouseLock();
@@ -3052,72 +3119,108 @@ export class GameEngine {
   // ------------------------------------------------------------------ loop
   private loop = (now: number) => {
     if (!this.running) return;
-    const elapsed = (now - this.last) / 1000;
-    this.last = now;
-    // ---- optional frame-rate cap ----
-    // Accumulate real elapsed time and only run a simulation+render step once
-    // `fpsInterval` worth of time has built up. This caps CPU/GPU work on
-    // high-refresh displays (e.g. 144Hz) down to the player's chosen 30/60/90.
-    this.acc += elapsed;
-    if (this.acc < this.fpsInterval) {
-      this.raf = requestAnimationFrame(this.loop);
-      return;
-    }
-    let dt = this.acc;
-    if (dt > 0.1) dt = 0.1; // clamp so a backgrounded tab doesn't fast-forward
-    this.acc = 0;
-    if (!this.gameOver) this.update(dt);
-    this.render();
-    this.pixelate();
-    this.hudAccum += dt;
-    if (this.hudAccum > 0.06) {
-      this.hudAccum = 0;
-      this.emit(false);
-    }
-    for (let i = this.effects.length - 1; i >= 0; i--) {
-      this.effects[i].t += dt;
-      if (this.effects[i].t > this.effects[i].duration) {
-        this.effects.splice(i, 1);
+    try {
+      const rawElapsed = (now - this.last) / 1000;
+      this.last = now;
+      const elapsed = Number.isFinite(rawElapsed) && rawElapsed >= 0 ? rawElapsed : 0.016;
+      // ---- optional frame-rate cap ----
+      this.acc = (Number.isFinite(this.acc) ? this.acc : 0) + elapsed;
+      if (this.acc < this.fpsInterval) {
+        return;
       }
-    }
-    for (let i = this.meleeTrails.length - 1; i >= 0; i--) {
-      this.meleeTrails[i].life -= dt;
-      if (this.meleeTrails[i].life <= 0) {
-        this.meleeTrails.splice(i, 1);
+      let dt = this.acc;
+      if (!Number.isFinite(dt) || dt <= 0) dt = 0.016;
+      if (dt > 0.1) dt = 0.1; // clamp so a backgrounded tab doesn't fast-forward
+      this.acc = 0;
+      const t0 = typeof performance !== "undefined" ? performance.now() : 0;
+      if (!this.gameOver) this.update(dt);
+      const t1 = typeof performance !== "undefined" ? performance.now() : 0;
+      this.render();
+      const t2 = typeof performance !== "undefined" ? performance.now() : 0;
+      if (t0 > 0 && t1 >= t0 && t2 >= t1) {
+        this.lastCpuMs = t1 - t0;
+        this.lastGpuMs = t2 - t1;
       }
-    }
-    
-    if ((this.weather === "rain" || this.weather === "snow" || this.weather === "sandstorm") && Math.random() < 0.6) {
-      for (let i = 0; i < (this.quality === "high" ? 4 : 2); i++) {
-        const rx = this.localPlayer ? this.localPlayer.x + (Math.random() - 0.5) * 1800 : Math.random() * this.W;
-        const ry = this.localPlayer ? this.localPlayer.y + (Math.random() - 0.5) * 1400 : Math.random() * this.H;
-        let vx = 0, vy = 0, life = 1;
-        if (this.weather === "rain") {
-          vx = -300 - Math.random() * 100;
-          vy = 800 + Math.random() * 200;
-          life = 0.6;
-        } else if (this.weather === "snow") {
-          vx = (Math.random() - 0.5) * 150;
-          vy = 150 + Math.random() * 100;
-          life = 3.0;
-        } else if (this.weather === "sandstorm") {
-          vx = 900 + Math.random() * 500;
-          vy = (Math.random() - 0.5) * 100;
-          life = 1.2;
+      this.hudAccum += dt;
+      if (this.hudAccum > 0.06) {
+        this.hudAccum = 0;
+        this.emit(false);
+      }
+      let ew = 0;
+      for (let i = 0; i < this.effects.length; i++) {
+        this.effects[i].t += dt;
+        if (this.effects[i].t <= this.effects[i].duration) {
+          this.effects[ew++] = this.effects[i];
         }
-        this.raindrops.push({ x: rx, y: ry, vx, vy, life, maxLife: life });
       }
-    }
-    for (let i = this.raindrops.length - 1; i >= 0; i--) {
-      this.raindrops[i].x += this.raindrops[i].vx * dt;
-      this.raindrops[i].y += this.raindrops[i].vy * dt;
-      this.raindrops[i].life -= dt;
-      if (this.raindrops[i].life <= 0) {
-        this.raindrops.splice(i, 1);
+      this.effects.length = ew;
+      let mw = 0;
+      for (let i = 0; i < this.meleeTrails.length; i++) {
+        this.meleeTrails[i].life -= dt;
+        if (this.meleeTrails[i].life > 0) {
+          this.meleeTrails[mw++] = this.meleeTrails[i];
+        }
       }
-    }
+      this.meleeTrails.length = mw;
 
-    this.raf = requestAnimationFrame(this.loop);
+      if (
+        this.quality !== "low" &&
+        (this.weather === "rain" || this.weather === "snow" || this.weather === "sandstorm")
+      ) {
+        const margin = 350;
+        const viewMinX = this.camX - margin;
+        const viewMaxX = this.camX + this.W + margin;
+        const viewMinY = this.camY - margin;
+        const viewMaxY = this.camY + this.H + margin;
+        const spawnCount = this.quality === "high" ? 6 : 3;
+
+        for (let i = 0; i < spawnCount; i++) {
+          let rx = viewMinX + Math.random() * (viewMaxX - viewMinX);
+          let ry = viewMinY + Math.random() * (viewMaxY - viewMinY);
+          let vx = 0, vy = 0, life = 1;
+          if (this.weather === "rain") {
+            if (Math.random() < 0.75) {
+              ry = viewMinY - Math.random() * 100;
+            }
+            vx = -350 - Math.random() * 120;
+            vy = 950 + Math.random() * 250;
+            life = 1.2;
+          } else if (this.weather === "snow") {
+            if (Math.random() < 0.65) {
+              ry = viewMinY - Math.random() * 80;
+            }
+            vx = (Math.random() - 0.5) * 160;
+            vy = 160 + Math.random() * 120;
+            life = 3.5;
+          } else if (this.weather === "sandstorm") {
+            if (Math.random() < 0.75) {
+              rx = viewMinX - Math.random() * 120;
+            }
+            vx = 1000 + Math.random() * 600;
+            vy = (Math.random() - 0.5) * 140;
+            life = 1.6;
+          }
+          this.raindrops.push({ x: rx, y: ry, vx, vy, life, maxLife: life });
+        }
+      }
+      let rw = 0;
+      for (let i = 0; i < this.raindrops.length; i++) {
+        const rd = this.raindrops[i];
+        rd.x += rd.vx * dt;
+        rd.y += rd.vy * dt;
+        rd.life -= dt;
+        if (rd.life > 0) {
+          this.raindrops[rw++] = rd;
+        }
+      }
+      this.raindrops.length = rw;
+    } catch (err) {
+      console.error("[GameEngine] loop error:", err);
+    } finally {
+      if (this.running) {
+        this.raf = requestAnimationFrame(this.loop);
+      }
+    }
   };
 
   /** Set the target frame rate. Pass 0 to follow the display's refresh rate. */
@@ -3170,21 +3273,35 @@ export class GameEngine {
       if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
       if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
       if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
-      const len = Math.hypot(dx, dy) || 1;
-      dx /= len;
-      dy /= len;
-      dx += this.virtualMove.x;
-      dy += this.virtualMove.y;
-      const vlen = Math.hypot(dx, dy) || 1;
-      dx /= vlen;
-      dy /= vlen;
+      const len = Math.hypot(dx, dy);
+      if (len > 0.001) {
+        dx /= len;
+        dy /= len;
+      } else {
+        dx = 0;
+        dy = 0;
+      }
+      const vmx = typeof this.virtualMove?.x === "number" && isFinite(this.virtualMove.x) ? this.virtualMove.x : 0;
+      const vmy = typeof this.virtualMove?.y === "number" && isFinite(this.virtualMove.y) ? this.virtualMove.y : 0;
+      dx += vmx;
+      dy += vmy;
+      const vlen = Math.hypot(dx, dy);
+      if (vlen > 0.001) {
+        dx /= vlen;
+        dy /= vlen;
+      } else {
+        dx = 0;
+        dy = 0;
+      }
 
       const p = this.player;
       // 冲撞转向：冲刺途中始终跟随鼠标方向实时改变冲刺方向（可自由转弯）
       if (p.isChargingSlam) {
-        const speed = Math.hypot(p.dashVx, p.dashVy) || 800;
-        const cur = Math.atan2(p.dashVy, p.dashVx);
-        const desired = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+        const speed = Math.hypot(p.dashVx || 0, p.dashVy || 0) || 800;
+        const cur = Math.atan2(p.dashVy || 0, p.dashVx || 1);
+        const aimX = this.mouse?.x ?? p.x;
+        const aimY = this.mouse?.y ?? p.y;
+        const desired = Math.atan2(aimY - p.y, aimX - p.x);
         let diff = desired - cur;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
@@ -3192,14 +3309,13 @@ export class GameEngine {
         const na = cur + turn;
         p.dashVx = Math.cos(na) * speed;
         p.dashVy = Math.sin(na) * speed;
-        // 不覆盖 p.angle：冲刺时枪口继续跟随鼠标，便于边冲边瞄准
       }
       if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
           p.dashTime -= dt;
-          p.x += p.dashVx * dt;
-          p.y += p.dashVy * dt;
+          p.x += (p.dashVx || 0) * dt;
+          p.y += (p.dashVy || 0) * dt;
         } else if (p.thrustDashActive) {
           this.stepThrustDash(dt);
         } else {
@@ -3209,6 +3325,11 @@ export class GameEngine {
           const slow = (p.bowDrawing ? (this.gun.drawSlowMult ?? 1) : 1) * (p.slowT && p.slowT > 0 ? 0.5 : 1);
           p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
           p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
+        }
+
+        if (!isFinite(p.x) || !isFinite(p.y)) {
+          p.x = this.worldW / 2;
+          p.y = this.worldH / 2;
         }
         const m = p.size;
         p.x = Math.max(m, Math.min(this.worldW - m, p.x));
@@ -3226,7 +3347,6 @@ export class GameEngine {
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
-        this.banner = { text: `你被击败 ${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
       } else {
         this.player.deadTimer = 0;
       }
@@ -3235,8 +3355,7 @@ export class GameEngine {
         this.inpAccum = 0;
         this.sendInput();
       }
-      this.camX = this.player.x - this.W / 2;
-      this.camY = this.player.y - this.H / 2;
+      this.updateCamera(dt);
       this.updateParticles(dt);
       this.emit(false);
       return;
@@ -3275,21 +3394,35 @@ export class GameEngine {
       if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
       if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
       if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
-      const len = Math.hypot(dx, dy) || 1;
-      dx /= len;
-      dy /= len;
-      dx += this.virtualMove.x;
-      dy += this.virtualMove.y;
-      const vlen = Math.hypot(dx, dy) || 1;
-      dx /= vlen;
-      dy /= vlen;
+      const len = Math.hypot(dx, dy);
+      if (len > 0.001) {
+        dx /= len;
+        dy /= len;
+      } else {
+        dx = 0;
+        dy = 0;
+      }
+      const vmx = typeof this.virtualMove?.x === "number" && isFinite(this.virtualMove.x) ? this.virtualMove.x : 0;
+      const vmy = typeof this.virtualMove?.y === "number" && isFinite(this.virtualMove.y) ? this.virtualMove.y : 0;
+      dx += vmx;
+      dy += vmy;
+      const vlen = Math.hypot(dx, dy);
+      if (vlen > 0.001) {
+        dx /= vlen;
+        dy /= vlen;
+      } else {
+        dx = 0;
+        dy = 0;
+      }
 
       const p = this.player;
       // 冲撞转向：冲刺途中始终跟随鼠标方向实时改变冲刺方向（可自由转弯）
       if (p.isChargingSlam) {
-        const speed = Math.hypot(p.dashVx, p.dashVy) || 800;
-        const cur = Math.atan2(p.dashVy, p.dashVx);
-        const desired = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+        const speed = Math.hypot(p.dashVx || 0, p.dashVy || 0) || 800;
+        const cur = Math.atan2(p.dashVy || 0, p.dashVx || 1);
+        const aimX = this.mouse?.x ?? p.x;
+        const aimY = this.mouse?.y ?? p.y;
+        const desired = Math.atan2(aimY - p.y, aimX - p.x);
         let diff = desired - cur;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
@@ -3297,14 +3430,13 @@ export class GameEngine {
         const na = cur + turn;
         p.dashVx = Math.cos(na) * speed;
         p.dashVy = Math.sin(na) * speed;
-        // 不覆盖 p.angle：冲刺时枪口继续跟随鼠标，便于边冲边瞄准
       }
       if (p.thrustCharging) p.thrustCharge = (p.thrustCharge ?? 0) + dt;
       if (!p.deadTimer || p.deadTimer <= 0) {
         if (p.dashTime > 0) {
           p.dashTime -= dt;
-          p.x += p.dashVx * dt;
-          p.y += p.dashVy * dt;
+          p.x += (p.dashVx || 0) * dt;
+          p.y += (p.dashVy || 0) * dt;
         } else if (p.thrustDashActive) {
           this.stepThrustDash(dt);
         } else {
@@ -3315,7 +3447,12 @@ export class GameEngine {
           p.x += dx * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
           p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
         }
-        const m = p.size;
+
+        if (!isFinite(p.x) || !isFinite(p.y)) {
+          p.x = this.worldW / 2;
+          p.y = this.worldH / 2;
+        }
+        const m = p.size || 20;
         p.x = Math.max(m, Math.min(this.worldW - m, p.x));
         p.y = Math.max(m, Math.min(this.worldH - m, p.y));
         this.collideWalls(p, p.size);
@@ -3341,7 +3478,6 @@ export class GameEngine {
       if (this.player.hp <= 0) {
         if (!this.player.deadTimer || this.player.deadTimer <= 0) this.player.deadTimer = RESPAWN_TIME;
         this.player.deadTimer = Math.max(0, this.player.deadTimer - dt);
-        this.banner = { text: `你被击败 ${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
       } else {
         this.player.deadTimer = 0;
       }
@@ -3350,8 +3486,7 @@ export class GameEngine {
         this.inpAccum = 0;
         this.sendInput();
       }
-      this.camX = this.player.x - this.W / 2;
-      this.camY = this.player.y - this.H / 2;
+      this.updateCamera(dt);
       this.updateParticles(dt);
       // tick local cooldown read-outs so the HUD shows gadget/skill/dash CD
       // correctly (the guest runs no world sim, so it must age these itself)
@@ -3385,13 +3520,15 @@ export class GameEngine {
     }
     this.simulateWorld(dt);
 
-    // ---- host: simulate the remote avatar + stream snapshots ----
-    if (this.mode === "host") {
+    if (this.mode === "local" || this.mode === "host") {
       this.tickRespawns(dt);
-      // keep a live respawn banner up for the local (host) player while downed
       if (this.player.deadTimer && this.player.deadTimer > 0) {
         this.banner = { text: `你被击败 ${Math.ceil(this.player.deadTimer)} 秒后复活`, t: 0.4 };
       }
+    }
+
+    // ---- host: simulate the remote avatar + stream snapshots ----
+    if (this.mode === "host") {
       this.simulateRemote(dt);
       this.snapAccum += dt;
       if (this.snapAccum >= 1 / 20) {
@@ -3434,42 +3571,73 @@ export class GameEngine {
     }
 
     // ---- camera follows player ----
-    const targetCamX = this.player.x - this.W / 2;
-    const targetCamY = this.player.y - this.H / 2;
-    this.camX += (targetCamX - this.camX) * Math.min(1, dt * 8);
-    this.camY += (targetCamY - this.camY) * Math.min(1, dt * 8);
-    // Unclamped camera for strict following
-    // this.camX = Math.max(0, Math.min(this.worldW - this.W, this.camX));
-    // this.camY = Math.max(0, Math.min(this.worldH - this.H, this.camY));
+    this.updateCamera(dt);
   }
 
-  private get gun(): GunDef {
+  /** Robust camera update ensuring localPlayer tracking and zero NaN freezes */
+  private updateCamera(dt: number) {
+    const targetPlayer = this.localPlayer || this.player;
+    const px = (targetPlayer && Number.isFinite(targetPlayer.x)) ? targetPlayer.x : (Number.isFinite(this.worldW) ? this.worldW / 2 : 0);
+    const py = (targetPlayer && Number.isFinite(targetPlayer.y)) ? targetPlayer.y : (Number.isFinite(this.worldH) ? this.worldH / 2 : 0);
+    const viewW = Number.isFinite(this.W) && this.W > 0 ? this.W : 960;
+    const viewH = Number.isFinite(this.H) && this.H > 0 ? this.H : 540;
+
+    const targetCamX = px - viewW / 2;
+    const targetCamY = py - viewH / 2;
+
+    if (!Number.isFinite(this.camX)) this.camX = targetCamX;
+    if (!Number.isFinite(this.camY)) this.camY = targetCamY;
+
+    const safeDt = Number.isFinite(dt) && dt > 0 ? dt : 0.016;
+    const followSpeed = Math.min(1, safeDt * 10);
+    this.camX += (targetCamX - this.camX) * followSpeed;
+    this.camY += (targetCamY - this.camY) * followSpeed;
+
+    if (!Number.isFinite(this.camX)) this.camX = 0;
+    if (!Number.isFinite(this.camY)) this.camY = 0;
+  }
+
+  public get gun(): GunDef {
     return this.guns[this.gunIndex];
   }
 
   private updateWeaponStates(dt: number) {
-    for (const [id, s] of this.weaponStates) {
-      const g = GUNS.find((x) => x.id === id);
-      if (!g) continue;
-      if (g.magazine && s.reload > 0) {
-        s.reload -= dt;
-        if (s.reload <= 0) {
-          s.reload = 0;
-          s.ammo = g.magazine;
-          sound.reloadDone();
+    const processWs = (wsMap: Map<string, WeaponState>, isLocal: boolean) => {
+      for (const [id, s] of wsMap) {
+        const g = GUNS.find((x) => x.id === id);
+        if (!g) continue;
+        if (g.magazine && s.reload > 0) {
+          s.reload -= dt;
+          if (s.reload <= 0) {
+            s.reload = 0;
+            s.ammo = g.magazine;
+            if (isLocal) sound.reloadDone();
+          }
+        }
+        // heat cooldown for beam, flamethrower & poison mist
+        if (
+          (g.weaponClass === "beam" ||
+            g.weaponClass === "flamethrower" ||
+            g.weaponClass === "poison_mist") &&
+          s.heat > 0
+        ) {
+          const cool = s.overheated ? (g.coolRate ?? 0.5) * 0.85 : g.coolRate ?? 0.5;
+          s.heat = Math.max(0, s.heat - cool * dt);
+          if (s.overheated && s.heat < 0.3) s.overheated = false;
         }
       }
-      // heat cooldown for beam, flamethrower & poison mist
-      if (
-        (g.weaponClass === "beam" ||
-          g.weaponClass === "flamethrower" ||
-          g.weaponClass === "poison_mist") &&
-        s.heat > 0
-      ) {
-        const cool = s.overheated ? (g.coolRate ?? 0.5) * 0.85 : g.coolRate ?? 0.5;
-        s.heat = Math.max(0, s.heat - cool * dt);
-        if (s.overheated && s.heat < 0.3) s.overheated = false;
+    };
+
+    if (this.weaponStates) processWs(this.weaponStates, true);
+    if (this.combatants && this.combatants.length > 0) {
+      for (const c of this.combatants) {
+        if (c.weaponStates && c.weaponStates !== this.weaponStates) {
+          processWs(c.weaponStates, false);
+        }
       }
+    }
+    if (this.foeWeaponStates && this.foeWeaponStates !== this.weaponStates) {
+      processWs(this.foeWeaponStates, false);
     }
   }
 
@@ -3483,6 +3651,10 @@ export class GameEngine {
     if (p.deadTimer && p.deadTimer > 0) {
       p.vx = 0;
       p.vy = 0;
+      this.firing = false;
+      this.flameActive = false;
+      p.bowDrawing = false;
+      p.bladeRaising = false;
       return;
     }
     if (p.iframes > 0) p.iframes -= dt;
@@ -3532,9 +3704,9 @@ export class GameEngine {
             if (Math.hypot(e.x - p.x, e.y - p.y) < hitR + e.size) {
               p.slamHitIds.add(e.id);
               this.damageEnemy(e, 120, p.dashVx * 0.4, p.dashVy * 0.4, false, undefined, p.cid ?? this.activeId);
-              this.screenshake(5);
-              this.addExplosionEffect(e.x, e.y, 22, "#fb923c");
-              sound.playHit();
+              if (!this.simulatingOther) this.shake = Math.min(20, this.shake + 5);
+              this.effects.push({ type: "explosion", x: e.x, y: e.y, t: 0, duration: 0.35, radius: 22, color: "#fb923c" });
+              sound.hit();
             }
           }
         } else if (this.isDM && it.kind === "player" && it.ownerId !== (p.cid ?? this.activeId)) {
@@ -3545,9 +3717,9 @@ export class GameEngine {
               if (Math.hypot(q.x - p.x, q.y - p.y) < hitR + q.size) {
                 p.slamHitIds.add(`p_${targetId}`);
                 this.damagePlayerEntity(q, 120, undefined, p.dashVx * 0.4, p.dashVy * 0.4, p.cid ?? this.activeId, "charge_slam");
-                this.screenshake(5);
-                this.addExplosionEffect(q.x, q.y, 24, "#fb923c");
-                sound.playHit();
+                if (!this.simulatingOther) this.shake = Math.min(20, this.shake + 5);
+                this.effects.push({ type: "explosion", x: q.x, y: q.y, t: 0, duration: 0.35, radius: 24, color: "#fb923c" });
+                sound.hit();
               }
             }
           }
@@ -3657,31 +3829,43 @@ export class GameEngine {
     if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) dy += 1;
     if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) dx -= 1;
     if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) dx += 1;
-    const len = Math.hypot(dx, dy) || 1;
-    dx /= len;
-    dy /= len;
+    const len = Math.hypot(dx, dy);
+    if (len > 0.001) {
+      dx /= len;
+      dy /= len;
+    } else {
+      dx = 0;
+      dy = 0;
+    }
     // on-screen joystick (mobile) — combined with keyboard WASD (desktop)
-    dx += this.virtualMove.x;
-    dy += this.virtualMove.y;
-    const vlen = Math.hypot(dx, dy) || 1;
-    dx /= vlen;
-    dy /= vlen;
+    const vmx = typeof this.virtualMove?.x === "number" && isFinite(this.virtualMove.x) ? this.virtualMove.x : 0;
+    const vmy = typeof this.virtualMove?.y === "number" && isFinite(this.virtualMove.y) ? this.virtualMove.y : 0;
+    dx += vmx;
+    dy += vmy;
+    const vlen = Math.hypot(dx, dy);
+    if (vlen > 0.001) {
+      dx /= vlen;
+      dy /= vlen;
+    } else {
+      dx = 0;
+      dy = 0;
+    }
 
     if (p.dashTime > 0) {
       p.dashTime -= dt;
       if (p.isChargingSlam && (dx !== 0 || dy !== 0)) {
-        const curAng = Math.atan2(p.dashVy, p.dashVx);
+        const curAng = Math.atan2(p.dashVy || 0, p.dashVx || 1);
         const targetAng = Math.atan2(dy, dx);
         const diff = this.angleDiff(targetAng, curAng);
         const step = Math.sign(diff) * Math.min(Math.abs(diff), 8 * dt);
         const newAng = curAng + step;
-        const sp = Math.hypot(p.dashVx, p.dashVy) || 800;
+        const sp = Math.hypot(p.dashVx || 0, p.dashVy || 0) || 800;
         p.dashVx = Math.cos(newAng) * sp;
         p.dashVy = Math.sin(newAng) * sp;
         p.angle = newAng;
       }
-      p.x += p.dashVx * dt;
-      p.y += p.dashVy * dt;
+      p.x += (p.dashVx || 0) * dt;
+      p.y += (p.dashVy || 0) * dt;
       this.spawnParticles(p.x, p.y, this.character.bodyColor, 2, 60);
     } else if (p.thrustDashActive) {
       this.stepThrustDash(dt);
@@ -3697,13 +3881,23 @@ export class GameEngine {
       p.y += dy * p.speed * slow * meleeMoveMult * RUNTIME.playerSpeedMult * dt;
     }
 
-    const m = p.size;
+    // Auto-recover NaN positions so character never disappears
+    if (!isFinite(p.x) || !isFinite(p.y)) {
+      p.x = this.worldW / 2;
+      p.y = this.worldH / 2;
+      p.vx = 0;
+      p.vy = 0;
+    }
+
+    const m = p.size || 20;
     p.x = Math.max(m, Math.min(this.worldW - m, p.x));
     p.y = Math.max(m, Math.min(this.worldH - m, p.y));
     this.collideWalls(p, p.size);
     this.collideBase(p, p.size);
     this.collideBase(p, p.size, this.enemyBase);
-    p.angle = Math.atan2(this.mouse.y - p.y, this.mouse.x - p.x);
+    const aimDx = (this.mouse?.x ?? p.x) - p.x;
+    const aimDy = (this.mouse?.y ?? p.y - 1) - p.y;
+    p.angle = Math.atan2(aimDy, aimDx);
 
     // mobile aim assist (touch only): auto-lock onto the nearest threat so the
     // player can move with the joystick and fire with the on-screen button
@@ -3811,6 +4005,16 @@ export class GameEngine {
     // burst fire: a semi-auto weapon with `burst` fires that many rounds per
     // trigger pull (e.g. the plasma rifle's 3-round burst), fanned slightly.
     const burstCount = g.burst ?? 1;
+    // M2: Pixel muzzle flash, shell casing, and recoil impulse
+    {
+      const muzzleX = p.x + Math.cos(base) * (p.size + g.barrel);
+      const muzzleY = p.y + Math.sin(base) * (p.size + g.barrel);
+      this.pixelParticles.emitMuzzleFlash(muzzleX, muzzleY, base, g.color || "#ffcc33", 4);
+      if (g.weaponClass === "ranged") {
+        this.pixelParticles.emitShellCasing(muzzleX, muzzleY, base, g);
+      }
+      applyRecoilImpulse(this.recoilState, g);
+    }
     for (let bI = 0; bI < burstCount; bI++) {
       const burstSpread =
         burstCount > 1 ? (bI - (burstCount - 1) / 2) * (g.burstSpread ?? 0.06) : 0;
@@ -4008,7 +4212,7 @@ export class GameEngine {
    *  the world. Shared by firing and the deployable-style aim indicator so the
    *  shell always lands where the marker shows — never at the raw mouse when the
    *  cursor is past the max-range ring. */
-  private mortarTarget(g: GunDef): { x: number; y: number; maxD: number; beyond: boolean } {
+  public mortarTarget(g: GunDef): { x: number; y: number; maxD: number; beyond: boolean } {
     const p = this.player;
     const maxD = g.range ?? (g.bulletSpeed ?? 500) * (g.life ?? 2) * 0.9;
     let dx = this.mouse.x - p.x;
@@ -4120,8 +4324,8 @@ export class GameEngine {
       const lungeDist = 46 + p.comboStep * 18;
       p.x += Math.cos(p.angle) * lungeDist;
       p.y += Math.sin(p.angle) * lungeDist;
-      p.x = Math.max(p.size, Math.min(this.W - p.size, p.x));
-      p.y = Math.max(p.size, Math.min(this.H - p.size, p.y));
+      p.x = Math.max(p.size, Math.min(this.worldW - p.size, p.x));
+      p.y = Math.max(p.size, Math.min(this.worldH - p.size, p.y));
       p.lunge = 14;
       p.iframes = Math.max(p.iframes, 0.12);
     }
@@ -4681,8 +4885,8 @@ export class GameEngine {
             if (bestTgt) {
               bestTgt.hp = Math.min(bestTgt.maxHp, bestTgt.hp + (g.healPerSecond ?? 50) * dt);
               this.effects.push({ type: "heal_beam", x: p.x, y: p.y, targetId: bestTgt.cid, t: 0, duration: 0.1, radius: 2, color: g.color });
-              // Also add green numbers occasionally
-              if (Math.random() < dt * 4) {
+              // Also add green numbers occasionally (capped to prevent memory leak)
+              if (Math.random() < dt * 4 && this.scorePopups.length < 50) {
                 this.scorePopups.push({ x: bestTgt.x, y: bestTgt.y - 20, t: 1.0, score: `+${Math.round(g.healPerSecond ?? 50)}`, color: "#4ade80" });
               }
             } else {
@@ -5002,6 +5206,7 @@ export class GameEngine {
   }
 
   private collideBase(ent: { x: number; y: number }, size: number, b: Base = this.base) {
+    if (this.isDM || this.gameMode === "deathmatch") return;
     const dx = ent.x - b.x;
     const dy = ent.y - b.y;
     const d = Math.hypot(dx, dy);
@@ -5451,7 +5656,7 @@ export class GameEngine {
 
   // ------------------------------------------------------- deployables
   /** Max distance from the player a gadget may be placed / thrown. */
-  private gadgetRange(def: GadgetDef): number {
+  public gadgetRange(def: GadgetDef): number {
     if (def.range) return def.range;
     const k = def.kind;
     if (k === "glue_grenade" || k === "fire_grenade" || k === "poison_grenade" || k === "cluster_grenade")
@@ -5464,7 +5669,7 @@ export class GameEngine {
    * same per-frame drag the live grenades use (see updateGrenades). Returns the
    * initial velocity, fuse and the predicted landing point.
    */
-  private simulateThrow(
+  public simulateThrow(
     px: number,
     py: number,
     tx: number,
@@ -6264,6 +6469,10 @@ export class GameEngine {
 
     if (dealt > 0) {
       this.awardDamageScore(finalAttackerId, dealt);
+      // M2/M4: Floating damage text + blood splat particles
+      const isCrit = dealt > 30;
+      this.floatingText.spawn(e.x, e.y - e.size, String(Math.round(dealt)), { critical: isCrit });
+      this.pixelParticles.emitBloodSplat(e.x, e.y, Math.atan2(kby, kbx));
       if (isLocalAttacker) {
         this.playerDamageDealt += dealt;
         this.recordDamageLog(
@@ -6513,6 +6722,9 @@ export class GameEngine {
     }
     p.hp -= dmg;
     this.playerDamageTaken += dmg;
+    // M4: Floating damage text when player is hit
+    this.floatingText.spawn(p.x, p.y - p.size, String(Math.round(dmg)), { color: "#ff4444" });
+    this.pixelParticles.emitBloodSplat(p.x, p.y, Math.random() * Math.PI * 2);
     this.recordDamageLog(dmg, "enemy_attack", "你", "敌人", false);
     p.flash = 1;
     p.iframes = 0.45;
@@ -6537,7 +6749,6 @@ export class GameEngine {
         this.firing = false;
         this.beamActive = false;
         this.flameActive = false;
-        this.banner = { text: `你被击败 ${RESPAWN_TIME} 秒后复活`, t: 1.6 };
       }
     }
 
@@ -6874,8 +7085,6 @@ export class GameEngine {
                  this.endGame(killer.id === this.selfPid || (this.mode === "local" && killer.id === 0) ? "你赢了" : `${kName} 获胜`);
              }
           }
-        } else if (victim && (victim.id === this.selfPid || (this.mode === "local" && victim.id === 0))) {
-          this.banner = { text: `你被击败 ${RESPAWN_TIME} 秒后复活`, t: 1.6 };
         }
       } else if (p === this.foe) {
         // you downed the opponent
@@ -6895,8 +7104,6 @@ export class GameEngine {
         });
         this.banner = { text: `击杀 ${this.peerName || "对手"}`, t: 1.6 };
         sound.playKillConfirm();
-      } else {
-        this.banner = { text: `你被击败 ${RESPAWN_TIME} 秒后复活`, t: 1.6 };
       }
     }
   }
@@ -7113,8 +7320,8 @@ export class GameEngine {
     if (p.deadTimer <= 0) {
       p.deadTimer = 0;
       p.hp = p.maxHp;
-      p.x = spawnX;
-      p.y = spawnY;
+      p.x = Number.isFinite(spawnX) ? spawnX : this.worldW / 2;
+      p.y = Number.isFinite(spawnY) ? spawnY : this.worldH / 2;
       p.vx = 0;
       p.vy = 0;
       p.iframes = 2;
@@ -7193,8 +7400,8 @@ export class GameEngine {
     this.keys = new Set(inp.keys);
     this.mouse = { x: inp.mx, y: inp.my };
     // adopt the GUEST's joystick vector so the host simulates the foe's movement
-    this.virtualMove.x = inp.vmx;
-    this.virtualMove.y = inp.vmy;
+    this.virtualMove.x = (typeof inp.vmx === "number" && isFinite(inp.vmx)) ? inp.vmx : 0;
+    this.virtualMove.y = (typeof inp.vmy === "number" && isFinite(inp.vmy)) ? inp.vmy : 0;
     this.firing = inp.firing;
     this.skillCd = foe.skillCd ?? 0;
     this.dashCharges = foe.dashCharges ?? MAX_DASH_CHARGES;
@@ -7281,104 +7488,96 @@ export class GameEngine {
       sOut = this.outfit, sSkillDef = this.skill, sActive = this.activeId;
     const sSec = this.secondaryFiring;
     const svmx = this.virtualMove.x, svmy = this.virtualMove.y;
-    // load bot context
-    this.player = c.player;
-    this.guns = c.guns;
-    this.gunIndex = Math.min(c.gunIndex ?? 0, this.guns.length - 1);
-    this.character = c.character;
-    this.outfit = c.outfit;
-    this.skill = c.skill;
-    this.skillCd = c.skillCd ?? 0;
-    this.dashCharges = c.dashCharges ?? MAX_DASH_CHARGES;
-    this.dashRecharge = c.dashRecharge ?? 0;
-    this.lastGadget = c.lastGadget ?? 0;
-    this.gadgets = c.gadgets;
-    this.gadgetCd = c.gadgetCd;
-    this.weaponStates = c.weaponStates;
-    this.semiAutoLatch = false;
-    this.activeId = c.id;
-    // throttle AI decisions: run the heavy brain (botThink) at a fixed rate
-    // (`aiStep`, decoupled from the render frame rate) and replay only the cached
-    // MOVEMENT intent between decisions. AIM + FIRE are recomputed EVERY frame by
-    // `botAimFire` so bots stay aggressive and never hesitate when an enemy appears
-    // between decisions. The decision interval = 1 / botAiHz and can be tuned live
-    // from settings (higher Hz = smarter but more CPU).
-    const decide = (c.aiTimer ?? 0) <= 0;
-    if (decide) {
-      this.keys = new Set();
-      this.mouse = { x: c.player.x, y: c.player.y - 1 };
-      this.virtualMove = { x: 0, y: 0 };
-      this.firing = false;
-      const intent = this.botThink(c, dt);
-      c.aiTimer = this.aiStep;
-      this.botAimFire(c, dt);
-      c.aiMvx = this.virtualMove.x;
-      c.aiMvy = this.virtualMove.y;
-      this.updatePlayer(dt);
-      if (intent.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
-      if (intent.skill) this.activateSkill();
-      if (intent.reload) this.reloadCurrent();
-      if (intent.gadget >= 0)
-        this.deployGadget(intent.gadget, intent.gadgetX ?? this.mouse.x, intent.gadgetY ?? this.mouse.y);
-    } else {
-      c.aiTimer = (c.aiTimer ?? 0) - dt;
-      this.keys = new Set();
-      // IMPORTANT: give `this.mouse` a FRESH object here (like the decide branch).
-      // `sm` is a *reference* to the human's real mouse; without this, botAimFire
-      // would mutate the human's mouse coords directly -> crosshair goes crazy.
-      this.mouse = { x: c.player.x, y: c.player.y - 1 };
-      // replay cached movement, but recompute aim + fire responsively
-      this.virtualMove = { x: c.aiMvx ?? 0, y: c.aiMvy ?? 0 };
-      this.botAimFire(c, dt);
-      this.updatePlayer(dt);
-    }
-    // age the bot's OWN cooldowns so it can actually re-use skills / gadgets /
-    // dashes. (The human's cooldowns are aged in `update()`; the bot context is
-    // only live inside this function, so it must age them here or they'd stay
-    // stuck at their post-use value forever.)
-    if (this.skillCd > 0) this.skillCd -= dt;
-    for (const [k, v] of this.gadgetCd) {
-      if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
-    }
-    if (this.dashCharges < MAX_DASH_CHARGES) {
-      this.dashRecharge += dt;
-      if (this.dashRecharge >= DASH_RECHARGE) {
-        this.dashRecharge = 0;
-        this.dashCharges = Math.min(MAX_DASH_CHARGES, this.dashCharges + 1);
+
+    try {
+      // load bot context
+      this.player = c.player;
+      this.guns = c.guns;
+      this.gunIndex = Math.min(c.gunIndex ?? 0, this.guns.length - 1);
+      this.character = c.character;
+      this.outfit = c.outfit;
+      this.skill = c.skill;
+      this.skillCd = c.skillCd ?? 0;
+      this.dashCharges = c.dashCharges ?? MAX_DASH_CHARGES;
+      this.dashRecharge = c.dashRecharge ?? 0;
+      this.lastGadget = c.lastGadget ?? 0;
+      this.gadgets = c.gadgets;
+      this.gadgetCd = c.gadgetCd;
+      this.weaponStates = c.weaponStates;
+      this.semiAutoLatch = false;
+      this.activeId = c.id;
+
+      const decide = (c.aiTimer ?? 0) <= 0;
+      if (decide) {
+        this.keys = new Set();
+        this.mouse = { x: c.player.x, y: c.player.y - 1 };
+        this.virtualMove = { x: 0, y: 0 };
+        this.firing = false;
+        const intent = this.botThink(c, dt);
+        c.aiTimer = this.aiStep;
+        this.botAimFire(c, dt);
+        c.aiMvx = this.virtualMove.x;
+        c.aiMvy = this.virtualMove.y;
+        this.updatePlayer(dt);
+        if (intent.weaponSwitch) this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+        if (intent.skill) this.activateSkill();
+        if (intent.reload) this.reloadCurrent();
+        if (intent.gadget >= 0)
+          this.deployGadget(intent.gadget, intent.gadgetX ?? this.mouse.x, intent.gadgetY ?? this.mouse.y);
+      } else {
+        c.aiTimer = (c.aiTimer ?? 0) - dt;
+        this.keys = new Set();
+        this.mouse = { x: c.player.x, y: c.player.y - 1 };
+        this.virtualMove = { x: c.aiMvx ?? 0, y: c.aiMvy ?? 0 };
+        this.botAimFire(c, dt);
+        this.updatePlayer(dt);
       }
-    } else {
-      this.dashRecharge = 0;
+      if (this.skillCd > 0) this.skillCd -= dt;
+      for (const [k, v] of this.gadgetCd) {
+        if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
+      }
+      if (this.dashCharges < MAX_DASH_CHARGES) {
+        this.dashRecharge += dt;
+        if (this.dashRecharge >= DASH_RECHARGE) {
+          this.dashRecharge = 0;
+          this.dashCharges = Math.min(MAX_DASH_CHARGES, this.dashCharges + 1);
+        }
+      } else {
+        this.dashRecharge = 0;
+      }
+      // write bot state back
+      c.gunIndex = this.gunIndex;
+      c.skillCd = this.skillCd;
+      c.dashCharges = this.dashCharges;
+      c.dashRecharge = this.dashRecharge;
+      c.lastGadget = this.lastGadget;
+    } catch (botErr) {
+      console.warn("[simulateBot error]", botErr);
+    } finally {
+      // ALWAYS restore human context
+      this.player = sp;
+      this.guns = sGuns;
+      this.gunIndex = sg;
+      this.keys = sk;
+      this.mouse = sm;
+      this.firing = sf;
+      this.gadgets = sGadgets;
+      this.gadgetCd = sGadgetCd;
+      this.weaponStates = sWs;
+      this.skillCd = sSkill;
+      this.dashCharges = sDash;
+      this.dashRecharge = sDashR;
+      this.lastGadget = sLastG;
+      this.semiAutoLatch = sSemi;
+      this.character = sChar;
+      this.outfit = sOut;
+      this.skill = sSkillDef;
+      this.virtualMove.x = svmx;
+      this.virtualMove.y = svmy;
+      this.activeId = sActive;
+      this.secondaryFiring = sSec;
+      this.simulatingOther = false;
     }
-    // write bot state back
-    c.gunIndex = this.gunIndex;
-    c.skillCd = this.skillCd;
-    c.dashCharges = this.dashCharges;
-    c.dashRecharge = this.dashRecharge;
-    c.lastGadget = this.lastGadget;
-    // c.gadgetCd is the SAME Map reference as this.gadgetCd (mutated in place)
-    // restore human context
-    this.player = sp;
-    this.guns = sGuns;
-    this.gunIndex = sg;
-    this.keys = sk;
-    this.mouse = sm;
-    this.firing = sf;
-    this.gadgets = sGadgets;
-    this.gadgetCd = sGadgetCd;
-    this.weaponStates = sWs;
-    this.skillCd = sSkill;
-    this.dashCharges = sDash;
-    this.dashRecharge = sDashR;
-    this.lastGadget = sLastG;
-    this.semiAutoLatch = sSemi;
-    this.character = sChar;
-    this.outfit = sOut;
-    this.skill = sSkillDef;
-    this.virtualMove.x = svmx;
-    this.virtualMove.y = svmy;
-    this.activeId = sActive;
-    this.secondaryFiring = sSec;
-    this.simulatingOther = false;
   }
 
   /** Effective engagement range of a gun (px), used by bot target-range logic. */
@@ -7499,7 +7698,8 @@ export class GameEngine {
       return { x: Math.cos(ang), y: Math.sin(ang) };
     }
 
-    while (cameFrom[curr] !== -1 && cameFrom[curr] !== startIdx) {
+    let traceLimit = 350;
+    while (cameFrom[curr] !== -1 && cameFrom[curr] !== startIdx && traceLimit-- > 0) {
       curr = cameFrom[curr];
     }
 
@@ -7945,6 +8145,46 @@ export class GameEngine {
     };
   }
 
+  private toSnapCombatant(c: Combatant): SnapPlayer {
+    const p = c.player;
+    const currentGun = c.guns[c.gunIndex ?? 0] ?? c.guns[0] ?? this.gun;
+    const ws = c.weaponStates.get(currentGun.id);
+    return {
+      id: c.id,
+      name: c.name,
+      isBot: c.isBot,
+      kills: c.kills,
+      score: c.score,
+      color: c.color,
+      teamId: c.teamId,
+      x: p.x,
+      y: p.y,
+      angle: p.angle,
+      hp: Math.max(0, Math.round(p.hp)),
+      maxHp: p.maxHp,
+      gunIndex: c.gunIndex ?? 0,
+      character: c.character.id,
+      outfit: c.outfit.id,
+      skillId: c.skill.id,
+      dashCharges: c.dashCharges ?? MAX_DASH_CHARGES,
+      maxDashCharges: MAX_DASH_CHARGES,
+      shieldHp: p.shieldHp ?? null,
+      shieldMaxHp: currentGun.shieldMaxHp ?? null,
+      gadgets: c.gadgets.map((g) => ({
+        id: g.id,
+        ready: (c.gadgetCd.get(g.id) ?? 0) <= 0,
+        cdPct: Math.min(1, (c.gadgetCd.get(g.id) ?? 0) / g.cooldown),
+        deployed: 0,
+      })),
+      ammo: currentGun.magazine !== undefined ? ws?.ammo ?? null : null,
+      magazine: currentGun.magazine ?? null,
+      electrified: p.electrifiedTime ?? 0,
+      electrifiedGlow: p.electrifiedGlow ?? "#38bdf8",
+      isCloaked: p.isCloaked ?? false,
+      skillEnergy: p.skillEnergy,
+    };
+  }
+
   /** Build the full world snapshot (used by the host relay AND the authoritative server). */
   buildSnapshot(): Snapshot {
     const snapWalls = this.wallsDirty
@@ -7970,10 +8210,12 @@ export class GameEngine {
       time: this.time,
       scene: this.sceneIndex,
       paused: this.paused,
-      players: [
-        this.toSnapPlayer(this.player, this.character, this.outfit, this.gadgets, this.gadgetCd),
-        ...(this.foe ? [this.toSnapPlayer(this.foe, this.foeChar!, this.foeOutfit!, this.foeGadgets, this.foeGadgetCd)] : [])
-      ],
+      players: this.combatants.length > 0
+        ? this.combatants.map((c) => this.toSnapCombatant(c))
+        : [
+            this.toSnapPlayer(this.player, this.character, this.outfit, this.gadgets, this.gadgetCd),
+            ...(this.foe ? [this.toSnapPlayer(this.foe, this.foeChar!, this.foeOutfit!, this.foeGadgets, this.foeGadgetCd)] : [])
+          ],
       enemies: this.enemies.map((e) => ({
         id: e.id,
         x: e.x,
@@ -8057,7 +8299,7 @@ export class GameEngine {
       dmKills: this.isDM 
         ? (this.gameMode === "team_deathmatch"
           ? [0, 1, 2, 3].map(t => this.combatants.filter(c => c.teamId === t).reduce((sum, c) => sum + c.kills, 0)).filter((_, i, arr) => i === 0 || arr[i] > 0 || this.combatants.some(c => c.teamId === i))
-          : [this.combatants.find(c => c.id === 1)?.kills ?? 0, this.combatants.find(c => c.id === 2)?.kills ?? 0])
+          : (this.combatants.length > 0 ? this.combatants.map(c => c.kills) : [this.combatants.find(c => c.id === 1)?.kills ?? 0, this.combatants.find(c => c.id === 2)?.kills ?? 0]))
         : undefined,
       dmTarget: this.isDM ? this.dmKillLimit : undefined,
       // always present (even when empty) so clients can initialise their
@@ -8082,6 +8324,7 @@ export class GameEngine {
       this.peerLatch.set(pid, l);
     }
     if (frame.weaponSwitch) l.weaponSwitch = true;
+    if (typeof frame.gunIndex === "number" && frame.gunIndex >= 0) l.gunIndex = frame.gunIndex;
     if (frame.skill) l.skill = true;
     if (frame.reload) l.reload = true;
     if (typeof frame.gadget === "number" && frame.gadget >= 0) l.gadget = frame.gadget;
@@ -8096,11 +8339,13 @@ export class GameEngine {
     const merged: InputFrame = {
       ...base,
       weaponSwitch: base.weaponSwitch || l.weaponSwitch,
+      gunIndex: l.gunIndex !== undefined ? l.gunIndex : base.gunIndex,
       skill: base.skill || l.skill,
       reload: base.reload || l.reload,
       gadget: l.gadget >= 0 ? l.gadget : base.gadget,
     };
     l.weaponSwitch = false;
+    l.gunIndex = undefined;
     l.skill = false;
     l.reload = false;
     l.gadget = -1;
@@ -8148,8 +8393,8 @@ export class GameEngine {
     this.gunIndex = Math.min(player.gunIndex ?? 0, this.guns.length - 1);
     this.keys = new Set(inp.keys);
     this.mouse = { x: inp.mx, y: inp.my };
-    this.virtualMove.x = inp.vmx;
-    this.virtualMove.y = inp.vmy;
+    this.virtualMove.x = (typeof inp.vmx === "number" && isFinite(inp.vmx)) ? inp.vmx : 0;
+    this.virtualMove.y = (typeof inp.vmy === "number" && isFinite(inp.vmy)) ? inp.vmy : 0;
     this.firing = inp.firing;
     this.secondaryFiring = !!inp.secondaryFiring;
     this.skillCd = player.skillCd ?? 0;
@@ -8221,6 +8466,11 @@ export class GameEngine {
     this.updateEnemyBullets(dt);
     this.updateEnemies(dt);
     this.updateParticles(dt);
+    // M2-M4: Tick new pixel engine subsystems
+    this.pixelParticles.update(dt);
+    this.floatingText.update(dt);
+    this.minimap.update(dt);
+    updateRecoil(this.recoilState, dt);
     this.updateEffects(dt);
     this.updatePickups(dt);
     this.updateTrain(dt);
@@ -8363,6 +8613,115 @@ export class GameEngine {
     }
   }
 
+  private simulatePeerCombatant(c: Combatant, inp: InputFrame, dt: number) {
+    if (!c || !c.player || !inp) return;
+    if (c.player.deadTimer && c.player.deadTimer > 0) return;
+
+    // Save current simulation context
+    const sp = this.player,
+      sg = this.gunIndex,
+      sk = this.keys,
+      sm = this.mouse,
+      sf = this.firing,
+      sGuns = this.guns,
+      sGadgets = this.gadgets,
+      sGadgetCd = this.gadgetCd,
+      sWs = this.weaponStates,
+      sSkill = this.skillCd,
+      sDash = this.dashCharges,
+      sDashR = this.dashRecharge,
+      sLastG = this.lastGadget,
+      sSemi = this.semiAutoLatch,
+      sActive = this.activeId,
+      sSec = this.secondaryFiring,
+      sChar = this.character,
+      sOut = this.outfit,
+      sSkillDef = this.skill,
+      svmx = this.virtualMove.x,
+      svmy = this.virtualMove.y;
+
+    // Load combatant context
+    this.player = c.player;
+    this.guns = c.guns.length ? c.guns : this.guns;
+    this.gunIndex = Math.min(c.gunIndex ?? 0, this.guns.length - 1);
+    this.character = c.character;
+    this.outfit = c.outfit;
+    this.skill = c.skill;
+    this.keys = new Set(inp.keys);
+    this.mouse = { x: inp.mx, y: inp.my };
+    this.virtualMove.x = (typeof inp.vmx === "number" && isFinite(inp.vmx)) ? inp.vmx : 0;
+    this.virtualMove.y = (typeof inp.vmy === "number" && isFinite(inp.vmy)) ? inp.vmy : 0;
+    this.firing = inp.firing;
+    this.secondaryFiring = !!inp.secondaryFiring;
+    this.skillCd = c.skillCd ?? 0;
+    this.dashCharges = c.dashCharges ?? MAX_DASH_CHARGES;
+    this.dashRecharge = c.dashRecharge ?? 0;
+    this.lastGadget = c.lastGadget ?? 0;
+    this.gadgets = c.gadgets.length ? c.gadgets : this.gadgets;
+    this.gadgetCd = c.gadgetCd;
+    this.activeId = c.id;
+    this.weaponStates = c.weaponStates;
+
+    // decay cooldowns
+    for (const [k, v] of this.gadgetCd) {
+      if (v > 0) this.gadgetCd.set(k, Math.max(0, v - dt));
+    }
+    if (this.skillCd > 0) this.skillCd = Math.max(0, this.skillCd - dt);
+    if (this.dashCharges < MAX_DASH_CHARGES) {
+      this.dashRecharge += dt;
+      if (this.dashRecharge >= 3.5) {
+        this.dashRecharge = 0;
+        this.dashCharges++;
+      }
+    }
+
+    this.semiAutoLatch = false;
+    this.updatePlayer(dt);
+
+    if (!this.player.stunTime || this.player.stunTime <= 0) {
+      if (typeof inp.gunIndex === "number" && inp.gunIndex >= 0 && inp.gunIndex < this.guns.length) {
+        this.clearGadgetSelection();
+        this.gunIndex = inp.gunIndex;
+      } else if (inp.weaponSwitch) {
+        this.clearGadgetSelection();
+        this.gunIndex = (this.gunIndex + 1) % this.guns.length;
+      }
+      if (inp.skill) this.activateSkill();
+      if (inp.reload) this.reloadCurrent();
+      if (inp.gadget !== undefined && inp.gadget >= 0) this.deployGadget(inp.gadget, this.mouse.x, this.mouse.y);
+    }
+
+    // Write back combatant state
+    c.gunIndex = this.gunIndex;
+    c.skillCd = this.skillCd;
+    c.dashCharges = this.dashCharges;
+    c.dashRecharge = this.dashRecharge;
+    c.lastGadget = this.lastGadget;
+
+    // Restore original context
+    this.player = sp;
+    this.guns = sGuns;
+    this.gunIndex = sg;
+    this.character = sChar;
+    this.outfit = sOut;
+    this.skill = sSkillDef;
+    this.keys = sk;
+    this.mouse = sm;
+    this.firing = sf;
+    this.gadgets = sGadgets;
+    this.gadgetCd = sGadgetCd;
+    this.skillCd = sSkill;
+    this.dashCharges = sDash;
+    this.dashRecharge = sDashR;
+    this.lastGadget = sLastG;
+    this.semiAutoLatch = sSemi;
+    this.activeId = sActive;
+    this.weaponStates = sWs;
+    this.secondaryFiring = sSec;
+    this.virtualMove.x = svmx;
+    this.virtualMove.y = svmy;
+  }
+
   /**
    * Authoritative fixed-step update driven by the Node server. Both peers are
    * simulated from their network input frames; the world is then advanced and a
@@ -8377,13 +8736,208 @@ export class GameEngine {
       }
       return;
     }
-    const fA = this.takePeerFrame(this.selfPid);
-    const fB = this.takePeerFrame(this.peerPid);
-    if (this.player)
-      this.simulatePeer(this.player, fA, this.guns, this.gadgets, this.gadgetCd, dt);
-    if (this.foe)
-      this.simulatePeer(this.foe, fB, this.foeGuns, this.foeGadgets, this.foeGadgetCd, dt);
+    if (this.combatants.length > 0) {
+      for (const c of this.combatants) {
+        if (!c.isBot) {
+          const frame = this.takePeerFrame(c.id);
+          if (frame) {
+            this.simulatePeerCombatant(c, frame, dt);
+          } else {
+            this.simulatePeerCombatant(c, {
+              keys: [],
+              mx: c.player.x + Math.cos(c.player.angle),
+              my: c.player.y + Math.sin(c.player.angle),
+              vmx: 0,
+              vmy: 0,
+              firing: false,
+              gadget: -1,
+              weaponSwitch: false,
+              skill: false,
+              reload: false
+            }, dt);
+          }
+        } else {
+          this.simulateBot(c, dt);
+        }
+      }
+    } else {
+      const fA = this.takePeerFrame(this.selfPid);
+      const fB = this.takePeerFrame(this.peerPid);
+      if (this.player)
+        this.simulatePeer(this.player, fA, this.guns, this.gadgets, this.gadgetCd, dt);
+      if (this.foe)
+        this.simulatePeer(this.foe, fB, this.foeGuns, this.foeGadgets, this.foeGadgetCd, dt);
+    }
     this.simulateWorld(dt);
+  }
+
+  /**
+   * Server: register N real human players and fill the rest up to totalCount (default 8) with bots.
+   */
+  setupServerMultiplayerMatch(
+    peers: { pid: number; name: string; loadout: Loadout }[],
+    totalCount = 8
+  ) {
+    this.selfPid = peers[0]?.pid ?? 1;
+    this.peerInput.clear();
+    this.peerLatch.clear();
+
+    this.isDM = true;
+    this.gameMode = "deathmatch";
+    this.dmKillLimit = 24;
+    this.dmTimeLeft = 300;
+    this.base.hp = Infinity;
+    this.base.maxHp = Infinity;
+    this.enemyBase.hp = Infinity;
+    this.enemyBase.maxHp = Infinity;
+
+    this.dmSpawns = this.generateCombatSpawns(totalCount);
+
+    const humanColors = [
+      "#38bdf8", "#f472b6", "#a3e635", "#fbbf24",
+      "#c084fc", "#34d399", "#f87171", "#e879f9"
+    ];
+    const botColors = [
+      "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9",
+      "#64748b", "#475569", "#334155", "#1e293b"
+    ];
+    const botNames = [
+      "智械-阿尔法", "智械-贝塔", "智械-伽马", "智械-德尔塔",
+      "智械-艾普", "智械-泽塔", "智械-伊塔", "智械-西塔"
+    ];
+
+    const combatants: Combatant[] = [];
+
+    // 1. Create human combatants
+    for (let i = 0; i < peers.length; i++) {
+      const peer = peers[i];
+      const sp = this.dmSpawns[i] ?? { x: this.worldW / 2, y: this.worldH / 2 };
+      const lo = peer.loadout ?? this.loadout;
+      const cDef = getCharacter(lo.characterId ?? "raider");
+      const oDef = getOutfit(lo.outfitId ?? "tactical");
+      const maxHp = RUNTIME.playerBaseHp > 0 ? RUNTIME.playerBaseHp : Math.round(cDef.maxHp + oDef.hpBonus);
+
+      const guns = (lo.gunIds && lo.gunIds.length > 0)
+        ? lo.gunIds.map((gid) => GUNS.find((g) => g.id === gid) ?? GUNS[0]).slice(0, 2)
+        : [GUNS.find((g) => g.id === lo.gunId) ?? GUNS[0]];
+
+      const gad = (lo.gadgetIds ?? [])
+        .map((gid) => GADGETS.find((g) => g.id === gid))
+        .filter((g): g is GadgetDef => !!g)
+        .slice(0, 3);
+      const chosenGadgets = gad.length > 0 ? gad : GADGETS.slice(0, 3);
+
+      const ws = new Map<string, WeaponState>();
+      for (const g of guns) {
+        ws.set(g.id, { ammo: g.magazine ?? 0, reload: 0, heat: 0, overheated: false });
+      }
+      const gc = new Map<string, number>();
+      for (const g of chosenGadgets) {
+        gc.set(g.id, 0);
+      }
+
+      let playerEntity: Player;
+      if (i === 0) {
+        this.player.x = sp.x;
+        this.player.y = sp.y;
+        this.player.hp = maxHp;
+        this.player.maxHp = maxHp;
+        this.player.cid = peer.pid;
+        this.player.speed = cDef.speed * (1 + oDef.speedBonus);
+        this.player.size = cDef.size;
+        this.character = cDef;
+        this.outfit = oDef;
+        this.guns = guns;
+        this.weaponStates = ws;
+        this.gadgets = chosenGadgets;
+        this.gadgetCd = gc;
+        playerEntity = this.player;
+      } else {
+        playerEntity = {
+          x: sp.x,
+          y: sp.y,
+          vx: 0,
+          vy: 0,
+          angle: Math.PI,
+          hp: maxHp,
+          maxHp,
+          size: cDef.size,
+          speed: cDef.speed * (1 + oDef.speedBonus),
+          fireTimer: 0,
+          iframes: 0,
+          flash: 0,
+          dashVx: 0,
+          dashVy: 0,
+          dashTime: 0,
+          shieldTime: 0,
+          overdriveTime: 0,
+          slamCd: 0,
+          t: 0,
+          swingTimer: 0,
+          swingDur: 0.22,
+          comboStep: 0,
+          comboTimer: 0,
+          lunge: 0,
+          bowCharge: 0,
+          bowDrawing: false,
+          shieldBlockTime: 0,
+          shieldHp: 0,
+          shieldCd: 0,
+          lastHitTime: 0,
+          cid: peer.pid,
+          gunIndex: 0,
+          skillCd: 0,
+          dashCharges: MAX_DASH_CHARGES,
+          dashRecharge: 0,
+          lastGadget: 0,
+        };
+      }
+
+      combatants.push({
+        id: peer.pid,
+        isBot: false,
+        name: peer.name || `玩家${peer.pid}`,
+        color: humanColors[i % humanColors.length],
+        player: playerEntity,
+        character: cDef,
+        outfit: oDef,
+        skill: getSkill(lo.skillId ?? "dash"),
+        guns,
+        gunIndex: 0,
+        weaponStates: ws,
+        gadgets: chosenGadgets,
+        selectedGadget: -1,
+        skillCd: 0,
+        dashCharges: MAX_DASH_CHARGES,
+        dashRecharge: 0,
+        gadgetCd: gc,
+        lastGadget: 0,
+        kills: 0,
+        score: 0,
+        wander: 0,
+        strafeDir: 1,
+        strafeTimer: 0,
+      });
+    }
+
+    // 2. Create AI bots for remaining slots
+    const botCount = Math.max(0, totalCount - peers.length);
+    const botPicks = this.rollBotLoadouts(botCount);
+    for (let j = 0; j < botCount; j++) {
+      const botPid = peers.length + j + 1;
+      const sp = this.dmSpawns[peers.length + j] ?? { x: this.worldW / 2, y: this.worldH / 2 };
+      const bot = this.makeBot(
+        botPid,
+        botPicks[j],
+        botNames[j % botNames.length],
+        botColors[j % botColors.length],
+        sp.x,
+        sp.y
+      );
+      combatants.push(bot);
+    }
+
+    this.combatants = combatants;
   }
 
   /** Server: begin the match once both peers are present. */
@@ -8508,25 +9062,30 @@ export class GameEngine {
       keys: [...this.keys],
       mx: this.mouse.x,
       my: this.mouse.y,
-      vmx: this.virtualMove.x,
-      vmy: this.virtualMove.y,
+      vmx: typeof this.virtualMove?.x === "number" && isFinite(this.virtualMove.x) ? this.virtualMove.x : 0,
+      vmy: typeof this.virtualMove?.y === "number" && isFinite(this.virtualMove.y) ? this.virtualMove.y : 0,
       firing: this.firing,
       gadget: this.pendGadget,
       skill: this.pendSkill,
       reload: this.pendReload,
       weaponSwitch: this.pendWeapon,
+      gunIndex: this.pendGunIndex !== null ? this.pendGunIndex : this.gunIndex,
       secondaryFiring: this.secondaryFiring,
     };
     this.pendGadget = -1;
     this.pendSkill = false;
     this.pendReload = false;
     this.pendWeapon = false;
+    this.pendGunIndex = null;
     this.net.sendGame({ t: "inp", input: inp });
   }
+
+  private lastSnapArriveTime = 0;
 
   private applySnapshot() {
     const s = this.lastSnap;
     if (!s) return;
+    this.lastSnapArriveTime = typeof performance !== "undefined" ? performance.now() : Date.now();
     // adopt the host-authoritative scene + pause state
     this.sceneTheme = SCENES[s.scene] ?? SCENES[0];
     this.sceneIndex = s.scene ?? 0; // keeps per-map building art in sync with the host
@@ -8833,11 +9392,8 @@ export class GameEngine {
   private renderNet(ctx: CanvasRenderingContext2D) {
     const s = this.lastSnap;
     if (!s) return;
-    ctx.save();
-    if (this.shake > 0.2) ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
-    ctx.translate(-this.camX, -this.camY);
 
-    this.drawDecorations(ctx);
+    this.renderQueue.clear();
 
     // age the mirrored effects by real frame time so they animate smoothly
     // between 30Hz snapshots (the host sends their current elapsed `t`).
@@ -8864,117 +9420,184 @@ export class GameEngine {
       return prev;
     };
 
-    // Each side renders ITS OWN base at the bottom of its own screen. The
-    // joiner (pid 2) defends the world's top base (this.enemyBase); the creator
-    // (pid 1) defends the bottom one (this.base). Use selfPid so the
-    // authoritative path (both peers run as "guest") orients correctly.
-    if (this.gameMode !== "biohazard") {
-      const ownBase = this.mode === "guest" ? this.enemyBase : this.base;
-      const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
-      this.drawBase(ctx, ownBase, true);
-      this.drawBase(ctx, foeBase, false);
+    // Layer 0: Ground
+    this.renderQueue.push(RenderLayer.Ground, 0, (c) => {
+      this.drawDecorations(c);
+      if (!this.isDM && this.gameMode !== "deathmatch" && this.gameMode !== "biohazard") {
+        const ownBase = this.mode === "guest" ? this.enemyBase : this.base;
+        const foeBase = this.mode === "guest" ? this.base : this.enemyBase;
+        this.drawBase(c, ownBase, true);
+        this.drawBase(c, foeBase, false);
+      }
+      this.drawArenaBorder(c);
+    });
+
+    // Layer 1 (Shadow) & Layer 2 (YSorted) for Walls
+    for (const w of this.walls) {
+      if (w.invisible) continue;
+      this.renderQueue.push(RenderLayer.Shadow, 0, (c) => {
+        c.fillStyle = "rgba(0,0,0,0.35)";
+        c.fillRect(w.x - 2, w.y + w.h + 1, w.w + 4, 6);
+      });
+      const footY = w.y + w.h;
+      this.renderQueue.push(RenderLayer.YSorted, footY, (c) => {
+        this.drawSingleWall(c, w);
+      }, null, Math.round(w.x * 1000 + footY));
     }
-    // terrain cover walls + arena border (mirrored from the snapshot)
-    this.drawWalls(ctx);
-    this.drawArenaBorder(ctx);
-    // mirror the host's thrown grenades + deployed gadgets (the guest runs no sim)
-    {
+
+    // Layer 2: Deployables & Grenades
+    this.renderQueue.push(RenderLayer.YSorted, 0, (c) => {
       const rg = this.grenades;
       const rd = this.deployables;
       this.grenades = this.netGrenades;
       this.deployables = this.netDeployables;
-      this.drawGrenades(ctx);
-      this.drawDeployables(ctx);
+      this.drawGrenades(c);
+      this.drawDeployables(c);
       this.grenades = rg;
       this.deployables = rd;
-    }
+    });
+
     if (this.trainActive) {
-      drawPixelTrain(ctx, this.trainX, this.trainTrackY, this.trainDir, this.time, this.trainWarning);
+      this.renderQueue.push(RenderLayer.YSorted, this.trainTrackY, (c) => {
+        drawPixelTrain(c, this.trainX, this.trainTrackY, this.trainDir, this.time, this.trainWarning);
+      });
     }
+
+    // Layer 2: Enemies (YSorted)
     for (const e of s.enemies) {
       const r = ease(e.id, e.x, e.y);
       const rx = Math.round(r.x);
       const ry = Math.round(r.y);
       const sz = Math.round(e.size);
       const c = getCharacter(e.character);
-      // Pixel monster/character body
-      ctx.fillStyle = "#09090b";
-      ctx.fillRect(rx - sz - 1, ry - sz - 1, sz * 2 + 2, sz * 2 + 2);
-      ctx.fillStyle = c?.bodyColor ?? "#f87171";
-      ctx.fillRect(rx - sz, ry - sz, sz * 2, sz * 2);
-      // Pixel eyes
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(rx + Math.round(sz * 0.3), ry - Math.round(sz * 0.3), 3, 3);
-      ctx.fillRect(rx + Math.round(sz * 0.3), ry + Math.round(sz * 0.1), 3, 3);
+      this.renderQueue.push(RenderLayer.YSorted, ry + sz, (ctx2) => {
+        // Pixel monster/character body
+        ctx2.fillStyle = "#09090b";
+        ctx2.fillRect(rx - sz - 1, ry - sz - 1, sz * 2 + 2, sz * 2 + 2);
+        ctx2.fillStyle = c?.bodyColor ?? "#f87171";
+        ctx2.fillRect(rx - sz, ry - sz, sz * 2, sz * 2);
+        // Pixel eyes
+        ctx2.fillStyle = "#ffffff";
+        ctx2.fillRect(rx + Math.round(sz * 0.3), ry - Math.round(sz * 0.3), 3, 3);
+        ctx2.fillRect(rx + Math.round(sz * 0.3), ry + Math.round(sz * 0.1), 3, 3);
 
-      if (e.hp < e.maxHp) {
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(rx - sz, ry - sz - 7, sz * 2, 5);
-        ctx.fillStyle = "#ef4444";
-        ctx.fillRect(rx - sz, ry - sz - 7, sz * 2 * (e.hp / e.maxHp), 5);
-      }
+        if (e.hp < e.maxHp) {
+          ctx2.fillStyle = "rgba(0,0,0,0.6)";
+          ctx2.fillRect(rx - sz, ry - sz - 7, sz * 2, 5);
+          ctx2.fillStyle = "#ef4444";
+          ctx2.fillRect(rx - sz, ry - sz - 7, sz * 2 * (e.hp / e.maxHp), 5);
+        }
+      });
     }
+
+    // Layer 2: Players (YSorted)
     for (const p of s.players) {
       if (p.hp <= 0) continue; // downed players are hidden until they respawn
       const isMe = p.id === this.selfPid;
       const r = isMe ? { x: this.player.x, y: this.player.y } : ease(p.id, p.x, p.y);
-      const gunList = isMe ? this.guns : this.foeGuns;
-      const size = isMe ? this.player.size : getCharacter(p.character).size;
-      if (isMe) {
-        this.drawThrustSwordChargeIndicator(ctx, this.player);
+      const combatantDef = this.combatants.find((cb) => cb.id === p.id);
+      const gunList = isMe ? this.guns : (combatantDef?.guns?.length ? combatantDef.guns : (this.foeGuns.length ? this.foeGuns : GUNS));
+      const charDef = getCharacter(p.character);
+      const size = isMe ? this.player.size : (charDef?.size ?? 20);
+      const pName = isMe ? this.character.name : (p.name || combatantDef?.name || this.peerName || (p.isBot ? "人机" : `玩家${p.id}`));
+      this.renderQueue.push(RenderLayer.YSorted, r.y + size, (ctx2) => {
+        if (isMe) {
+          this.drawThrustSwordChargeIndicator(ctx2, this.player);
+        }
+        this.drawNetCharacter(
+          ctx2,
+          Math.round(r.x),
+          Math.round(r.y),
+          p.angle,
+          p.character,
+          p.outfit,
+          p.gunIndex ?? 0,
+          gunList,
+          pName,
+          p.hp / (p.maxHp || 250),
+          this.time,
+          size,
+          p.selectedGadget !== undefined && p.selectedGadget >= 0 ? (isMe ? this.gadgets[p.selectedGadget] : GADGETS[p.selectedGadget]) : undefined,
+          undefined,
+          undefined,
+          isMe ? "#ffffff" : "#fca5a5",
+          false,
+          isMe ? "#22c55e" : "#ef4444",
+          isMe ? 4 : 7
+        );
+        if (p.electrified > 0) {
+          this.drawElectricArcs(ctx2, r.x, r.y, size, p.electrifiedGlow, this.time);
+        }
+      });
+    }
+
+    // Layer 4: AirborneFX (Aim preview, Bullets, Particles, Effects)
+    this.renderQueue.push(RenderLayer.AirborneFX, 0, (ctx2) => {
+      this.drawAimPreview(ctx2);
+      const bulletDt = Math.min(0.045, Math.max(0, (performance.now() - (this.lastSnapArriveTime || performance.now())) / 1000));
+      for (const b of s.bullets) {
+        const bx = Math.round(b.x + (b.vx || 0) * bulletDt);
+        const by = Math.round(b.y + (b.vy || 0) * bulletDt);
+        ctx2.save();
+        ctx2.translate(bx, by);
+        ctx2.rotate(Math.atan2(b.vy, b.vx));
+        const bw = Math.max(5, Math.round(b.size * 2.2));
+        const bh = Math.max(3, Math.round(b.size * 1.3));
+        ctx2.fillStyle = "#09090b";
+        ctx2.fillRect(Math.round(-bw / 2) - 1, Math.round(-bh / 2) - 1, bw + 2, bh + 2);
+        ctx2.fillStyle = b.color;
+        ctx2.fillRect(Math.round(-bw / 2), Math.round(-bh / 2), bw, bh);
+        ctx2.fillStyle = "#ffffff";
+        ctx2.fillRect(Math.round(-bw / 2) + 1, Math.round(-bh / 2) + 1, Math.max(2, bw - 2), Math.max(1, bh - 2));
+        ctx2.restore();
       }
-      this.drawNetCharacter(
-        ctx,
-        Math.round(r.x),
-        Math.round(r.y),
-        p.angle,
-        p.character,
-        p.outfit,
-        p.gunIndex ?? 0,
-        gunList,
-        isMe ? this.character.name : this.peerName || "对手",
-        p.hp / p.maxHp,
-        this.time,
-        size,
-        p.selectedGadget !== undefined && p.selectedGadget >= 0 ? (isMe ? this.gadgets[p.selectedGadget] : GADGETS[p.selectedGadget]) : undefined,
-        undefined,
-        undefined,
-        isMe ? "#ffffff" : "#fca5a5",
-        false,
-        isMe ? "#22c55e" : "#ef4444",
-        isMe ? 4 : 7
-      );
-      if (p.electrified > 0) {
-        this.drawElectricArcs(ctx, r.x, r.y, size, p.electrifiedGlow, this.time);
+      this.drawParticles(ctx2);
+      if (this.netEffects.length) this.drawEffects(ctx2, this.netEffects as unknown as Effect[]);
+    });
+
+    // Dynamic Lighting pass for guest/snapshot mode
+    this.lighting.beginFrame();
+    this.lighting.setTheme(this.loadout?.customMap?.themeId ?? this.sceneTheme?.id ?? "citadel");
+
+    // 1. Players Ambient Lantern (F10)
+    for (const p of s.players) {
+      if (p.hp <= 0) continue;
+      const isMe = p.id === this.selfPid;
+      const r = isMe ? { x: this.player.x, y: this.player.y } : ease(p.id, p.x, p.y);
+      this.lighting.addPlayerLantern(r.x, r.y, p.angle, this.time);
+    }
+
+    // 2. Bullets Glow (F11)
+    for (const b of s.bullets) {
+      this.lighting.addBulletLight(b.x, b.y, Math.max(20, b.size * 3.5), b.color);
+    }
+
+    // 3. Detonations / Explosions / Hazards (F12, F13)
+    for (const e of this.netEffects) {
+      if (e.type === "explosion" || e.type === "shock") {
+        this.lighting.addExplosionLight(e.x, e.y, e.t / e.duration, e.radius * 2.2);
+      } else if (e.type === "poisoncloud") {
+        this.lighting.addHazardGlow(e.x, e.y, e.radius * 1.1, "rgba(74, 222, 128, 0.75)");
+      } else if (e.type === "firefield") {
+        this.lighting.addHazardGlow(e.x, e.y, e.radius * 1.1, "rgba(249, 115, 22, 0.75)");
       }
     }
-    // local gadget aiming preview (selection highlight + throw/deploy hint)
-    this.drawAimPreview(ctx);
-    // 16-bit retro pixel projectile rendering
-    for (const b of s.bullets) {
-      const bx = Math.round(b.x);
-      const by = Math.round(b.y);
-      ctx.save();
-      ctx.translate(bx, by);
-      ctx.rotate(Math.atan2(b.vy, b.vx));
-      const bw = Math.max(5, Math.round(b.size * 2.2));
-      const bh = Math.max(3, Math.round(b.size * 1.3));
-      // Outer dark pixel outline
-      ctx.fillStyle = "#09090b";
-      ctx.fillRect(Math.round(-bw / 2) - 1, Math.round(-bh / 2) - 1, bw + 2, bh + 2);
-      // Bright bullet body
-      ctx.fillStyle = b.color;
-      ctx.fillRect(Math.round(-bw / 2), Math.round(-bh / 2), bw, bh);
-      // White hot core pixel strip
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(Math.round(-bw / 2) + 1, Math.round(-bh / 2) + 1, Math.max(2, bw - 2), Math.max(1, bh - 2));
+
+    const snapCam = this.viewport ? this.viewport.snapCamera(this.camX, this.camY) : { x: Math.round(this.camX), y: Math.round(this.camY) };
+    this.lighting.renderMask(snapCam.x, snapCam.y);
+
+    ctx.save();
+    try {
+      if (this.shake > 0.2) ctx.translate(Math.round((Math.random() - 0.5) * this.shake), Math.round((Math.random() - 0.5) * this.shake));
+      ctx.translate(-snapCam.x, -snapCam.y);
+      this.renderQueue.flushWorld(ctx, (c) => {
+        this.lighting.composite(c, snapCam.x, snapCam.y);
+      });
+    } finally {
       ctx.restore();
     }
-    // draw particles
-    this.drawParticles(ctx);
-    // mirrored host effects (explosions, sweeps, shockwaves, ...)
-    if (this.netEffects.length) this.drawEffects(ctx, this.netEffects as unknown as Effect[]);
-    ctx.restore();
+    this.renderQueue.flushScreenUI(ctx);
+    this.renderQueue.clear();
   }
 
   private damageWall(w: Wall, dmg: number) {
@@ -9026,7 +9649,7 @@ export class GameEngine {
   /** Rebuild the broad-phase spatial grid from current targets. Called once
    *  per collision pass; positions are fresh enough for a single frame. */
   private buildGrid() {
-    this.grid.clear();
+    for (const arr of this.grid.values()) arr.length = 0;
     let maxR = 0;
     const cs = GRID_CELL;
     const put = (it: GridItem) => {
@@ -9174,6 +9797,8 @@ export class GameEngine {
       radius: r,
       color: glowColor,
     });
+    // M2: Pixel explosion particles (sparks, smoke, debris)
+    this.pixelParticles.emitExplosion(x, y, r, glowColor);
     this.effects.push({
       type: "shock",
       x,
@@ -9798,8 +10423,10 @@ export class GameEngine {
     return getSkill(id);
   }
 
+  private lastCpuMs = 0;
+  private lastGpuMs = 0;
   private lastHudEmit = 0;
-    private emit(immediate = false) {
+  private emit(immediate = false) {
     // While simulating a bot / remote foe we swap the engine's single context
     // onto them; any emit() here would push THEIR state into the player's HUD
     // and cause a brief flicker (e.g. the bot uses a skill). Skip it — the
@@ -9963,8 +10590,97 @@ export class GameEngine {
           characterName: this.character?.name
         }]
       ) : undefined,
+      perfStats: {
+        cpuMs: Number(this.lastCpuMs.toFixed(1)),
+        gpuMs: Number(this.lastGpuMs.toFixed(1)),
+        memoryMb: typeof performance !== "undefined" && (performance as any).memory?.usedJSHeapSize
+          ? Math.round((performance as any).memory.usedJSHeapSize / (1024 * 1024))
+          : undefined,
+      },
     };
     this.onHud(hud);
+  }
+
+  // ---------------------------------------------------------------- render
+  private drawSingleCombatant(ctx: CanvasRenderingContext2D, c: Combatant) {
+    const q = c.player;
+    if (q.deadTimer && q.deadTimer > 0) return;
+
+    const isLocalC = this.mode === "local" ? c.id === 0 : c.id === this.selfPid;
+    if (isLocalC) {
+      this.drawThrustSwordChargeIndicator(ctx, q);
+    }
+
+    const isTeammate = this.isTeammate(this.activeId, c.id);
+    const cloakAlpha = isLocalC ? 0.15 : isTeammate ? 0.35 : 0.08;
+    const nameColor = isLocalC ? "#ffffff" : isTeammate ? "#7dd3fc" : "#fca5a5";
+    const hpBarColor = isLocalC ? "#22c55e" : isTeammate ? "#38bdf8" : "#ef4444";
+    const hpBarHeight = isLocalC || isTeammate ? 4 : 7;
+
+    this.drawNetCharacter(
+      ctx,
+      q.x,
+      q.y,
+      q.angle,
+      c.character.id,
+      c.outfit.id,
+      q.gunIndex ?? c.gunIndex ?? 0,
+      c.guns,
+      c.name,
+      q.hp / q.maxHp,
+      this.time,
+      q.size,
+      c.selectedGadget >= 0 ? c.gadgets[c.selectedGadget] : undefined,
+      q.isCloaked,
+      cloakAlpha,
+      nameColor,
+      this.gameMode === "team_deathmatch" && isTeammate,
+      hpBarColor,
+      hpBarHeight
+    );
+    if (q.electrifiedTime && q.electrifiedTime > 0) {
+      this.drawElectricArcs(ctx, q.x, q.y, q.size, q.electrifiedGlow ?? "#38bdf8", this.time);
+    }
+    if (q.iframes > 0 && q.dashTime <= 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.4 + Math.sin(this.time * 20) * 0.2;
+      ctx.fillStyle = "#e0f2fe";
+      for (let i = 0; i < 4; i++) {
+        const a = this.time * 4 + (i * Math.PI) / 2;
+        const nx = Math.round(q.x + Math.cos(a) * (q.size + 4));
+        const ny = Math.round(q.y + Math.sin(a) * (q.size + 4));
+        ctx.fillRect(nx - 1, ny - 1, 3, 3);
+      }
+      ctx.restore();
+    }
+  }
+
+  private drawSingleFoe(ctx: CanvasRenderingContext2D) {
+    if (!this.foe || (this.foe.deadTimer && this.foe.deadTimer > 0)) return;
+    this.drawNetCharacter(
+      ctx,
+      this.foe.x,
+      this.foe.y,
+      this.foe.angle,
+      this.foeChar?.id ?? "raider",
+      this.foeOutfit?.id ?? "tactical",
+      this.foe.gunIndex ?? 0,
+      this.foeGuns,
+      this.peerName || "对手",
+      this.foe.hp / this.foe.maxHp,
+      this.time,
+      this.foe.size,
+      this.foe.selectedGadget !== undefined && this.foe.selectedGadget >= 0 ? (this.foeGadgets?.[this.foe.selectedGadget] ?? GADGETS[this.foe.selectedGadget]) : undefined,
+      this.foe.isCloaked,
+      0.08,
+      "#fca5a5",
+      false,
+      "#ef4444",
+      7
+    );
+    if (this.foe.electrifiedTime && this.foe.electrifiedTime > 0) {
+      this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
+    }
   }
 
   // ---------------------------------------------------------------- render
@@ -9972,142 +10688,246 @@ export class GameEngine {
     const ctx = this.ctx;
     // headless / server mode: no canvas, simulation only
     if (!ctx) return;
-    ctx.clearRect(0, 0, this.W, this.H);
-    this.drawBackground(ctx);
+
+    // 1. Begin frame on Virtual Pixel Viewport (480x270 virtual buffer)
+    const vCtx = this.viewport ? this.viewport.beginFrame() : ctx;
+    if (!vCtx) return;
+
+    this.renderQueue.clear();
+    this.drawBackground(vCtx);
 
     // guest / authoritative-server clients render the world straight from the snapshot
     if (this.mode === "guest" || this.authoritative) {
-      this.renderNet(ctx);
-      this.drawCrosshair(ctx);
-      this.drawOverlays(ctx);
+      this.renderNet(vCtx);
+      this.drawCrosshair(vCtx);
+      this.drawOverlays(vCtx);
+      if (this.viewport) this.viewport.endFrame(ctx);
       return;
     }
 
-    ctx.save();
-    if (this.shake > 0.2) {
-      ctx.translate(
-        (Math.random() - 0.5) * this.shake,
-        (Math.random() - 0.5) * this.shake
-      );
-    }
-    // camera offset for world-space rendering
-    ctx.translate(-this.camX, -this.camY);
+    // Submit scene elements to 6-layer RenderQueue:
+    // Layer 0: Ground (Floor decorations, bases, arena border, field effects)
+    this.renderQueue.push(RenderLayer.Ground, 0, (c) => {
+      this.drawDecorations(c);
+      if (this.gameMode !== "biohazard" && !this.isDM) {
+        this.drawBase(c, this.enemyBase, false);
+        this.drawBase(c, this.base, true);
+      }
+      this.drawArenaBorder(c);
+      this.drawFieldEffects(c);
+    });
 
-    this.drawDecorations(ctx);
-    this.drawWalls(ctx);
-    this.drawDeployables(ctx);
-    if (this.gameMode !== "biohazard" && !this.isDM) {
-      this.drawBase(ctx, this.enemyBase, false);
-      this.drawBase(ctx, this.base, true);
+    // Layer 1 (Shadow) & Layer 2 (YSorted) for Walls
+    for (const w of this.walls) {
+      if (w.invisible) continue;
+      if (!this.inView(w.x, w.y, Math.max(w.w, w.h) + 60)) continue;
+      // Shadow (Layer 1)
+      this.renderQueue.push(RenderLayer.Shadow, 0, (c) => {
+        c.fillStyle = "rgba(0,0,0,0.35)";
+        c.fillRect(w.x - 2, w.y + w.h + 1, w.w + 4, 6);
+      });
+      // Front Face (Layer 2 YSorted)
+      const footY = w.y + w.h;
+      const tieBreaker = Math.round(w.x * 1000 + footY);
+      this.renderQueue.push(RenderLayer.YSorted, footY, (c) => {
+        this.drawSingleWall(c, w);
+      }, null, tieBreaker);
     }
-    this.drawArenaBorder(ctx);
-    this.drawFieldEffects(ctx);
-    this.drawPickups(ctx);
-    this.drawParticles(ctx);
-    this.drawGrenades(ctx);
-    this.drawEnemies(ctx);
-    this.drawEnemyBullets(ctx);
-    this.drawBeam(ctx);
-    this.drawFlameCone(ctx);
+
+    // Layer 2: Deployables (YSorted)
+    for (const d of this.deployables) {
+      if (!this.inView(d.x, d.y, d.size + 40)) continue;
+      this.renderQueue.push(RenderLayer.YSorted, d.y + (d.size ?? 16), (c) => {
+        this.drawSingleDeployable(c, d);
+      });
+    }
+
+    // Layer 2: Pickups (YSorted)
+    for (const pk of this.pickups) {
+      if (!this.inView(pk.x, pk.y, 30)) continue;
+      this.renderQueue.push(RenderLayer.YSorted, pk.y, (c) => {
+        this.drawSinglePickup(c, pk);
+      });
+    }
+
+    // Layer 2: Train (YSorted)
     if (this.trainActive) {
-      drawPixelTrain(ctx, this.trainX, this.trainTrackY, this.trainDir, this.time, this.trainWarning);
+      this.renderQueue.push(RenderLayer.YSorted, this.trainTrackY, (c) => {
+        drawPixelTrain(c, this.trainX, this.trainTrackY, this.trainDir, this.time, this.trainWarning);
+      });
     }
+
+    // Layer 2: Enemies (YSorted)
+    for (const e of this.enemies) {
+      if (!this.inView(e.x, e.y, e.size * 2.5 + 30)) continue;
+      this.renderQueue.push(RenderLayer.YSorted, e.y + e.size, (c) => {
+        this.drawSingleEnemy(c, e);
+      });
+    }
+
+    // Layer 2: Combatants / Player / Foe (YSorted)
     if (this.isDM) {
-      // draw every combatant (you + 3 bots) with its name + hp bar
       for (const c of this.combatants) {
         const q = c.player;
         if (q.deadTimer && q.deadTimer > 0) continue;
-
-        const isLocalC = this.mode === "local" ? c.id === 0 : c.id === this.selfPid;
-        if (isLocalC) {
-          this.drawThrustSwordChargeIndicator(ctx, q);
-        }
-
-        const isTeammate = this.isTeammate(this.activeId, c.id);
-        const cloakAlpha = isLocalC ? 0.15 : isTeammate ? 0.35 : 0.08;
-        const nameColor = isLocalC ? "#ffffff" : isTeammate ? "#7dd3fc" : "#fca5a5";
-        const hpBarColor = isLocalC ? "#22c55e" : isTeammate ? "#38bdf8" : "#ef4444";
-        const hpBarHeight = isLocalC || isTeammate ? 4 : 7;
-
-        this.drawNetCharacter(
-          ctx,
-          q.x,
-          q.y,
-          q.angle,
-          c.character.id,
-          c.outfit.id,
-          q.gunIndex ?? c.gunIndex ?? 0,
-          c.guns,
-          c.name,
-          q.hp / q.maxHp,
-          this.time,
-          q.size,
-          c.selectedGadget >= 0 ? c.gadgets[c.selectedGadget] : undefined,
-          q.isCloaked,
-          cloakAlpha,
-          nameColor,
-          this.gameMode === "team_deathmatch" && isTeammate,
-          hpBarColor,
-          hpBarHeight
-        );
-        if (q.electrifiedTime && q.electrifiedTime > 0) {
-          this.drawElectricArcs(ctx, q.x, q.y, q.size, q.electrifiedGlow ?? "#38bdf8", this.time);
-        }
-        if (q.iframes > 0 && q.dashTime <= 0) {
-          ctx.save();
-          ctx.globalAlpha = 0.4 + Math.sin(this.time * 20) * 0.2;
-          ctx.fillStyle = "#e0f2fe";
-          for (let i = 0; i < 4; i++) {
-            const a = this.time * 4 + (i * Math.PI) / 2;
-            const nx = Math.round(q.x + Math.cos(a) * (q.size + 4));
-            const ny = Math.round(q.y + Math.sin(a) * (q.size + 4));
-            ctx.fillRect(nx - 1, ny - 1, 3, 3);
-          }
-          ctx.restore();
-        }
+        if (!this.inView(q.x, q.y, q.size + 60)) continue;
+        this.renderQueue.push(RenderLayer.YSorted, q.y + q.size, (ctx) => {
+          this.drawSingleCombatant(ctx, c);
+        });
       }
     } else {
-      if (!(this.player.deadTimer && this.player.deadTimer > 0)) this.drawPlayer(ctx);
+      if (!(this.player.deadTimer && this.player.deadTimer > 0)) {
+        this.renderQueue.push(RenderLayer.YSorted, this.player.y + this.player.size, (c) => {
+          this.drawPlayer(c);
+        });
+      }
       if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0)) {
-        this.drawNetCharacter(
-          ctx,
-          this.foe.x,
-          this.foe.y,
-          this.foe.angle,
-          this.foeChar?.id ?? "raider",
-          this.foeOutfit?.id ?? "tactical",
-          this.foe.gunIndex ?? 0,
-          this.foeGuns,
-          this.peerName || "对手",
-          this.foe.hp / this.foe.maxHp,
-          this.time,
-          this.foe.size,
-          this.foe.selectedGadget !== undefined && this.foe.selectedGadget >= 0 ? (this.foeGadgets?.[this.foe.selectedGadget] ?? GADGETS[this.foe.selectedGadget]) : undefined,
-          this.foe.isCloaked,
-          0.08,
-          "#fca5a5",
-          false,
-          "#ef4444",
-          7
-        );
-        if (this.foe.electrifiedTime && this.foe.electrifiedTime > 0) {
-          this.drawElectricArcs(ctx, this.foe.x, this.foe.y, this.foe.size, this.foe.electrifiedGlow ?? "#38bdf8", this.time);
-        }
+        this.renderQueue.push(RenderLayer.YSorted, this.foe.y + this.foe.size, (c) => {
+          this.drawSingleFoe(c);
+        });
       }
     }
-    // gadget aiming preview (selection highlight + throw/deploy hint)
-    this.drawAimPreview(ctx);
-    // weapon aim indicator (投射榴弹炮 — deployable-style target marker)
-    if (this.gun.aimIndicator) this.drawLauncherIndicator(ctx);
-    this.drawBullets(ctx);
-    this.drawMeleeTrails(ctx);
-    this.drawEffects(ctx);
-    this.drawWeather(ctx);
 
-    ctx.restore();
+    // Layer 4: AirborneFX (Aim Preview, Launcher, Particles, Grenades, Bullets, Beams, Flames, Melee Trails, Weather)
+    this.renderQueue.push(RenderLayer.AirborneFX, 0, (c) => {
+      this.drawAimPreview(c);
+      if (this.gun.aimIndicator) this.drawLauncherIndicator(c);
+      this.drawParticles(c);
+      // M2: New pixel particle system (muzzle flash, shell casings, explosions, debris)
+      this.pixelParticles.draw(c);
+      // M4: Floating combat damage/heal/shield numbers
+      this.floatingText.draw(c);
+      this.drawGrenades(c);
+      this.drawEnemyBullets(c);
+      this.drawBullets(c);
+      this.drawBeam(c);
+      this.drawFlameCone(c);
+      this.drawMeleeTrails(c);
+      this.drawEffects(c);
+      this.drawWeatherParticles(c);
+    });
 
-    this.drawCrosshair(ctx);
-    this.drawOverlays(ctx);
+    // Dynamic lighting pass:
+    this.lighting.beginFrame();
+    this.lighting.setTheme(this.loadout?.customMap?.themeId ?? this.sceneTheme?.id ?? "citadel");
+
+    // 1. Players Ambient Lantern (F10)
+    if (this.isDM) {
+      for (const c of this.combatants) {
+        const q = c.player;
+        if (q.deadTimer && q.deadTimer > 0) continue;
+        this.lighting.addPlayerLantern(q.x, q.y, q.aimAngle, this.time);
+      }
+    } else {
+      if (!(this.player.deadTimer && this.player.deadTimer > 0)) {
+        this.lighting.addPlayerLantern(this.player.x, this.player.y, this.player.aimAngle, this.time);
+      }
+      if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0)) {
+        this.lighting.addPlayerLantern(this.foe.x, this.foe.y, this.foe.aimAngle, this.time);
+      }
+    }
+
+    // 2. Bullets Glow (F11)
+    for (const b of this.bullets) {
+      this.lighting.addBulletLight(b.x, b.y - (b.z ?? 0), Math.max(20, b.size * 3.5), b.color);
+    }
+    for (const b of this.enemyBullets) {
+      this.lighting.addBulletLight(b.x, b.y, Math.max(18, b.size * 3.0), b.color);
+    }
+
+    // 3. Detonations / Explosions / Hazards (F12, F13)
+    for (const e of this.effects) {
+      if (e.type === "explosion" || e.type === "shock") {
+        this.lighting.addExplosionLight(e.x, e.y, e.t / e.duration, e.radius * 2.2);
+      } else if (e.type === "poisoncloud") {
+        this.lighting.addHazardGlow(e.x, e.y, e.radius * 1.1, "rgba(74, 222, 128, 0.75)");
+      } else if (e.type === "firefield") {
+        this.lighting.addHazardGlow(e.x, e.y, e.radius * 1.1, "rgba(249, 115, 22, 0.75)");
+      }
+    }
+
+    // Execute World Rendering with Integer Snapped Camera
+    const snapCam = this.viewport ? this.viewport.snapCamera(this.camX, this.camY) : { x: Math.round(this.camX), y: Math.round(this.camY) };
+    this.lighting.renderMask(snapCam.x, snapCam.y);
+
+    vCtx.save();
+    try {
+      if (this.shake > 0.2) {
+        const sx = Math.round((Math.random() - 0.5) * this.shake);
+        const sy = Math.round((Math.random() - 0.5) * this.shake);
+        vCtx.translate(sx, sy);
+      }
+      vCtx.translate(-snapCam.x, -snapCam.y);
+      this.renderQueue.flushWorld(vCtx, (c) => {
+        this.lighting.composite(c, snapCam.x, snapCam.y);
+      });
+    } finally {
+      vCtx.restore();
+    }
+
+    // Layer 5: ScreenUI (Weather Overlays, Crosshair, Overlays, Minimap)
+    this.drawWeatherOverlays(vCtx);
+    this.drawCrosshair(vCtx);
+    this.drawOverlays(vCtx);
+    // M4: Pixel radar minimap
+    this.minimap.draw(
+      vCtx,
+      this.W, this.H,
+      this.worldW, this.worldH,
+      this.walls as Array<{x:number;y:number;w:number;h:number;invisible?:boolean}>,
+      this.buildMinimapBlips(),
+      this.player.x, this.player.y
+    );
+    this.renderQueue.flushScreenUI(vCtx);
+    this.renderQueue.clear();
+
+    // End frame: Blit 480x270 virtual buffer to display canvas with integer nearest-neighbor scaling
+    if (this.viewport) {
+      this.viewport.endFrame(ctx);
+    }
+  }
+
+  /** M4: Collect entity positions into minimap blip array. */
+  private _minimapBlips: Array<{x:number;y:number;color:string;size?:number;pulse?:boolean}> = [];
+  private buildMinimapBlips(): Array<{x:number;y:number;color:string;size?:number;pulse?:boolean}> {
+    const blips = this._minimapBlips;
+    blips.length = 0;
+
+    // Enemies (red)
+    for (const e of this.enemies) {
+      if (e.hp > 0) blips.push({ x: e.x, y: e.y, color: "#ff4444", size: 2 });
+    }
+
+    // Foe player (red, larger)
+    if (this.foe && !(this.foe.deadTimer && this.foe.deadTimer > 0)) {
+      blips.push({ x: this.foe.x, y: this.foe.y, color: "#ff2222", size: 3 });
+    }
+
+    // DM combatants
+    if (this.isDM) {
+      for (const c of this.combatants) {
+        const q = c.player;
+        if (q.deadTimer && q.deadTimer > 0) continue;
+        const isTeam = c.team === this.playerTeam;
+        blips.push({
+          x: q.x, y: q.y,
+          color: isTeam ? "#4488ff" : "#ff4444",
+          size: 2,
+        });
+      }
+    }
+
+    // Deployables (cyan)
+    for (const d of this.deployables) {
+      blips.push({ x: d.x, y: d.y, color: "#44cccc", size: 1 });
+    }
+
+    // Pickups (golden, pulsing)
+    for (const pk of this.pickups) {
+      blips.push({ x: pk.x, y: pk.y, color: "#ffd700", size: 2, pulse: true });
+    }
+
+    return blips;
   }
 
   private cityBg: HTMLCanvasElement | null = null;
@@ -10282,80 +11102,49 @@ export class GameEngine {
     const isDesert = this.sceneIndex === 1;
     const isSnow = this.sceneIndex === 2 || this.sceneIndex === 7;
 
-    const dirtColor = isSnow ? "rgba(186,230,253,0.3)" : isDesert ? "rgba(180,83,9,0.38)" : isWest ? "rgba(180,83,9,0.35)" : "rgba(120,53,15,0.42)";
-    const pathHighlight = isSnow ? "rgba(255,255,255,0.5)" : isDesert ? "rgba(251,191,36,0.32)" : isWest ? "rgba(245,158,11,0.3)" : "rgba(217,119,6,0.32)";
-    const fringeColor = isSnow ? "#e0f2fe" : isDesert ? "#d97706" : isWest ? "#b45309" : "#1e4d2b";
-
-    // 1. Main cross paths (horizontal & vertical dirt avenues cutting across the map)
     const midX = Math.round(this.worldW / 2);
     const midY = Math.round(this.worldH / 2);
-    const pathW = 96;
 
-    // Horizontal dirt path
-    ctx.fillStyle = dirtColor;
-    ctx.fillRect(0, midY - pathW / 2, this.worldW, pathW);
-    // Vertical dirt path
-    ctx.fillRect(midX - pathW / 2, 0, pathW, this.worldH);
+    if (isSnow) {
+      // 冰雪地图：纯净自然的极地雪原地表，散落轻柔积雪堆
+      for (let sx = 100; sx < this.worldW - 100; sx += 220) {
+        const sy1 = ((sx * 7) % (midY - 120)) + 60;
+        const sy2 = midY + 70 + ((sx * 11) % (midY - 140));
+        drawPixelSnowDrift(ctx, sx, sy1, 1.4);
+        drawPixelSnowDrift(ctx, sx + 90, sy2, 1.4);
+      }
+    } else {
+      const dirtColor = isDesert ? "rgba(180,83,9,0.22)" : isWest ? "rgba(180,83,9,0.20)" : "rgba(120,53,15,0.24)";
+      const pathW = 80;
 
-    // Path center highlight strip
-    ctx.fillStyle = pathHighlight;
-    ctx.fillRect(0, midY - 6, this.worldW, 12);
-    ctx.fillRect(midX - 6, 0, 12, this.worldH);
+      // Horizontal & vertical pathways with soft blend
+      ctx.fillStyle = dirtColor;
+      ctx.fillRect(0, midY - pathW / 2, this.worldW, pathW);
+      ctx.fillRect(midX - pathW / 2, 0, pathW, this.worldH);
 
-    // 2. Jagged stepped grass fringes along path borders
-    ctx.fillStyle = fringeColor;
-    const toothStep = 16;
-    // Horizontal path top & bottom fringes
-    for (let x = 0; x < this.worldW; x += toothStep) {
-      const h1 = ((x * 13) % 7) * 2;
-      const h2 = ((x * 17) % 7) * 2;
-      ctx.fillRect(x, midY - pathW / 2 - h1, toothStep, h1 + 2);
-      ctx.fillRect(x, midY + pathW / 2 - 2, toothStep, h2 + 2);
-    }
-    // Vertical path left & right fringes
-    for (let y = 0; y < this.worldH; y += toothStep) {
-      const w1 = ((y * 11) % 7) * 2;
-      const w2 = ((y * 19) % 7) * 2;
-      ctx.fillRect(midX - pathW / 2 - w1, y, w1 + 2, toothStep);
-      ctx.fillRect(midX + pathW / 2 - 2, y, w2 + 2, toothStep);
-    }
-
-    // 3. Central plaza cobblestones (Only on non-snow maps so railway can cross smoothly)
-    if (!isSnow) {
-      const plazaR = 110;
-      ctx.fillStyle = "rgba(71,85,105,0.35)";
+      // Central plaza cobblestones
+      const plazaR = 100;
+      ctx.fillStyle = "rgba(71,85,105,0.25)";
       ctx.fillRect(midX - plazaR, midY - plazaR, plazaR * 2, plazaR * 2);
-      ctx.strokeStyle = "rgba(148,163,184,0.4)";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(148,163,184,0.3)";
+      ctx.lineWidth = 1;
       const stoneSize = 24;
       for (let x = midX - plazaR; x < midX + plazaR; x += stoneSize) {
         for (let y = midY - plazaR; y < midY + plazaR; y += stoneSize) {
           ctx.strokeRect(x + 2, y + 2, stoneSize - 4, stoneSize - 4);
         }
       }
-    } else {
-      // 冰雪地图：横向铺设极地铁道床与散落雪堆
-      drawPixelRailwayTrack(ctx, this.worldW, midY, 0, false);
-      for (let sx = 100; sx < this.worldW - 100; sx += 220) {
-        const sy1 = ((sx * 7) % (midY - 120)) + 60;
-        const sy2 = midY + 70 + ((sx * 11) % (midY - 140));
-        drawPixelSnowDrift(ctx, sx, sy1, 2);
-        drawPixelSnowDrift(ctx, sx + 90, sy2, 2);
-      }
     }
 
-    // 4. Wildflower and grass tuft specks
-    const flCols = isSnow ? ["#ffffff", "#93c5fd"] : isDesert ? ["#fde047", "#fb923c"] : ["#f472b6", "#fde047", "#ffffff", "#4ade80"];
-    const numTufts = 80;
+    // Wildflower and vegetation specks
+    const flCols = isSnow ? ["#ffffff", "#bae6fd"] : isDesert ? ["#fde047", "#fb923c"] : ["#f472b6", "#fde047", "#ffffff", "#4ade80"];
+    const numTufts = 60;
     for (let i = 0; i < numTufts; i++) {
       const tx = ((i * 1973 + 241) % (this.worldW - 100)) + 50;
       const ty = ((i * 3821 + 839) % (this.worldH - 100)) + 50;
-      if (Math.abs(tx - midX) < pathW / 2 - 10 || Math.abs(ty - midY) < pathW / 2 - 10) continue;
-
       const col = flCols[i % flCols.length];
       ctx.fillStyle = col;
       ctx.fillRect(tx, ty, 3, 3);
-      ctx.fillRect(tx + 2, ty - 2, 2, 2);
     }
 
     // Subtle 48px tile grid overlay
@@ -10431,118 +11220,123 @@ export class GameEngine {
     ctx.fillRect(this.worldW - 3, this.worldH - cLen, 3, cLen);
   }
 
+  private drawSingleWall(ctx: CanvasRenderingContext2D, w: Wall) {
+    if (w.invisible) return;
+    ctx.save();
+    if (w.building) {
+      this.drawBuilding(ctx, w);
+    } else if (w.glue) {
+      // Glue Wall — 16-bit pixel gel block with floating pixel bubbles
+      ctx.fillStyle = "rgba(34,211,238,0.45)";
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.fillRect(w.x, w.y, w.w, 1);
+      ctx.strokeStyle = "#0891b2";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(w.x, w.y, w.w, w.h);
+      // Floating pixel bubbles
+      ctx.fillStyle = "#cffafe";
+      for (let i = 0; i < 4; i++) {
+        const bx = Math.round(w.x + 8 + i * (w.w / 4));
+        const by = Math.round(w.y + w.h / 2 + Math.sin(this.time * 3 + i * 2) * 4);
+        ctx.fillRect(bx, by, 3, 3);
+      }
+      const frac = Math.max(0, w.hp / w.maxHp);
+      if (frac < 1) {
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(w.x + 4, w.y + w.h + 3, w.w - 8, 3);
+        ctx.fillStyle = "#22d3ee";
+        ctx.fillRect(w.x + 4, w.y + w.h + 3, (w.w - 8) * frac, 3);
+      }
+    } else if (w.destructible) {
+      // Destructible Wooden Wall / Crate — 16-bit pixel cross-brace crate
+      const frac = Math.max(0, w.hp / w.maxHp);
+      // Main wooden body
+      ctx.fillStyle = "#8a6a3c";
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      // Top/left highlight
+      ctx.fillStyle = "#c9a36a";
+      ctx.fillRect(w.x, w.y, w.w, 2);
+      ctx.fillRect(w.x, w.y, 2, w.h);
+      // Dark inner bevel
+      ctx.fillStyle = "#5c4020";
+      ctx.fillRect(w.x + w.w - 2, w.y, 2, w.h);
+      ctx.fillRect(w.x, w.y + w.h - 2, w.w, 2);
+      // Outer dark frame
+      ctx.strokeStyle = "#2e1e0e";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(w.x, w.y, w.w, w.h);
+
+      // Pixel Cross-bracing & planks
+      ctx.strokeStyle = "rgba(46,30,14,0.6)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      // Diagonal cross
+      ctx.moveTo(w.x + 3, w.y + 3);
+      ctx.lineTo(w.x + w.w - 3, w.y + w.h - 3);
+      ctx.moveTo(w.x + w.w - 3, w.y + 3);
+      ctx.lineTo(w.x + 3, w.y + w.h - 3);
+      ctx.stroke();
+
+      // 4 Corner pixel nails
+      ctx.fillStyle = "#d4b07b";
+      ctx.fillRect(w.x + 3, w.y + 3, 2, 2);
+      ctx.fillRect(w.x + w.w - 5, w.y + 3, 2, 2);
+      ctx.fillRect(w.x + 3, w.y + w.h - 5, 2, 2);
+      ctx.fillRect(w.x + w.w - 5, w.y + w.h - 5, 2, 2);
+
+      // Damage cracks if low HP
+      if (frac < 0.6) {
+        ctx.fillStyle = "#1a120a";
+        ctx.fillRect(Math.round(w.x + w.w * 0.4), Math.round(w.y + w.h * 0.3), 4, 2);
+        ctx.fillRect(Math.round(w.x + w.w * 0.5), Math.round(w.y + w.h * 0.4), 2, 6);
+        ctx.fillRect(Math.round(w.x + w.w * 0.6), Math.round(w.y + w.h * 0.6), 5, 2);
+      }
+
+      if (frac < 1) {
+        const pw = w.w - 8;
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(w.x + 4, w.y + w.h + 3, pw, 3);
+        ctx.fillStyle = "#fbbf24";
+        ctx.fillRect(w.x + 4, w.y + w.h + 3, pw * frac, 3);
+      }
+    } else {
+      // Solid Alloy Cover Wall — 16-bit Steel Plate with Rivets
+      ctx.fillStyle = "#3a4254";
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      // Top & Left 1px pixel highlight
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.fillRect(w.x, w.y, w.w, 1);
+      ctx.fillRect(w.x, w.y, 1, w.h);
+      // Bottom & Right 1px dark bevel
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(w.x, w.y + w.h - 1, w.w, 1);
+      ctx.fillRect(w.x + w.w - 1, w.y, 1, w.h);
+      // Dark outline
+      ctx.strokeStyle = "rgba(10,12,28,0.9)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(w.x, w.y, w.w, w.h);
+      // 4 Corner Square Rivets
+      ctx.fillStyle = "#727d93";
+      for (const [rx, ry] of [
+        [w.x + 4, w.y + 4],
+        [w.x + w.w - 7, w.y + 4],
+        [w.x + 4, w.y + w.h - 7],
+        [w.x + w.w - 7, w.y + w.h - 7],
+      ]) {
+        ctx.fillRect(rx, ry, 3, 3);
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.fillRect(rx, ry, 1, 1);
+        ctx.fillStyle = "#727d93";
+      }
+    }
+    ctx.restore();
+  }
+
   private drawWalls(ctx: CanvasRenderingContext2D) {
     for (const w of this.walls) {
       if (w.invisible) continue;
-      ctx.save();
-      if (w.building) {
-        this.drawBuilding(ctx, w);
-      } else if (w.glue) {
-        // Glue Wall — 16-bit pixel gel block with floating pixel bubbles
-        ctx.fillStyle = "rgba(34,211,238,0.45)";
-        ctx.fillRect(w.x, w.y, w.w, w.h);
-        ctx.fillStyle = "rgba(255,255,255,0.25)";
-        ctx.fillRect(w.x, w.y, w.w, 1);
-        ctx.strokeStyle = "#0891b2";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(w.x, w.y, w.w, w.h);
-        // Floating pixel bubbles
-        ctx.fillStyle = "#cffafe";
-        for (let i = 0; i < 4; i++) {
-          const bx = Math.round(w.x + 8 + i * (w.w / 4));
-          const by = Math.round(w.y + w.h / 2 + Math.sin(this.time * 3 + i * 2) * 4);
-          ctx.fillRect(bx, by, 3, 3);
-        }
-        const frac = Math.max(0, w.hp / w.maxHp);
-        if (frac < 1) {
-          ctx.fillStyle = "rgba(0,0,0,0.6)";
-          ctx.fillRect(w.x + 4, w.y + w.h + 3, w.w - 8, 3);
-          ctx.fillStyle = "#22d3ee";
-          ctx.fillRect(w.x + 4, w.y + w.h + 3, (w.w - 8) * frac, 3);
-        }
-      } else if (w.destructible) {
-        // Destructible Wooden Wall / Crate — 16-bit pixel cross-brace crate
-        const frac = Math.max(0, w.hp / w.maxHp);
-        // Main wooden body
-        ctx.fillStyle = "#8a6a3c";
-        ctx.fillRect(w.x, w.y, w.w, w.h);
-        // Top/left highlight
-        ctx.fillStyle = "#c9a36a";
-        ctx.fillRect(w.x, w.y, w.w, 2);
-        ctx.fillRect(w.x, w.y, 2, w.h);
-        // Dark inner bevel
-        ctx.fillStyle = "#5c4020";
-        ctx.fillRect(w.x + w.w - 2, w.y, 2, w.h);
-        ctx.fillRect(w.x, w.y + w.h - 2, w.w, 2);
-        // Outer dark frame
-        ctx.strokeStyle = "#2e1e0e";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(w.x, w.y, w.w, w.h);
-
-        // Pixel Cross-bracing & planks
-        ctx.strokeStyle = "rgba(46,30,14,0.6)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Diagonal cross
-        ctx.moveTo(w.x + 3, w.y + 3);
-        ctx.lineTo(w.x + w.w - 3, w.y + w.h - 3);
-        ctx.moveTo(w.x + w.w - 3, w.y + 3);
-        ctx.lineTo(w.x + 3, w.y + w.h - 3);
-        ctx.stroke();
-
-        // 4 Corner pixel nails
-        ctx.fillStyle = "#d4b07b";
-        ctx.fillRect(w.x + 3, w.y + 3, 2, 2);
-        ctx.fillRect(w.x + w.w - 5, w.y + 3, 2, 2);
-        ctx.fillRect(w.x + 3, w.y + w.h - 5, 2, 2);
-        ctx.fillRect(w.x + w.w - 5, w.y + w.h - 5, 2, 2);
-
-        // Damage cracks if low HP
-        if (frac < 0.6) {
-          ctx.fillStyle = "#1a120a";
-          ctx.fillRect(Math.round(w.x + w.w * 0.4), Math.round(w.y + w.h * 0.3), 4, 2);
-          ctx.fillRect(Math.round(w.x + w.w * 0.5), Math.round(w.y + w.h * 0.4), 2, 6);
-          ctx.fillRect(Math.round(w.x + w.w * 0.6), Math.round(w.y + w.h * 0.6), 5, 2);
-        }
-
-        if (frac < 1) {
-          const pw = w.w - 8;
-          ctx.fillStyle = "rgba(0,0,0,0.6)";
-          ctx.fillRect(w.x + 4, w.y + w.h + 3, pw, 3);
-          ctx.fillStyle = "#fbbf24";
-          ctx.fillRect(w.x + 4, w.y + w.h + 3, pw * frac, 3);
-        }
-      } else {
-        // Solid Alloy Cover Wall — 16-bit Steel Plate with Rivets
-        ctx.fillStyle = "#3a4254";
-        ctx.fillRect(w.x, w.y, w.w, w.h);
-        // Top & Left 1px pixel highlight
-        ctx.fillStyle = "rgba(255,255,255,0.22)";
-        ctx.fillRect(w.x, w.y, w.w, 1);
-        ctx.fillRect(w.x, w.y, 1, w.h);
-        // Bottom & Right 1px dark bevel
-        ctx.fillStyle = "rgba(0,0,0,0.35)";
-        ctx.fillRect(w.x, w.y + w.h - 1, w.w, 1);
-        ctx.fillRect(w.x + w.w - 1, w.y, 1, w.h);
-        // Dark outline
-        ctx.strokeStyle = "rgba(10,12,28,0.9)";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(w.x, w.y, w.w, w.h);
-        // 4 Corner Square Rivets
-        ctx.fillStyle = "#727d93";
-        for (const [rx, ry] of [
-          [w.x + 4, w.y + 4],
-          [w.x + w.w - 7, w.y + 4],
-          [w.x + 4, w.y + w.h - 7],
-          [w.x + w.w - 7, w.y + w.h - 7],
-        ]) {
-          ctx.fillRect(rx, ry, 3, 3);
-          ctx.fillStyle = "rgba(255,255,255,0.4)";
-          ctx.fillRect(rx, ry, 1, 1);
-          ctx.fillStyle = "#727d93";
-        }
-      }
-      ctx.restore();
+      this.drawSingleWall(ctx, w);
     }
   }
 
@@ -10639,12 +11433,12 @@ export class GameEngine {
   }
 
   /** 霓虹都市 — Pixel Cyber Tower */
-  private bldNeon(ctx: CanvasRenderingContext2D, w: Wall) {
+  public bldNeon(ctx: CanvasRenderingContext2D, w: Wall) {
     drawPixelCyberRooftop(ctx, w.x, w.y, w.w, w.h, this.time, this.sceneTheme.accent || "#818cf8");
   }
 
   /** 沙漠废墟 / 西部沙漠 — Pixel Western Saloon, Wooden House, Cabin Shop & Adobe Fort */
-  private bldDesert(ctx: CanvasRenderingContext2D, w: Wall) {
+  public bldDesert(ctx: CanvasRenderingContext2D, w: Wall) {
     const seed = Math.abs(Math.round(w.x * 17 + w.y * 31));
     if (w.w >= 170 && w.h >= 120) {
       if (seed % 2 === 0) {
@@ -10662,12 +11456,12 @@ export class GameEngine {
   }
 
   /** 冰原基地 — Pixel Arctic Research Bunker */
-  private bldArctic(ctx: CanvasRenderingContext2D, w: Wall) {
+  public bldArctic(ctx: CanvasRenderingContext2D, w: Wall) {
     drawPixelArcticBunker(ctx, w.x, w.y, w.w, w.h, this.time, this.sceneTheme.accent || "#38bdf8");
   }
 
   /** 末日废墟 — Ancient Stone Ruins with Climbing Ivy or Ruined Factory */
-  private bldRuin(ctx: CanvasRenderingContext2D, w: Wall) {
+  public bldRuin(ctx: CanvasRenderingContext2D, w: Wall) {
     if (w.w < 110) {
       drawPixelStoneRuins(ctx, w.x, w.y, w.w, w.h);
     } else {
@@ -10676,12 +11470,12 @@ export class GameEngine {
   }
 
   /** 赛博都市 — Pixel Cyber Tower */
-  private bldCyber(ctx: CanvasRenderingContext2D, w: Wall) {
+  public bldCyber(ctx: CanvasRenderingContext2D, w: Wall) {
     drawPixelCyberRooftop(ctx, w.x, w.y, w.w, w.h, this.time, this.sceneTheme.accent || "#00f0ff");
   }
 
   /** 西部牛仔 / 边境小镇 — Pixel Western Saloon, Wooden Houses & Cabin Shops */
-  private bldWildWest(ctx: CanvasRenderingContext2D, w: Wall) {
+  public bldWildWest(ctx: CanvasRenderingContext2D, w: Wall) {
     const seed = Math.abs(Math.round(w.x * 17 + w.y * 31));
     if (w.w >= 170 && w.h >= 120) {
       if (seed % 2 === 0) {
@@ -11050,12 +11844,14 @@ export class GameEngine {
   }
 
   /** Is (x,y) within the camera viewport (plus margin)? Used to skip drawing\n   *  entities that are fully off-screen (cheap perf win when the world is large\n   *  but the viewport is small). */
-  private inView(x: number, y: number, margin = 0): boolean {
+  public inView(x: number, y: number, margin = 0): boolean {
+    const snapX = Math.round(this.camX);
+    const snapY = Math.round(this.camY);
     return (
-      x >= this.camX - margin &&
-      x <= this.camX + this.W + margin &&
-      y >= this.camY - margin &&
-      y <= this.camY + this.H + margin
+      x >= snapX - margin &&
+      x <= snapX + this.W + margin &&
+      y >= snapY - margin &&
+      y <= snapY + this.H + margin
     );
   }
 
@@ -11113,72 +11909,76 @@ export class GameEngine {
     return c;
   }
 
+  private drawSingleDeployable(ctx: CanvasRenderingContext2D, d: Deployable) {
+    ctx.save();
+    const dx = Math.round(d.x);
+    const dy = Math.round(d.y);
+    ctx.translate(dx, dy);
+    // shadow (pixel box)
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(-Math.round(d.size * 0.8), Math.round(d.size * 0.5), Math.round(d.size * 1.6), 4);
+
+    // range indicator for turrets (stepped pixel dashed diamond)
+    if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
+      ctx.strokeStyle = rgba(d.color, 0.15);
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      const dr = Math.round(d.radius);
+      ctx.strokeRect(-dr, -dr, dr * 2, dr * 2);
+      ctx.setLineDash([]);
+    }
+
+    if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
+      ctx.rotate(d.angle + Math.PI / 2);
+      ctx.scale(1.5, 1.5);
+      drawGadgetModel(ctx, d.kind, d.color, this.time);
+    } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire" || d.kind === "mine_stun") {
+      // Mine blink animation
+      const blink = d.armed <= 0 ? (Math.floor(this.time * 4) % 2 === 0 ? 1 : 0.4) : 0.5;
+      const colorWithBlink = rgba(d.color, blink);
+      ctx.scale(1.2, 1.2);
+      drawGadgetModel(ctx, d.kind, colorWithBlink, this.time);
+
+      // Pulse ring when armed (stepped pixel diamond)
+      if (d.armed <= 0) {
+        ctx.strokeStyle = rgba(d.color, 0.35);
+        ctx.lineWidth = 1.5;
+        const pr = Math.round(8 + (this.time * 20) % 16);
+        ctx.strokeRect(-pr, -pr, pr * 2, pr * 2);
+      }
+    } else if (d.kind === "healing_station") {
+      // Range indicator
+      ctx.strokeStyle = rgba(d.color, 0.15);
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      const dr = Math.round(d.radius);
+      ctx.strokeRect(-dr, -dr, dr * 2, dr * 2);
+      ctx.setLineDash([]);
+      // Pulsing pixel aura
+      const pulse = 0.5 + Math.sin(this.time * 3) * 0.2;
+      const hsz = Math.round(d.size * 1.5 * pulse);
+      ctx.fillStyle = rgba(d.color, 0.15);
+      ctx.fillRect(-hsz, -hsz, hsz * 2, hsz * 2);
+
+      // Render station model
+      ctx.scale(1.2, 1.2);
+      drawGadgetModel(ctx, d.kind, d.color, this.time);
+    }
+    ctx.restore();
+
+    // hp bar for turrets & healing station
+    if ((d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper" || d.kind === "healing_station") && d.hp < d.maxHp) {
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(d.x - 14, d.y - d.size - 10, 28, 4);
+      ctx.fillStyle = rgba(d.color, 0.9);
+      ctx.fillRect(d.x - 14, d.y - d.size - 10, 28 * (d.hp / d.maxHp), 4);
+    }
+  }
+
   private drawDeployables(ctx: CanvasRenderingContext2D) {
     for (const d of this.deployables) {
       if (!this.inView(d.x, d.y, d.size + 40)) continue;
-      ctx.save();
-      const dx = Math.round(d.x);
-      const dy = Math.round(d.y);
-      ctx.translate(dx, dy);
-      // shadow (pixel box)
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.fillRect(-Math.round(d.size * 0.8), Math.round(d.size * 0.5), Math.round(d.size * 1.6), 4);
-
-      // range indicator for turrets (stepped pixel dashed diamond)
-      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
-        ctx.strokeStyle = rgba(d.color, 0.15);
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        const dr = Math.round(d.radius);
-        ctx.strokeRect(-dr, -dr, dr * 2, dr * 2);
-        ctx.setLineDash([]);
-      }
-
-      if (d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper") {
-        ctx.rotate(d.angle + Math.PI / 2);
-        ctx.scale(1.5, 1.5);
-        drawGadgetModel(ctx, d.kind, d.color, this.time);
-      } else if (d.kind === "mine_explosive" || d.kind === "mine_poison" || d.kind === "mine_fire" || d.kind === "mine_stun") {
-        // Mine blink animation
-        const blink = d.armed <= 0 ? (Math.floor(this.time * 4) % 2 === 0 ? 1 : 0.4) : 0.5;
-        const colorWithBlink = rgba(d.color, blink);
-        ctx.scale(1.2, 1.2);
-        drawGadgetModel(ctx, d.kind, colorWithBlink, this.time);
-
-        // Pulse ring when armed (stepped pixel diamond)
-        if (d.armed <= 0) {
-          ctx.strokeStyle = rgba(d.color, 0.35);
-          ctx.lineWidth = 1.5;
-          const pr = Math.round(8 + (this.time * 20) % 16);
-          ctx.strokeRect(-pr, -pr, pr * 2, pr * 2);
-        }
-      } else if (d.kind === "healing_station") {
-        // Range indicator
-        ctx.strokeStyle = rgba(d.color, 0.15);
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        const dr = Math.round(d.radius);
-        ctx.strokeRect(-dr, -dr, dr * 2, dr * 2);
-        ctx.setLineDash([]);
-        // Pulsing pixel aura
-        const pulse = 0.5 + Math.sin(this.time * 3) * 0.2;
-        const hsz = Math.round(d.size * 1.5 * pulse);
-        ctx.fillStyle = rgba(d.color, 0.15);
-        ctx.fillRect(-hsz, -hsz, hsz * 2, hsz * 2);
-
-        // Render station model
-        ctx.scale(1.2, 1.2);
-        drawGadgetModel(ctx, d.kind, d.color, this.time);
-      }
-      ctx.restore();
-
-      // hp bar for turrets & healing station
-      if ((d.kind === "turret_mg" || d.kind === "turret_cannon" || d.kind === "turret_sniper" || d.kind === "healing_station") && d.hp < d.maxHp) {
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillRect(d.x - 14, d.y - d.size - 10, 28, 4);
-        ctx.fillStyle = rgba(d.color, 0.9);
-        ctx.fillRect(d.x - 14, d.y - d.size - 10, 28 * (d.hp / d.maxHp), 4);
-      }
+      this.drawSingleDeployable(ctx, d);
     }
   }
 
@@ -11320,50 +12120,54 @@ export class GameEngine {
     ctx.restore();
   }
 
+  private drawSinglePickup(ctx: CanvasRenderingContext2D, pk: Pickup) {
+    const px = Math.round(pk.x);
+    const py = Math.round(pk.y + Math.sin(pk.bob) * 3);
+    const blink = pk.life < 3 && Math.floor(pk.life * 6) % 2 === 0;
+    if (blink) return;
+    ctx.save();
+    ctx.translate(px, py);
+
+    // Pixel shadow
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(-7, 9, 14, 3);
+
+    // 16-bit First Aid Kit Body
+    ctx.fillStyle = "#09090b";
+    ctx.fillRect(-8, -7, 16, 14);
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(-7, -6, 14, 12);
+
+    // Green medical cross
+    ctx.fillStyle = "#16a34a";
+    ctx.fillRect(-2, -4, 4, 8);
+    ctx.fillRect(-4, -2, 8, 4);
+
+    // Top handle
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(-3, -9, 6, 2);
+
+    // Highlight pixel
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-6, -5, 2, 2);
+
+    // Blinking sparkle star
+    const spark = Math.floor(this.time * 4) % 4;
+    if (spark === 0) {
+      ctx.fillStyle = "#4ade80";
+      ctx.fillRect(8, -8, 2, 2);
+    } else if (spark === 2) {
+      ctx.fillStyle = "#4ade80";
+      ctx.fillRect(-9, -6, 2, 2);
+    }
+
+    ctx.restore();
+  }
+
   private drawPickups(ctx: CanvasRenderingContext2D) {
     for (const pk of this.pickups) {
       if (!this.inView(pk.x, pk.y, 30)) continue;
-      const px = Math.round(pk.x);
-      const py = Math.round(pk.y + Math.sin(pk.bob) * 3);
-      const blink = pk.life < 3 && Math.floor(pk.life * 6) % 2 === 0;
-      if (blink) continue;
-      ctx.save();
-      ctx.translate(px, py);
-
-      // Pixel shadow
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.fillRect(-7, 9, 14, 3);
-
-      // 16-bit First Aid Kit Body
-      ctx.fillStyle = "#09090b";
-      ctx.fillRect(-8, -7, 16, 14);
-      ctx.fillStyle = "#f8fafc";
-      ctx.fillRect(-7, -6, 14, 12);
-
-      // Green medical cross
-      ctx.fillStyle = "#16a34a";
-      ctx.fillRect(-2, -4, 4, 8);
-      ctx.fillRect(-4, -2, 8, 4);
-
-      // Top handle
-      ctx.fillStyle = "#334155";
-      ctx.fillRect(-3, -9, 6, 2);
-
-      // Highlight pixel
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(-6, -5, 2, 2);
-
-      // Blinking sparkle star
-      const spark = Math.floor(this.time * 4) % 4;
-      if (spark === 0) {
-        ctx.fillStyle = "#4ade80";
-        ctx.fillRect(8, -8, 2, 2);
-      } else if (spark === 2) {
-        ctx.fillStyle = "#4ade80";
-        ctx.fillRect(-9, -6, 2, 2);
-      }
-
-      ctx.restore();
+      this.drawSinglePickup(ctx, pk);
     }
   }
 
@@ -11412,126 +12216,130 @@ export class GameEngine {
     }
   }
 
+  private drawSingleEnemy(ctx: CanvasRenderingContext2D, e: Enemy) {
+    const scale = e.spawnT;
+    // shadow
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(e.x, e.y + e.size * 0.7, e.size * 0.9, e.size * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // enemy glow (red aura)
+    if (e.type === "elite") {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      this.fillGlow(ctx, e.x, e.y, e.size * 2.5, `elite`, [[0, rgba("#fb7185", 0.25)], [1, rgba("#fb7185", 0)]]);
+      ctx.restore();
+    }
+
+    // biohazard monsters get a dedicated, detailed silhouette
+    if (e.behavior) {
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.scale(scale, scale);
+      drawMonster(ctx, {
+        behavior: e.behavior,
+        size: e.size,
+        color: e.color,
+        glow: e.glow,
+        angle: e.angle,
+        t: this.time,
+        flash: e.hitFlash > 0.05 ? Math.min(1, e.hitFlash) : 0,
+        poison: (e.poisonT ?? 0) > 0,
+        buffed: (e.buffT ?? 0) > 0,
+        charging: (e.chargeT ?? 0) > 0,
+      });
+      ctx.restore();
+    } else if (e.character && e.outfit) {
+      // tint enemy red-ish by overriding colors
+      const enemyChar: CharacterDef = {
+        ...e.character,
+        bodyColor: e.type === "elite" ? "#fb7185" : "#f87171",
+        accent: "#dc2626",
+      };
+      const enemyOutfit: OutfitDef = {
+        ...e.outfit,
+        suit: e.type === "elite" ? "#9f1239" : "#991b1b",
+        suitDark: e.type === "elite" ? "#881337" : "#7f1d1d",
+        accent: "#fca5a5",
+      };
+      ctx.save();
+      ctx.scale(scale, scale);
+      drawCharacter(ctx, {
+        x: e.x / scale,
+        y: e.y / scale,
+        angle: e.angle,
+        character: enemyChar,
+        outfit: enemyOutfit,
+        size: e.size,
+        t: this.time,
+        flash: e.hitFlash > 0.05 ? Math.min(1, e.hitFlash) : 0,
+        gun: e.gun,
+      });
+      ctx.restore();
+    } else {
+      // fallback pixel character block
+      ctx.save();
+      ctx.translate(Math.round(e.x), Math.round(e.y));
+      ctx.scale(scale, scale);
+      const sz = Math.round(e.size);
+      const body = e.hitFlash > 0.05 ? "#ffffff" : e.color;
+      // Dark outline
+      ctx.fillStyle = shade(e.glow, -0.4);
+      ctx.fillRect(-sz - 1, -sz - 1, sz * 2 + 2, sz * 2 + 2);
+      // Body
+      ctx.fillStyle = body;
+      ctx.fillRect(-sz, -sz, sz * 2, sz * 2);
+      // Eyes
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(Math.round(sz * 0.3), -Math.round(sz * 0.3), 3, 3);
+      ctx.fillRect(Math.round(sz * 0.3), Math.round(sz * 0.1), 3, 3);
+      ctx.restore();
+    }
+
+    // poison cloud / slow
+    if (e.slowT > 0) {
+      ctx.save();
+      ctx.fillStyle = rgba("#84cc16", 0.45);
+      ctx.fillRect(Math.round(e.x - 4), Math.round(e.y + e.size * 0.4), 8, 3);
+      ctx.restore();
+    }
+
+    // active poison damage aura
+    if ((e.poisonT ?? 0) > 0) {
+      ctx.save();
+      ctx.fillStyle = rgba("#a3e635", 0.6);
+      for (let i = 0; i < 3; i++) {
+        const px = Math.round(e.x + Math.sin(this.time * 6 + i * 2) * (e.size * 0.7));
+        const py = Math.round(e.y - (this.time * 15 + i * 8) % (e.size * 1.3));
+        ctx.fillRect(px - 1, py - 1, 3, 3);
+      }
+      ctx.restore();
+    }
+
+    // hp bar (enemies: red & thicker)
+    if (e.hp < e.maxHp) {
+      const w = Math.max(24, e.size * 2);
+      const hpx = e.x - w / 2;
+      const hpy = e.y - e.size - 12;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(hpx - 1, hpy - 1, w + 2, 7);
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(hpx, hpy, w * (e.hp / e.maxHp), 5);
+    }
+
+    // electric arcs from a lightsaber hit
+    if (e.electrifiedTime && e.electrifiedTime > 0) {
+      this.drawElectricArcs(ctx, e.x, e.y, e.size, e.electrifiedGlow ?? "#38bdf8", this.time);
+    }
+  }
+
   private drawEnemies(ctx: CanvasRenderingContext2D) {
     for (const e of this.enemies) {
       if (!this.inView(e.x, e.y, e.size * 2.5 + 30)) continue;
-      const scale = e.spawnT;
-      // shadow
-      ctx.save();
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.beginPath();
-      ctx.ellipse(e.x, e.y + e.size * 0.7, e.size * 0.9, e.size * 0.45, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      // enemy glow (red aura)
-      if (e.type === "elite") {
-        ctx.save();
-        ctx.globalCompositeOperation = "lighter";
-        this.fillGlow(ctx, e.x, e.y, e.size * 2.5, `elite`, [[0, rgba("#fb7185", 0.25)], [1, rgba("#fb7185", 0)]]);
-        ctx.restore();
-      }
-
-      // biohazard monsters get a dedicated, detailed silhouette
-      if (e.behavior) {
-        ctx.save();
-        ctx.translate(e.x, e.y);
-        ctx.scale(scale, scale);
-        drawMonster(ctx, {
-          behavior: e.behavior,
-          size: e.size,
-          color: e.color,
-          glow: e.glow,
-          angle: e.angle,
-          t: this.time,
-          flash: e.hitFlash > 0.05 ? Math.min(1, e.hitFlash) : 0,
-          poison: (e.poisonT ?? 0) > 0,
-          buffed: (e.buffT ?? 0) > 0,
-          charging: (e.chargeT ?? 0) > 0,
-        });
-        ctx.restore();
-      } else if (e.character && e.outfit) {
-        // tint enemy red-ish by overriding colors
-        const enemyChar: CharacterDef = {
-          ...e.character,
-          bodyColor: e.type === "elite" ? "#fb7185" : "#f87171",
-          accent: "#dc2626",
-        };
-        const enemyOutfit: OutfitDef = {
-          ...e.outfit,
-          suit: e.type === "elite" ? "#9f1239" : "#991b1b",
-          suitDark: e.type === "elite" ? "#881337" : "#7f1d1d",
-          accent: "#fca5a5",
-        };
-        ctx.save();
-        ctx.scale(scale, scale);
-        drawCharacter(ctx, {
-          x: e.x / scale,
-          y: e.y / scale,
-          angle: e.angle,
-          character: enemyChar,
-          outfit: enemyOutfit,
-          size: e.size,
-          t: this.time,
-          flash: e.hitFlash > 0.05 ? Math.min(1, e.hitFlash) : 0,
-          gun: e.gun,
-        });
-        ctx.restore();
-      } else {
-        // fallback pixel character block
-        ctx.save();
-        ctx.translate(Math.round(e.x), Math.round(e.y));
-        ctx.scale(scale, scale);
-        const sz = Math.round(e.size);
-        const body = e.hitFlash > 0.05 ? "#ffffff" : e.color;
-        // Dark outline
-        ctx.fillStyle = shade(e.glow, -0.4);
-        ctx.fillRect(-sz - 1, -sz - 1, sz * 2 + 2, sz * 2 + 2);
-        // Body
-        ctx.fillStyle = body;
-        ctx.fillRect(-sz, -sz, sz * 2, sz * 2);
-        // Eyes
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(Math.round(sz * 0.3), -Math.round(sz * 0.3), 3, 3);
-        ctx.fillRect(Math.round(sz * 0.3), Math.round(sz * 0.1), 3, 3);
-        ctx.restore();
-      }
-
-      // poison cloud / slow
-      if (e.slowT > 0) {
-        ctx.save();
-        ctx.fillStyle = rgba("#84cc16", 0.45);
-        ctx.fillRect(Math.round(e.x - 4), Math.round(e.y + e.size * 0.4), 8, 3);
-        ctx.restore();
-      }
-
-      // active poison damage aura
-      if ((e.poisonT ?? 0) > 0) {
-        ctx.save();
-        ctx.fillStyle = rgba("#a3e635", 0.6);
-        for (let i = 0; i < 3; i++) {
-          const px = Math.round(e.x + Math.sin(this.time * 6 + i * 2) * (e.size * 0.7));
-          const py = Math.round(e.y - (this.time * 15 + i * 8) % (e.size * 1.3));
-          ctx.fillRect(px - 1, py - 1, 3, 3);
-        }
-        ctx.restore();
-      }
-
-      // hp bar (enemies: red & thicker)
-      if (e.hp < e.maxHp) {
-        const w = Math.max(24, e.size * 2);
-        const hpx = e.x - w / 2;
-        const hpy = e.y - e.size - 12;
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(hpx - 1, hpy - 1, w + 2, 7);
-        ctx.fillStyle = "#ef4444";
-        ctx.fillRect(hpx, hpy, w * (e.hp / e.maxHp), 5);
-      }
-
-      // electric arcs from a lightsaber hit
-      if (e.electrifiedTime && e.electrifiedTime > 0) {
-        this.drawElectricArcs(ctx, e.x, e.y, e.size, e.electrifiedGlow ?? "#38bdf8", this.time);
-      }
+      this.drawSingleEnemy(ctx, e);
     }
   }
 
@@ -11613,28 +12421,7 @@ export class GameEngine {
   private drawPlayer(ctx: CanvasRenderingContext2D) {
     const p = this.player;
     if (p.shieldTime > 0) {
-      ctx.save();
-      ctx.translate(Math.round(p.x), Math.round(p.y));
-      const pulse = 1 + Math.sin(this.time * 8) * 0.04;
-      const rr = Math.round(p.size * 1.8 * pulse);
-      const alpha = Math.min(1, p.shieldTime / 0.6) * 0.7;
-      // 16-bit Stepped Pixel Forcefield Octagon Nodes
-      ctx.fillStyle = rgba("#60a5fa", alpha);
-      for (let i = 0; i < 8; i++) {
-        const a = (i * Math.PI) / 4;
-        const nx = Math.round(Math.cos(a) * rr);
-        const ny = Math.round(Math.sin(a) * rr);
-        ctx.fillRect(nx - 2, ny - 2, 4, 4);
-      }
-      // 4 rotating corner pixel nodes
-      for (let i = 0; i < 4; i++) {
-        const a = this.time * 3 + (i * Math.PI) / 2;
-        const nx = Math.round(Math.cos(a) * (rr + 4));
-        const ny = Math.round(Math.sin(a) * (rr + 4));
-        ctx.fillStyle = "#93c5fd";
-        ctx.fillRect(nx - 2, ny - 2, 4, 4);
-      }
-      ctx.restore();
+      drawShieldHalo(ctx, p.x, p.y, p.size, this.time, p.shieldTime);
     }
 
     // riot shield raised visual
@@ -11691,6 +12478,7 @@ export class GameEngine {
 
     // melee swing progress 0..1
     const swing = p.swingTimer > 0 ? 1 - p.swingTimer / p.swingDur : 0;
+    const speed = Math.hypot(p.vx, p.vy);
 
     drawCharacter(ctx, {
       x: p.x,
@@ -11699,6 +12487,7 @@ export class GameEngine {
       character: this.character,
       outfit: this.outfit,
       size: p.size,
+      speed,
       t: p.t,
       flash: p.flash > 0 ? Math.min(1, p.flash) : 0,
       glow,
@@ -11718,16 +12507,7 @@ export class GameEngine {
     }
 
     if (p.iframes > 0 && p.dashTime <= 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.4 + Math.sin(this.time * 20) * 0.2;
-      ctx.fillStyle = "#e0f2fe";
-      for (let i = 0; i < 4; i++) {
-        const a = this.time * 4 + (i * Math.PI) / 2;
-        const nx = Math.round(p.x + Math.cos(a) * (p.size + 4));
-        const ny = Math.round(p.y + Math.sin(a) * (p.size + 4));
-        ctx.fillRect(nx - 1, ny - 1, 3, 3);
-      }
-      ctx.restore();
+      drawRespawnProtectionRing(ctx, p.x, p.y, p.size, this.time, p.iframes);
     }
   }
 
@@ -11976,62 +12756,66 @@ export class GameEngine {
     ctx.restore();
   }
 
-  private drawWeather(ctx: CanvasRenderingContext2D) {
+  private drawWeatherParticles(ctx: CanvasRenderingContext2D) {
+    if (this.raindrops.length === 0) return;
     ctx.save();
-    
-    // Draw pixel raindrops / snowflakes / dust
-    if (this.raindrops.length > 0) {
-      if (this.weather === "rain") {
-        ctx.fillStyle = "rgba(180, 210, 240, 0.65)";
-        for (const r of this.raindrops) {
-          ctx.fillRect(Math.round(r.x), Math.round(r.y), 2, 5);
-        }
-      } else if (this.weather === "snow") {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-        for (const r of this.raindrops) {
-          ctx.fillRect(Math.round(r.x), Math.round(r.y), 3, 3);
-        }
-      } else if (this.weather === "sandstorm") {
-        ctx.fillStyle = "rgba(234, 179, 8, 0.65)";
-        for (const r of this.raindrops) {
-          ctx.fillRect(Math.round(r.x), Math.round(r.y), 3, 2);
-        }
+    if (this.weather === "rain") {
+      ctx.fillStyle = "rgba(180, 210, 240, 0.65)";
+      for (const r of this.raindrops) {
+        if (!this.inView(r.x, r.y, 80)) continue;
+        ctx.fillRect(Math.round(r.x), Math.round(r.y), 2, 6);
+      }
+    } else if (this.weather === "snow") {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      for (const r of this.raindrops) {
+        if (!this.inView(r.x, r.y, 80)) continue;
+        ctx.fillRect(Math.round(r.x), Math.round(r.y), 3, 3);
+      }
+    } else if (this.weather === "sandstorm") {
+      ctx.fillStyle = "rgba(234, 179, 8, 0.65)";
+      for (const r of this.raindrops) {
+        if (!this.inView(r.x, r.y, 80)) continue;
+        ctx.fillRect(Math.round(r.x), Math.round(r.y), 4, 2);
       }
     }
-    
-    // Global tint / overlays
+    ctx.restore();
+  }
+
+  private drawWeatherOverlays(ctx: CanvasRenderingContext2D) {
+    if (this.quality === "low") return; // Keep crisp and lightweight in low quality mode
+    ctx.save();
     ctx.globalCompositeOperation = "source-over";
-    
-    // Time of day tint
+
+    // Time of day atmospheric tint (Screen space 0..W, 0..H)
     if (this.timeOfDay === "morning") {
-      ctx.fillStyle = "rgba(255, 240, 200, 0.08)";
+      ctx.fillStyle = "rgba(255, 240, 200, 0.05)";
       ctx.fillRect(0, 0, this.W, this.H);
     } else if (this.timeOfDay === "afternoon") {
-      ctx.fillStyle = "rgba(255, 180, 100, 0.04)";
+      ctx.fillStyle = "rgba(255, 180, 100, 0.03)";
       ctx.fillRect(0, 0, this.W, this.H);
     } else if (this.timeOfDay === "night") {
-      ctx.fillStyle = "rgba(10, 15, 35, 0.35)";
+      ctx.fillStyle = "rgba(10, 15, 35, 0.28)";
       ctx.fillRect(0, 0, this.W, this.H);
     }
-    
+
     // Weather overlay
     if (this.weather === "fog") {
-      ctx.fillStyle = "rgba(200, 210, 220, 0.25)";
+      ctx.fillStyle = "rgba(200, 210, 220, 0.18)";
       ctx.fillRect(0, 0, this.W, this.H);
     } else if (this.weather === "overcast") {
-      ctx.fillStyle = "rgba(120, 130, 140, 0.15)";
+      ctx.fillStyle = "rgba(120, 130, 140, 0.10)";
       ctx.fillRect(0, 0, this.W, this.H);
     } else if (this.weather === "rain") {
-      ctx.fillStyle = "rgba(90, 100, 110, 0.2)";
+      ctx.fillStyle = "rgba(90, 100, 110, 0.12)";
       ctx.fillRect(0, 0, this.W, this.H);
     } else if (this.weather === "snow") {
-      ctx.fillStyle = "rgba(220, 240, 255, 0.15)";
+      ctx.fillStyle = "rgba(220, 240, 255, 0.08)";
       ctx.fillRect(0, 0, this.W, this.H);
     } else if (this.weather === "sandstorm") {
-      ctx.fillStyle = "rgba(180, 130, 70, 0.35)";
+      ctx.fillStyle = "rgba(180, 130, 70, 0.20)";
       ctx.fillRect(0, 0, this.W, this.H);
     }
-    
+
     ctx.restore();
   }
 
