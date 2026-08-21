@@ -40,6 +40,8 @@ export interface GameSettings {
   quality: "low" | "medium" | "high";
   /** CRT scanlines retro arcade filter overlay */
   crt: boolean;
+  /** kill score panel UI style: standard (battlefield popups & details) or compact (minimalist unobtrusive HUD) */
+  scorePanelStyle: "standard" | "compact";
   /** on-screen mobile control buttons */
   mobile: MobileButtonCfg[];
 }
@@ -73,6 +75,7 @@ function defaultSettings(): GameSettings {
     botAiHz: 16,
     quality: "high",
     crt: true,
+    scorePanelStyle: "standard",
     mobile: defaultMobileLayout(),
   };
 }
@@ -103,6 +106,10 @@ function load(): GameSettings {
           ? (parsed.quality as "low" | "medium" | "high")
           : base.quality,
       crt: typeof parsed.crt === "boolean" ? parsed.crt : base.crt,
+      scorePanelStyle:
+        parsed.scorePanelStyle === "compact" || parsed.scorePanelStyle === "standard"
+          ? parsed.scorePanelStyle
+          : base.scorePanelStyle,
       mobile: base.mobile.map((def) => {
         const saved = (parsed.mobile ?? []).find((m) => m.id === def.id);
         return saved ? { ...def, ...saved } : def;

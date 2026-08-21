@@ -210,6 +210,38 @@ export default function MainMenuExtras({ announce }: { announce: string }) {
                 </div>
               </div>
 
+              {/* 击杀得分面板 UI */}
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-300 block">
+                      击杀得分面板 UI
+                    </span>
+                    <span className="text-[10px] text-slate-400">击杀飘字反馈与计分面板呈现样式</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "标准版 (战地风)", value: "standard", desc: "华丽动效 · 详细分项" },
+                    { label: "简洁版 (极简)", value: "compact", desc: "清爽胶囊 · 视野开阔" },
+                  ].map((o) => (
+                    <button
+                      key={o.value}
+                      onClick={() => updateSettings({ scorePanelStyle: o.value as any })}
+                      className={
+                        "rounded-xl border py-2 px-1 text-center transition flex flex-col items-center justify-center " +
+                        (s.scorePanelStyle === o.value
+                          ? "border-amber-300/60 bg-amber-500/20 text-amber-100 shadow-md shadow-amber-950/40"
+                          : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10")
+                      }
+                    >
+                      <span className="text-xs font-bold">{o.label}</span>
+                      <span className="text-[10px] text-slate-400 mt-0.5">{o.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Display */}
               <div className="mb-4">
                 <span className="mb-2 block text-xs font-semibold text-slate-300">

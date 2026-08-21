@@ -167,6 +167,36 @@ export default function SettingsOverlay({
           </div>
         </section>
 
+        {/* ---- 击杀得分面板 UI ---- */}
+        <section className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-200">击杀得分面板 UI</h3>
+              <p className="text-[11px] text-slate-400">设置击杀飘字反馈与计分面板的呈现样式</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "标准版 (战地风)", value: "standard", desc: "华丽动效 · 详细分项" },
+              { label: "简洁版 (极简)", value: "compact", desc: "清爽胶囊 · 视野开阔" },
+            ].map((o) => (
+              <button
+                key={o.value}
+                onClick={() => updateSettings({ scorePanelStyle: o.value as any })}
+                className={
+                  "rounded-xl border py-2 px-2 text-center transition flex flex-col items-center justify-center " +
+                  (s.scorePanelStyle === o.value
+                    ? "border-amber-300/60 bg-amber-500/20 text-amber-100 shadow-md shadow-amber-950/40"
+                    : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10")
+                }
+              >
+                <span className="text-xs font-bold">{o.label}</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">{o.desc}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* ---- Bot strength (AI step, decoupled from frame rate) ---- */}
         <section className="mb-5">
           <BotStrengthControl />

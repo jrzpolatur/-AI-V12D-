@@ -774,68 +774,107 @@ export default function GameScreen({
       <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-start justify-between p-3 sm:p-4 z-20">
         {/* Left Top: Mode Status / Leaderboard (Normal upright font without skew) */}
         {hud.mode === "deathmatch" ? (
-          <div className="flex flex-col items-start gap-1 rounded-xl border border-white/15 bg-black/85 p-2.5 shadow-xl backdrop-blur-md">
-            <div className="text-[11px] uppercase tracking-wider text-fuchsia-300 font-bold not-italic">
-              死亡竞赛 DEATHMATCH
-            </div>
-            {(hud.dm ?? []).map((e) => (
-              <div
-                key={e.id}
-                className={cn(
-                  "flex items-center gap-2 text-[11px] not-italic",
-                  e.you ? "font-bold text-white" : "font-medium text-slate-300"
-                )}
-              >
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: e.color }}
-                />
-                <span className="w-16 truncate">{e.you ? "你" : e.name}</span>
-                <span className="font-bold text-white tnum">{e.kills}</span>
-                {e.dead && <span className="text-[9px] text-rose-400 font-bold">倒下</span>}
+          settings.scorePanelStyle === "compact" ? (
+            <div className="flex items-center gap-2 rounded-xl border border-fuchsia-400/30 bg-black/80 px-3 py-1.5 shadow-lg backdrop-blur-md">
+              <span className="rounded bg-fuchsia-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-fuchsia-300 border border-fuchsia-400/30">
+                DM
+              </span>
+              <div className="text-xs text-slate-300 font-medium not-italic flex items-center gap-2">
+                <span>击杀 <b className="text-sm font-bold text-white tnum">{hud.kills}</b><span className="text-slate-500">/{hud.dmTarget}</span></span>
+                {(() => {
+                  const sorted = [...(hud.dm ?? [])].sort((a, b) => b.kills - a.kills);
+                  const myRank = sorted.findIndex((p) => p.you) + 1;
+                  const leader = sorted[0];
+                  return (
+                    <span className="text-[11px] text-fuchsia-200 border-l border-white/15 pl-2">
+                      {myRank > 0 ? `第 ${myRank} 名` : ""} {leader && !leader.you ? `(头名 ${leader.kills} 杀)` : "👑 领先"}
+                    </span>
+                  );
+                })()}
               </div>
-            ))}
-            <div className="text-[10px] text-slate-400 font-medium not-italic">
-              目标 {hud.dmTarget} 淘汰
             </div>
-          </div>
-        ) : hud.mode === "team_deathmatch" ? (
-          <div className="flex flex-col items-start gap-1 rounded-xl border border-white/15 bg-black/85 p-3 shadow-xl backdrop-blur-md min-w-[190px] pointer-events-auto">
-            <div className="text-[11px] uppercase tracking-wider text-orange-300 font-bold not-italic">
-              团队死斗 TEAM DM
-            </div>
-            {(hud.teamScores ?? []).map((t) => (
-              <div key={t.teamId} className="flex w-full flex-col gap-0.5">
+          ) : (
+            <div className="flex flex-col items-start gap-1 rounded-xl border border-white/15 bg-black/85 p-2.5 shadow-xl backdrop-blur-md">
+              <div className="text-[11px] uppercase tracking-wider text-fuchsia-300 font-bold not-italic">
+                死亡竞赛 DEATHMATCH
+              </div>
+              {(hud.dm ?? []).map((e) => (
                 <div
+                  key={e.id}
                   className={cn(
-                    "flex w-full items-center justify-between gap-2 text-[11px] not-italic",
-                    t.isMine ? "font-bold text-white" : "font-medium text-slate-300"
+                    "flex items-center gap-2 text-[11px] not-italic",
+                    e.you ? "font-bold text-white" : "font-medium text-slate-300"
                   )}
                 >
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ background: t.color }}
-                    />
-                    <span className="w-16 truncate">{t.isMine ? "你的队伍" : t.name}</span>
-                  </div>
-                  <span className="font-bold text-white tnum">
-                    {t.kills}
-                    <span className="text-slate-500 font-normal">/{hud.dmTarget ?? 0}</span>
-                  </span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{
-                      width: `${Math.min(100, ((t.kills ?? 0) / (hud.dmTarget || 1)) * 100)}%`,
-                      background: t.color,
-                    }}
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ background: e.color }}
                   />
+                  <span className="w-16 truncate">{e.you ? "你" : e.name}</span>
+                  <span className="font-bold text-white tnum">{e.kills}</span>
+                  {e.dead && <span className="text-[9px] text-rose-400 font-bold">倒下</span>}
                 </div>
+              ))}
+              <div className="text-[10px] text-slate-400 font-medium not-italic">
+                目标 {hud.dmTarget} 淘汰
               </div>
-            ))}
-          </div>
+            </div>
+          )
+        ) : hud.mode === "team_deathmatch" ? (
+          settings.scorePanelStyle === "compact" ? (
+            <div className="flex items-center gap-2 rounded-xl border border-orange-400/30 bg-black/80 px-3 py-1.5 shadow-lg backdrop-blur-md">
+              <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-orange-300 border border-orange-400/30">
+                TDM
+              </span>
+              <div className="flex items-center gap-2.5 text-xs">
+                {(hud.teamScores ?? []).map((t) => (
+                  <div key={t.teamId} className={cn("flex items-center gap-1 text-[11px]", t.isMine ? "font-bold text-white" : "text-slate-400")}>
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: t.color }} />
+                    <span>{t.isMine ? "我方" : t.name}</span>
+                    <span className="tnum font-bold text-white">{t.kills}</span>
+                  </div>
+                ))}
+                <span className="text-[10px] text-slate-500">/ {hud.dmTarget}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-start gap-1 rounded-xl border border-white/15 bg-black/85 p-3 shadow-xl backdrop-blur-md min-w-[190px] pointer-events-auto">
+              <div className="text-[11px] uppercase tracking-wider text-orange-300 font-bold not-italic">
+                团队死斗 TEAM DM
+              </div>
+              {(hud.teamScores ?? []).map((t) => (
+                <div key={t.teamId} className="flex w-full flex-col gap-0.5">
+                  <div
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 text-[11px] not-italic",
+                      t.isMine ? "font-bold text-white" : "font-medium text-slate-300"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ background: t.color }}
+                      />
+                      <span className="w-16 truncate">{t.isMine ? "你的队伍" : t.name}</span>
+                    </div>
+                    <span className="font-bold text-white tnum">
+                      {t.kills}
+                      <span className="text-slate-500 font-normal">/{hud.dmTarget ?? 0}</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min(100, ((t.kills ?? 0) / (hud.dmTarget || 1)) * 100)}%`,
+                        background: t.color,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : hud.mode === "biohazard" ? (
           <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/85 px-3 py-1.5 shadow-xl backdrop-blur-md">
             <span className="rounded bg-lime-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-lime-300 border border-lime-400/30">
@@ -1228,38 +1267,64 @@ export default function GameScreen({
 
       {/* ============ BATTLEFIELD STYLE SCORE FEED ============ */}
       {hud.activeScoreFeed && (
-        <div
-          key={`sf-${hud.activeScoreFeed.totalScore}-${hud.activeScoreFeed.events[0]?.id ?? 0}-${hud.activeScoreFeed.totalKills}`}
-          className="pointer-events-none absolute inset-x-0 bottom-[32%] flex flex-col items-center justify-center gap-1 z-50 animate-score-pop"
-          style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.9))" }}
-        >
-          <div className="flex items-center gap-2 text-3xl font-black mb-1">
-            <span className="hud-numbers text-yellow-400 text-4xl italic">+{hud.activeScoreFeed.totalScore}</span>
-          </div>
-
-          {hud.activeScoreFeed.events.map((sf) => (
-            <div key={sf.id} className="flex flex-col items-center">
-              {sf.victimName ? (
-                <div className="hud-skew flex items-center gap-3 text-sm font-bold text-slate-200 bg-black/70 px-3 py-0.5 rounded border border-white/10">
-                  <span className="text-slate-100">{sf.text}</span>
-                  <span className="text-rose-400 uppercase font-black">{sf.victimName}</span>
-                  <span className="hud-numbers text-amber-400">+{sf.subScore}</span>
-                </div>
-              ) : (
-                <div className="hud-skew flex items-center gap-2 bg-black/70 px-2.5 py-0.5 rounded border border-white/10">
-                  <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">{sf.text}</span>
-                  <span className="hud-numbers text-sm font-black text-amber-400">+{sf.subScore}</span>
+        settings.scorePanelStyle === "compact" ? (
+          <div
+            key={`sf-${hud.activeScoreFeed.totalScore}-${hud.activeScoreFeed.events[0]?.id ?? 0}-${hud.activeScoreFeed.totalKills}`}
+            className="pointer-events-none absolute inset-x-0 bottom-[26%] flex flex-col items-center justify-center gap-1 z-50 animate-score-pop-compact"
+            style={{ filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.85))" }}
+          >
+            {/* 简洁版胶囊反馈：紧凑、不遮挡准星与走位 */}
+            <div className="flex items-center gap-2 rounded-full border border-amber-400/50 bg-black/80 px-3.5 py-1 backdrop-blur-md shadow-lg">
+              <span className="text-amber-400 font-black text-lg tnum tracking-tight">+{hud.activeScoreFeed.totalScore}</span>
+              {hud.activeScoreFeed.events[0] && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                  <span className="text-amber-200">{hud.activeScoreFeed.events[0].text}</span>
+                  {hud.activeScoreFeed.events[0].victimName && (
+                    <span className="text-rose-400 font-extrabold">{hud.activeScoreFeed.events[0].victimName}</span>
+                  )}
                 </div>
               )}
+              {hud.activeScoreFeed.totalKills > 0 && (
+                <span className="rounded bg-rose-500/30 border border-rose-400/40 px-1.5 py-0.5 text-[10px] font-black text-rose-200">
+                  {hud.activeScoreFeed.totalKills} 淘汰
+                </span>
+              )}
             </div>
-          ))}
+          </div>
+        ) : (
+          <div
+            key={`sf-${hud.activeScoreFeed.totalScore}-${hud.activeScoreFeed.events[0]?.id ?? 0}-${hud.activeScoreFeed.totalKills}`}
+            className="pointer-events-none absolute inset-x-0 bottom-[32%] flex flex-col items-center justify-center gap-1 z-50 animate-score-pop"
+            style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.9))" }}
+          >
+            <div className="flex items-center gap-2 text-3xl font-black mb-1">
+              <span className="hud-numbers text-yellow-400 text-4xl italic">+{hud.activeScoreFeed.totalScore}</span>
+            </div>
 
-          {hud.activeScoreFeed.totalKills > 0 && (
-            <div className="flex items-center gap-2 text-sm font-bold text-slate-300 mt-1">
-              <span>淘汰数 {hud.activeScoreFeed.totalKills}</span>
-            </div>
-          )}
-        </div>
+            {hud.activeScoreFeed.events.map((sf) => (
+              <div key={sf.id} className="flex flex-col items-center">
+                {sf.victimName ? (
+                  <div className="hud-skew flex items-center gap-3 text-sm font-bold text-slate-200 bg-black/70 px-3 py-0.5 rounded border border-white/10">
+                    <span className="text-slate-100">{sf.text}</span>
+                    <span className="text-rose-400 uppercase font-black">{sf.victimName}</span>
+                    <span className="hud-numbers text-amber-400">+{sf.subScore}</span>
+                  </div>
+                ) : (
+                  <div className="hud-skew flex items-center gap-2 bg-black/70 px-2.5 py-0.5 rounded border border-white/10">
+                    <span className="text-xs font-bold tracking-wider text-slate-100 uppercase">{sf.text}</span>
+                    <span className="hud-numbers text-sm font-black text-amber-400">+{sf.subScore}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {hud.activeScoreFeed.totalKills > 0 && (
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-300 mt-1">
+                <span>淘汰数 {hud.activeScoreFeed.totalKills}</span>
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {/* ============ TOP RIGHT KILL FEED ============ */}
@@ -1297,12 +1362,21 @@ export default function GameScreen({
           88% { transform: translateY(0) scale(1); opacity: 1; }
           100% { transform: translateY(-10px) scale(1); opacity: 0; }
         }
+        @keyframes compact-score-pop {
+          0% { transform: translateY(8px) scale(0.92); opacity: 0; }
+          6% { transform: translateY(0) scale(1); opacity: 1; }
+          85% { transform: translateY(0) scale(1); opacity: 1; }
+          100% { transform: translateY(-8px) scale(0.95); opacity: 0; }
+        }
         @keyframes kf-slide-in {
           0% { transform: translateX(40px); opacity: 0; }
           100% { transform: translateX(0); opacity: 1; }
         }
         .animate-score-pop {
           animation: bf-score-pop 5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-score-pop-compact {
+          animation: compact-score-pop 4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .animate-kf-slide {
           animation: kf-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
